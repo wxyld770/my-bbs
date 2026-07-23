@@ -1,0 +1,53 @@
+# ========== 编译后的二进制文件 ==========
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# ========== Go 编译缓存和依赖 ==========
+# 编译生成的可执行文件（如果你习惯把构建产物放在根目录）
+/my-bbs
+
+# Go 模块缓存（一般都在 $GOPATH/pkg/mod，但以防万一项目里有）
+vendor/
+
+# ========== 输出目录 ==========
+/bin
+/build
+/dist
+/tmp
+
+# ========== 测试覆盖率文件 ==========
+*.coverprofile
+coverage.html
+coverage.out
+
+# ========== IDE 和编辑器配置 ==========
+# VS Code（如果团队共享配置，可以删掉 .vscode，但保留 settings.json 看情况）
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ========== 环境变量和敏感信息 ==========
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# ========== 日志文件 ==========
+*.log
+logs/
+
+# ========== Go 工作区文件 (Go 1.18+) ==========
+go.work
+go.work.sum
+
+.obsidian/
