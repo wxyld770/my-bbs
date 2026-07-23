@@ -1,0 +1,20 @@
+internal/config/config.go
+  h_994034d8bcd203 1-37
+internal/database/db.go
+  h_994034d8bcd203 1-30
+.gitignore
+  h_994034d8bcd203 54-55
+cmd/main.go
+  h_994034d8bcd203 4-6,10-14,16-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a85612f96b509feda983694299196e19ea2f09c3",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
