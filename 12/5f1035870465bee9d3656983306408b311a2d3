@@ -1,0 +1,14 @@
+.gitignore
+  h_994034d8bcd203 1-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "125f1035870465bee9d3656983306408b311a2d3",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
