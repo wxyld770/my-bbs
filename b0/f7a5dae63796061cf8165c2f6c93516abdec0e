@@ -1,0 +1,16 @@
+internal/service/user_service.go
+  h_994034d8bcd203 1-67
+internal/service/post_service.go
+  h_994034d8bcd203 1-79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "b0f7a5dae63796061cf8165c2f6c93516abdec0e",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
