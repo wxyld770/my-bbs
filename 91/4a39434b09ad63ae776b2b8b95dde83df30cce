@@ -1,0 +1,18 @@
+internal/repository/user_repo.go
+  h_994034d8bcd203 1-57
+internal/model/user.go
+  h_994034d8bcd203 10
+internal/repository/post_repo.go
+  h_994034d8bcd203 1-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "914a39434b09ad63ae776b2b8b95dde83df30cce",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
