@@ -1,0 +1,18 @@
+pkg/jwt/jwt.go
+  h_994034d8bcd203 1-47
+config/.env.example
+  h_994034d8bcd203 3
+pkg/bcrypt/bcrypt.go
+  h_994034d8bcd203 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "40927bb8dfddee81be710d57ccab7f7e33209130",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
