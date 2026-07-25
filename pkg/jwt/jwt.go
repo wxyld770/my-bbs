@@ -8,7 +8,7 @@ import (
 )
 
 var (
-    secretKey = SECRET_KEY()
+    secretKey = []byte(SECRET_KEY())
     ErrTokenExpired = errors.New("令牌已过期")
     ErrTokenInvalid = errors.New("令牌无效")
 )
@@ -30,7 +30,7 @@ func GenerateToken(userID uint) (string, error) {
         },
     }
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString(SECRET_KEY())
+    return token.SignedString(secretKey)
 }
 
 // ParseToken 解析并验证JWT，返回用户ID

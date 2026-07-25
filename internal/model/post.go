@@ -11,6 +11,7 @@ type Post struct {
     Title   string `gorm:"type:varchar(255);not null" json:"title"`
     Content string `gorm:"type:text;not null" json:"content"`
 	Visible string `gorm:"type:tinyint(4);not null;default:1;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"` // 可见范围
+    User    User   `gorm:"foreignKey:UserID;constraint:false"` // 不创建物理外键
 }
 
 // 实现 TableComment 方法，返回表注释
