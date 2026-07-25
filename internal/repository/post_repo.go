@@ -36,7 +36,8 @@ func (r *PostRepository) FindPostByID(id uint) (*model.Post, error) {
 // FindPostsByUserID 查询某用户的所有帖子（用于个人主页）
 func (r *PostRepository) FindPostsByUserID(userID uint) ([]model.Post, error) {
     var posts []model.Post
-    result := r.db.Where("user_id = ?", userID).
+    result := r.db.Preload("User").
+        Where("user_id = ?", userID).
         Order("created_at DESC").
         Find(&posts)
     if result.Error != nil {

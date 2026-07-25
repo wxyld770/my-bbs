@@ -5,10 +5,13 @@ import (
     "my-bbs/internal/model"
     "gorm.io/driver/mysql"
     "gorm.io/gorm"
+    "gorm.io/gorm/logger"
 )
 
 func InitDB(dsn string) *gorm.DB {
-    db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+    db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+        Logger: logger.Default.LogMode(logger.Info), // 开启日志
+    })
     if err != nil {
         log.Fatalf("连接数据库失败: %v", err)
     }

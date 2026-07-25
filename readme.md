@@ -65,7 +65,7 @@ my-bbs/
 
 bash
 
-git clone https://github.com/yourname/my-bbs.git
+git clone https://github.com/wxyld770/my-bbs.git
 cd my-bbs
 
 ### 2. 安装依赖
@@ -78,7 +78,8 @@ go mod tidy
 
 - 创建 MySQL 数据库（如 `my_bbs`）
     
-- 修改 `internal/config/config.go` 中的数据库连接串（或通过环境变量）
+- 修改 `config/.env.example` 为  `config/.env` 
+- 修改 ` .env ` 中的数据库连接
     
 
 ### 4. 运行服务
@@ -95,19 +96,16 @@ go run cmd/main.go
     
 - `POST /api/login` – 登录
     
-- `GET /api/posts` – 广场（公开）
+- `GET /api/posts/list` – 广场（公开）
     
-- `POST /api/posts` – 发帖（需认证，Header: `Authorization: Bearer <token>`）
+- `POST /api/posts/create` – 发帖（需认证，Header: `Authorization: Bearer <token>`）
     
-- `GET /api/user/posts` – 个人主页（需认证）
+- `POST /api/user/posts` – 个人主页（需认证）
     
-- `PUT /api/posts/:id` – 修改（需认证且为作者）
+- `POST /api/posts/update/:id` – 修改（需认证且为作者）
     
-- `DELETE /api/posts/:id` – 删除（需认证且为作者）
+- `POST /api/posts/del/:id` – 删除（需认证且为作者）
     
-
-> 详细 API 文档建议后续使用 Swagger 或 API 测试脚本补充。
-
 ---
 
 ## 📚 学习收获
@@ -128,10 +126,6 @@ go run cmd/main.go
 ---
 
 ## 📌 后续计划（个人扩展）
-
-- □ 
-    
-    引入 `viper` 实现配置外部化（支持 `.env` / `yaml`）
     
 - □ 
     

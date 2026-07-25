@@ -32,9 +32,9 @@ func (m *Module) Register(r *gin.RouterGroup) {
     auth := r.Group("/")
     auth.Use(middleware.Auth())
     {
-        auth.POST("/posts", m.Handler.CreatePost)
-        auth.PUT("/posts/:id", m.Handler.UpdatePost)
-        auth.DELETE("/posts/:id", m.Handler.DeletePost)
-        auth.GET("/user/posts", m.Handler.GetMyPosts)
+        auth.POST("/posts/create", m.Handler.CreatePost)
+        auth.POST("/posts/update/:id", m.Handler.UpdatePost)
+        auth.POST("/posts/del/:id", m.Handler.DeletePost)
+        auth.POST("/user/posts", m.Handler.GetMyPosts)
     }
 }
