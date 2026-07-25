@@ -1,0 +1,22 @@
+internal/repository/post_repo.go
+  h_994034d8bcd203 39
+internal/modules/post/module.go
+  h_994034d8bcd203 35-38
+readme.md
+  h_994034d8bcd203 68,81-82,99,101,103,105,107
+internal/model/post.go
+  h_994034d8bcd203 14
+internal/database/db.go
+  h_994034d8bcd203 8,13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "992c65ee8ee640878a83b4fd740f48cda6250d52",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
