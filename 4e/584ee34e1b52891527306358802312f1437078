@@ -1,0 +1,20 @@
+internal/model/post.go
+  h_994034d8bcd203 14
+internal/model/user.go
+  h_994034d8bcd203 10
+internal/config/config.go
+  h_994034d8bcd203 19
+pkg/jwt/jwt.go
+  h_994034d8bcd203 11,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "4e584ee34e1b52891527306358802312f1437078",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
