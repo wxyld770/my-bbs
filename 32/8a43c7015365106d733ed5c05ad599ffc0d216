@@ -1,0 +1,32 @@
+internal/middleware/auth.go
+  h_994034d8bcd203 1-96
+internal/handler/post_handler.go
+  h_994034d8bcd203 1-177
+internal/handler/user_handler.go
+  h_994034d8bcd203 1-75
+pkg/jwt/jwt.go
+  h_994034d8bcd203 10-15,29,38-43,45,47-50,52,56-57,60-75
+internal/router/register.go
+  h_994034d8bcd203 1-9
+cmd/main.go
+  h_994034d8bcd203 1,5,7-9,23-40
+internal/modules/user/module.go
+  h_994034d8bcd203 1-28
+internal/modules/post/module.go
+  h_994034d8bcd203 1-40
+开发流程.md
+  h_994034d8bcd203 1-83
+internal/router/router.go
+  h_994034d8bcd203 1-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "328a43c7015365106d733ed5c05ad599ffc0d216",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
