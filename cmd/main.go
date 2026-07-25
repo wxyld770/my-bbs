@@ -1,9 +1,12 @@
-package cmd
+package main
 
 import (
-	"log"
-	"my-bbs/internal/config"
+    "log"
+    "my-bbs/internal/config"
     "my-bbs/internal/database"
+    "my-bbs/internal/modules/post"
+    "my-bbs/internal/modules/user"
+    "my-bbs/internal/router"
 )
 
 func main() {
@@ -13,8 +16,26 @@ func main() {
     // 2. 初始化基础设施
     db := database.InitDB(cfg.DBDSN)
 
-	// 3. 执行迁移（建议加开关）
+	// 3. 执行迁移
     if err := database.AutoMigrate(db); err != nil {
         log.Fatalf("迁移失败: %v", err)
+    }
+
+    // 4. 初始化各模块（每个模块封装了自己的依赖）
+    userMod := user.Initialize(db)
+    postMod := post.Initialize(db)
+
+    // 5. 配置路由
+    deps := router.RouterDeps{
+        Modules: []router.RouteRegister{
+            userMod,
+            postMod,
+        },
+    }
+    r := router.SetupRouter(deps)
+
+    // 5. 启动服务
+    if err := r.Run(":8080"); err != nil {
+        log.Fatalf("启动失败: %v", err)
     }
 }
