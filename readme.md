@@ -12,30 +12,37 @@
 
 ## 技术栈
 
-|技术 / 库|版本|用途|
+|技术 ｜ 库|版本|用途|
 |---|---|---|
-|Go|1.21+|后端主语言|
-|Gin|v1.10.0|Web 框架，路由与中间件|
-|GORM|v1.25.5|ORM，数据库操作|
-|GORM MySQL Driver|v1.5.2|连接 MySQL 数据库|
-|golang-jwt/jwt|v5.2.0|生成与解析 JWT Token|
+|Go|1.26+|后端主语言|
+|Gin|v1.12.0|Web 框架，路由与中间件|
+|GORM|v1.31.2|ORM，数据库操作|
+|GORM MySQL Driver|v1.6.0|连接 MySQL 数据库|
+|golang-jwt/jwt|v5.3.1|生成与解析 JWT Token|
 |[golang.org/x/crypto/bcrypt](https://golang.org/x/crypto/bcrypt)|v0.18.0|用户密码加密|
+
+
 ## 项目结构
 
 ```text
 my-bbs/
 ├── cmd/
 │   └── main.go                # 程序入口
+├── config/
+│   └── .env                   # 配置信息（数据库账号密码、加密密钥等）
 ├── internal/
 │   ├── config/                # 配置加载（数据库连接、JWT密钥等）
+│   ├── database/              # 初始化数据连接、数据迁移等
 │   ├── model/                 # 数据模型（User、Post）
 │   ├── repository/            # 数据访问层（CRUD）
 │   ├── service/               # 业务逻辑层（注册、发帖等）
 │   ├── handler/               # HTTP 处理器（解析请求、返回响应）
 │   ├── middleware/            # 中间件（JWT 认证）
 │   └── router/                # 路由注册
+│   └── modules/               # 模块依赖注入和router注册
 ├── pkg/                       # 可复用工具（JWT、密码加密）
 ├── go.mod
+├── go.sum
 └── README.md
 ```
 
@@ -56,7 +63,6 @@ my-bbs/
 - ✅ 删除帖子（验证当前用户是否为作者）
 
 > 注：当前为学习阶段实现，未来可扩展评论、点赞、关注等功能。
-
 ---
 
 ## 🚀 快速开始
@@ -77,10 +83,9 @@ go mod tidy
 ### 3. 配置数据库
 
 - 创建 MySQL 数据库（如 `my_bbs`）
-    
 - 修改 `config/.env.example` 为  `config/.env` 
 - 修改 ` .env ` 中的数据库连接
-    
+
 
 ### 4. 运行服务
 
