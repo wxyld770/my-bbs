@@ -1,0 +1,42 @@
+internal/handler/post_handler.go
+  s_a5a11e4636fe16::t_24fac6d5ee4cee 177-216
+internal/repository/user_repo.go
+  s_a5a11e4636fe16::t_dd61ec77b2f675 53,57-62,64-66
+  h_994034d8bcd203 63
+internal/repository/post_repo.go
+  s_a5a11e4636fe16::t_6d825499ceada5 49,52-53
+  s_a5a11e4636fe16::t_fe0b0c3e64f389 68-71
+internal/modules/post/module.go
+  s_a5a11e4636fe16::t_1583ef65924aeb 38
+internal/modules/user/module.go
+  s_a5a11e4636fe16::t_f29b8797940c02 5
+  s_a5a11e4636fe16::t_8f2cb67d196de1 29-34
+internal/service/post_service.go
+  s_a5a11e4636fe16::t_a3dc775b11a8db 79-96
+internal/handler/user_handler.go
+  s_a5a11e4636fe16::t_64f8f66e11c12b 76-102
+  s_a5a11e4636fe16::t_7d90959990777d 5
+internal/service/user_service.go
+  s_a5a11e4636fe16::t_752ef4225945d3 67-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3f77c6e847accaaa414a82813b92428d4307d4f8",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
