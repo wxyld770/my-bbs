@@ -34,8 +34,10 @@ func main() {
     }
     r := router.SetupRouter(deps)
 
-    // 5. 启动服务
-    if err := r.Run(":8080"); err != nil {
+    // 6. 启动服务
+    addr := ":" + cfg.AppPort
+    log.Printf("服务启动于 %s", addr)
+    if err := r.Run(addr); err != nil {
         log.Fatalf("启动失败: %v", err)
     }
 }
