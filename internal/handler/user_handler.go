@@ -60,7 +60,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 
     token, err := h.userService.Login(req.Username, req.Password)
     if err != nil {
-        if err.Error() == "用户不存在" || err.Error() == "密码错误" {
+        if err.Error() == "用户名或密码错误" {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
         }

@@ -78,7 +78,7 @@ func OptionalAuth() gin.HandlerFunc {
 
         userID, err := jwt.ParseToken(parts[1])
         if err == nil {
-            c.Set("userID", userID)
+            c.Set("userId", userID)
         }
         // 解析失败也继续，不阻断请求
         c.Next()

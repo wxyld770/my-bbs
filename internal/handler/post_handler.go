@@ -56,11 +56,11 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 
     post, err := h.postService.GetPostByID(uint(id))
     if err != nil {
-        if err.Error() == "帖子不存在" {
-            c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-            return
-        }
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    if post == nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "帖子不存在"})
         return
     }
 
