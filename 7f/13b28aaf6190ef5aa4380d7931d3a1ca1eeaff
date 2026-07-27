@@ -1,0 +1,28 @@
+internal/handler/user_handler.go
+  s_a5a11e4636fe16::t_c73ab279c4efdc 63
+internal/handler/post_handler.go
+  s_a5a11e4636fe16::t_372c51b8787aad 62-63
+internal/middleware/auth.go
+  s_a5a11e4636fe16::t_2cf6dec0acaba5 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "7f13b28aaf6190ef5aa4380d7931d3a1ca1eeaff",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
