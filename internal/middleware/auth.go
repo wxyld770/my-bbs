@@ -1,10 +1,12 @@
 package middleware
 
 import (
-    "net/http"
-    "strings"
-    "my-bbs/pkg/jwt"
-    "github.com/gin-gonic/gin"
+	"my-bbs/internal/logger"
+	"my-bbs/pkg/jwt"
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 // Auth 中间件：验证 JWT Token，将用户 ID 注入上下文
@@ -51,7 +53,7 @@ func Auth() gin.HandlerFunc {
             })
             return
         }
-
+        logger.Info("get userID: %d from Authorization", userID)
         // 4. 将用户 ID 注入 Context，供后续 Handler 使用
         c.Set("userID", userID)
         

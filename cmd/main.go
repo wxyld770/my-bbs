@@ -3,17 +3,18 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
+
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
 	"my-bbs/internal/logger"
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/router"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,7 +27,7 @@ func main() {
 
 	// 2. 初始化日志（写入当前目录下的日志文件夹）
 	if err := logger.Init(cfg.LogDir); err != nil {
-		log.Fatalf("日志初始化失败: %v", err)
+		logger.Fatal("日志初始化失败: %v", err)
 	}
 	defer logger.Close()
 
@@ -37,7 +38,7 @@ func main() {
 
 	// 4. 执行迁移
 	if err := database.AutoMigrate(db); err != nil {
-		log.Fatalf("迁移失败: %v", err)
+		logger.Fatal("迁移失败: %v", err)
 	}
 
 	// 5. 初始化各模块（每个模块封装了自己的依赖）
@@ -68,7 +69,7 @@ func main() {
 	go func() {
 		logger.Info("服务启动于 %s", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("启动失败: %v", err)
+			logger.Fatal("启动失败: %v", err)
 		}
 	}()
 

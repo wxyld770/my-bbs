@@ -6,16 +6,20 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
+
 	"github.com/gin-gonic/gin"
 )
 
 const defaultQueueSize = 1024
 
 var (
-	logFile *os.File
-	writer  *asyncWriter
+	logFile     *os.File
+	writer      *asyncWriter
+	projectRoot string
 )
 
 // asyncWriter 基于 channel 的异步日志写入器（生产者-消费者模型）
@@ -105,6 +109,11 @@ func Init(dir string) error {
 	mw := io.MultiWriter(os.Stdout, f)
 	writer = newAsyncWriter(mw, defaultQueueSize)
 
+	if wd, err := os.Getwd(); err == nil {
+		projectRoot = wd
+	}
+
+	// 不开启 Llongfile：由我们自己用 runtime.Caller 打印真实业务调用位置
 	log.SetOutput(writer)
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
@@ -112,21 +121,54 @@ func Init(dir string) error {
 	gin.DefaultWriter = writer
 	gin.DefaultErrorWriter = writer
 
-	log.Printf("日志初始化完成（异步 channel），输出目录: %s, queue=%d", dir, defaultQueueSize)
+	Info("日志初始化完成（异步 channel），输出目录: %s, queue=%d", dir, defaultQueueSize)
 	return nil
 }
 
-// Info / Warn / Error 封装，方便业务侧调用（底层仍走异步 channel）
+// Info / Warn / Error / Fatal 封装，自动附带调用方文件路径和行号
 func Info(format string, v ...any) {
-	log.Printf("[INFO] "+format, v...)
+	output(2, "INFO", format, v...)
 }
 
 func Warn(format string, v ...any) {
-	log.Printf("[WARN] "+format, v...)
+	output(2, "WARN", format, v...)
 }
 
 func Error(format string, v ...any) {
-	log.Printf("[ERROR] "+format, v...)
+	output(2, "ERROR", format, v...)
+}
+
+// Fatal 打印致命错误后刷盘退出进程
+func Fatal(format string, v ...any) {
+	output(2, "FATAL", format, v...)
+	Close()
+	os.Exit(1)
+}
+
+// output skip=2 表示跳过 output 自身和 Info/Warn/Error/Fatal，定位到业务调用行
+func output(skip int, level, format string, v ...any) {
+	_, file, line, ok := runtime.Caller(skip)
+	if !ok {
+		file, line = "???", 0
+	} else {
+		file = shortPath(file)
+	}
+	msg := fmt.Sprintf(format, v...)
+	log.Printf("%s:%d [%s] %s", file, line, level, msg)
+}
+
+// shortPath 尽量转成相对项目根目录的路径，方便阅读
+func shortPath(file string) string {
+	if projectRoot != "" {
+		if rel, err := filepath.Rel(projectRoot, file); err == nil && !strings.HasPrefix(rel, "..") {
+			return rel
+		}
+	}
+	// 退化：截取模块名之后的路径
+	if idx := strings.LastIndex(file, "/my-bbs/"); idx >= 0 {
+		return file[idx+1:]
+	}
+	return filepath.Base(file)
 }
 
 // Close 关闭异步日志：排空 channel 后关闭文件（进程退出前必须调用）
@@ -136,5 +178,6 @@ func Close() {
 	}
 	if logFile != nil {
 		_ = logFile.Close()
+		logFile = nil
 	}
 }
