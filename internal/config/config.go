@@ -7,11 +7,13 @@ import (
 )
 
 type Config struct {
-    DBDSN      string
-    RedisAddr  string
-    RedisPass  string
-    JWTSecret  string
-    AppPort    string
+    DBDSN     string
+    RedisAddr string
+    RedisPass string
+    JWTSecret string
+    AppPort   string
+    AppMode   string
+    LogDir    string
 }
 
 func Load() *Config {
@@ -26,6 +28,8 @@ func Load() *Config {
         RedisPass: getEnv("REDIS_PASS", ""),
         JWTSecret: getEnv("JWT_SECRET", "default-secret-key"),
         AppPort:   getEnv("APP_PORT", "8080"),
+        AppMode:   getEnv("APP_MODE", "debug"),
+        LogDir:    getEnv("LOG_DIR", "logs"),
     }
 }
 
