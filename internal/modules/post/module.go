@@ -35,6 +35,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
         auth.POST("/posts/create", m.Handler.CreatePost)
         auth.POST("/posts/update/:id", m.Handler.UpdatePost)
         auth.POST("/posts/del/:id", m.Handler.DeletePost)
+        auth.POST("/posts/visible/:id", m.Handler.SetVisible)
         auth.POST("/user/posts", m.Handler.GetMyPosts)
     }
 }

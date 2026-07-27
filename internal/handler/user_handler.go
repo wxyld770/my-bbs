@@ -2,6 +2,7 @@ package handler
 
 import (
     "net/http"
+    "my-bbs/internal/middleware"
     "my-bbs/internal/service"
     "github.com/gin-gonic/gin"
 )
@@ -72,4 +73,31 @@ func (h *UserHandler) Login(c *gin.Context) {
         "token":   token,
         "message": "登录成功",
     })
+}
+
+type UpdateProfileRequest struct {
+    Nickname     string `json:"nickname" binding:"max=64"`
+    Introduction string `json:"introduction" binding:"max=1024"`
+}
+
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+    userID, ok := middleware.GetUserID(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+        return
+    }
+
+    var req UpdateProfileRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+        return
+    }
+
+    err := h.userService.UpdateProfile(userID, req.Nickname, req.Introduction)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "资料更新成功"})
 }

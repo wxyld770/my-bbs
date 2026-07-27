@@ -65,3 +65,15 @@ func (s *UserService) Login(username, password string) (string, error) {
     }
     return token, nil
 }
+
+// UpdateProfile 更新当前用户的昵称和介绍
+func (s *UserService) UpdateProfile(userID uint, nickname, introduction string) error {
+    user, err := s.userRepo.FindUserByID(userID)
+    if err != nil {
+        return err
+    }
+    if user == nil {
+        return errors.New("用户不存在")
+    }
+    return s.userRepo.UpdateProfile(userID, nickname, introduction)
+}

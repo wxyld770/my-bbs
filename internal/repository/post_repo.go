@@ -46,10 +46,11 @@ func (r *PostRepository) FindPostsByUserID(userID uint) ([]model.Post, error) {
     return posts, nil
 }
 
-// FindAllPosts 查询所有帖子（用于广场），按创建时间倒序
+// FindAllPosts 查询所有帖子（用于广场），只返回公开帖子，按创建时间倒序
 func (r *PostRepository) FindAllPosts() ([]model.Post, error) {
     var posts []model.Post
-    result := r.db.Preload("User"). // 关联用户信息
+    result := r.db.Preload("User").
+        Where("visible = ?", 1).
         Order("created_at DESC").
         Find(&posts)
     if result.Error != nil {
@@ -60,8 +61,14 @@ func (r *PostRepository) FindAllPosts() ([]model.Post, error) {
 
 // UpdatePost 更新帖子
 func (r *PostRepository) UpdatePost(post *model.Post) error {
-    // 使用 Save 会更新所有字段（包括零值），如果只想更新部分字段，可用 Updates
     result := r.db.Updates(post)
+    return result.Error
+}
+
+// UpdatePostVisible 更新帖子可见性
+func (r *PostRepository) UpdatePostVisible(id uint, visible string) error {
+    result := r.db.Model(&model.Post{}).Where("id = ?", id).
+        Update("visible", visible)
     return result.Error
 }
 

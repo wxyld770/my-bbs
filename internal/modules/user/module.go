@@ -2,6 +2,7 @@ package user
 
 import (
     "my-bbs/internal/handler"
+    "my-bbs/internal/middleware"
     "my-bbs/internal/repository"
     "my-bbs/internal/service"
     "github.com/gin-gonic/gin"
@@ -25,4 +26,10 @@ func Initialize(db *gorm.DB) *Module {
 func (m *Module) Register(r *gin.RouterGroup) {
     r.POST("/register", m.Handler.Register)
     r.POST("/login", m.Handler.Login)
+
+    auth := r.Group("/")
+    auth.Use(middleware.Auth())
+    {
+        auth.POST("/user/profile", m.Handler.UpdateProfile)
+    }
 }

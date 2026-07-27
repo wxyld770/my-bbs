@@ -77,3 +77,21 @@ func (s *PostService) DeletePost(postID uint, userID uint) error {
 
     return s.postRepo.DeletePost(postID)
 }
+
+// SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
+func (s *PostService) SetPostVisible(postID uint, userID uint, visible string) error {
+    if visible != "0" && visible != "1" {
+        return errors.New("可见性参数无效，仅支持 0（仅自己）或 1（所有人）")
+    }
+    post, err := s.postRepo.FindPostByID(postID)
+    if err != nil {
+        return err
+    }
+    if post == nil {
+        return errors.New("帖子不存在")
+    }
+    if post.UserID != userID {
+        return errors.New("无权限修改此帖子")
+    }
+    return s.postRepo.UpdatePostVisible(postID, visible)
+}

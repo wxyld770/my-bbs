@@ -175,3 +175,43 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
         "message": "删除成功",
     })
 }
+
+type SetVisibleRequest struct {
+    Visible string `json:"visible" binding:"required,oneof=0 1"`
+}
+
+func (h *PostHandler) SetVisible(c *gin.Context) {
+    id, err := strconv.Atoi(c.Param("id"))
+    if err != nil || id <= 0 {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "无效的帖子ID"})
+        return
+    }
+
+    userID, ok := middleware.GetUserID(c)
+    if !ok {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+        return
+    }
+
+    var req SetVisibleRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
+        return
+    }
+
+    err = h.postService.SetPostVisible(uint(id), userID, req.Visible)
+    if err != nil {
+        if err.Error() == "帖子不存在" {
+            c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+            return
+        }
+        if err.Error() == "无权限修改此帖子" {
+            c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+            return
+        }
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "可见性设置成功"})
+}

@@ -50,8 +50,19 @@ func (r *UserRepository) FindUserByID(id uint) (*model.User, error) {
     return &user, nil
 }
 
-// UpdatePost 更新用户信息
+// UpdateUser 更新用户信息
 func (r *UserRepository) UpdateUser(user *model.User) error {
     result := r.db.Updates(user)
+    return result.Error
+}
+
+// UpdateProfile 更新用户昵称和介绍（允许设为空字符串）
+func (r *UserRepository) UpdateProfile(id uint, nickname, introduction string) error {
+    result := r.db.Model(&model.User{}).Where("id = ?", id).
+        Select("nickname", "introduction").
+        Updates(map[string]any{
+            "nickname":     nickname,
+            "introduction": introduction,
+        })
     return result.Error
 }
