@@ -1,0 +1,26 @@
+cmd/main.go
+  s_a5a11e4636fe16::t_aabb11cce20720 37-40
+config/.env.example
+  s_a5a11e4636fe16::t_21454ce435dec1 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "de48b2e57a0f39e9916fabc8951081d2cc848c1d",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
