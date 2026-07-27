@@ -1,0 +1,38 @@
+internal/logger/logger.go
+  s_a5a11e4636fe16::t_dbf07aa24681c7 112-116,128,130,134,138,143,146-171
+  s_a5a11e4636fe16::t_869de061bf14e3 20-22
+  s_a5a11e4636fe16::t_d6144d3c0c733d 9-10,13
+  s_a5a11e4636fe16::t_291812a03a7ec7 141-142,144-145,181
+  s_a5a11e4636fe16::t_386a8220eaf5e1 124
+internal/config/config.go
+  s_a5a11e4636fe16::t_c31de4b973ab58 4-8,12-18,22-25,27-35,39-43
+internal/middleware/auth.go
+  h_994034d8bcd203 4-5,8,56
+开发流程.md
+  h_994034d8bcd203 88-90
+internal/database/db.go
+  s_a5a11e4636fe16::t_b1e537f843f408 4-12,16-36,39,41-48,53-61
+cmd/main.go
+  s_a5a11e4636fe16::t_cc68e87dcd88b6 10,17,30,41,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e73b0165b7aad064ac7e1101f8469f4ae9a9f0ea",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
