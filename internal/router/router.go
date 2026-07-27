@@ -1,6 +1,7 @@
 package router
 
 import (
+    "my-bbs/internal/middleware"
     "github.com/gin-gonic/gin"
 )
 
@@ -11,7 +12,8 @@ type RouterDeps struct {
 
 // SetupRouter 配置路由
 func SetupRouter(deps RouterDeps) *gin.Engine {
-    r := gin.Default()
+    r := gin.New()
+    r.Use(middleware.RequestLogger(), middleware.Recovery())
 
     api := r.Group("/api")
 
