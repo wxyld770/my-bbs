@@ -1,0 +1,31 @@
+internal/middleware/logger.go
+  s_a5a11e4636fe16::t_5efe14ff608a40 1-10,12-15,17-34,36-64,69-72,74-85
+  s_a5a11e4636fe16::t_a904be1b07d54b 11,16,35,65,73
+  s_a5a11e4636fe16::t_9f89e9c205c452 66-68
+internal/router/router.go
+  s_a5a11e4636fe16::t_2a95254e1ee8a3 4,15-16
+internal/logger/logger.go
+  s_a5a11e4636fe16::t_083501233393c7 9,15,17-89,107-109,112-114,116,120-133,135-137
+  s_a5a11e4636fe16::t_c9e6eb44856faa 1-8,10-14,16,90-106,110-111,115,117-119,134,138-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3902824c30e7193395360c7fa21dd785da76ac40",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
