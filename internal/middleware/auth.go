@@ -37,7 +37,7 @@ func Auth() gin.HandlerFunc {
         }
 
         // 3. 解析 Token
-        userId, err := jwt.ParseToken(tokenString)
+        userID, err := jwt.ParseToken(tokenString)
         if err != nil {
             // 根据错误类型给出更具体的提示
             if err == jwt.ErrTokenExpired {
@@ -53,7 +53,7 @@ func Auth() gin.HandlerFunc {
         }
 
         // 4. 将用户 ID 注入 Context，供后续 Handler 使用
-        c.Set("userId", userId)
+        c.Set("userID", userID)
         
         // 5. 继续处理请求
         c.Next()
@@ -78,7 +78,7 @@ func OptionalAuth() gin.HandlerFunc {
 
         userID, err := jwt.ParseToken(parts[1])
         if err == nil {
-            c.Set("userId", userID)
+            c.Set("userID", userID)
         }
         // 解析失败也继续，不阻断请求
         c.Next()
@@ -87,10 +87,10 @@ func OptionalAuth() gin.HandlerFunc {
 
 // GetUserID 从上下文中获取用户 ID（辅助函数，方便 Handler 使用）
 func GetUserID(c *gin.Context) (uint, bool) {
-    val, exists := c.Get("userId")
+    val, exists := c.Get("userID")
     if !exists {
         return 0, false
     }
-    userId, ok := val.(uint)
-    return userId, ok
+    userID, ok := val.(uint)
+    return userID, ok
 }
