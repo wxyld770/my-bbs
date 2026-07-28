@@ -27,6 +27,8 @@ func InitDB(dsn string) *gorm.DB {
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: gormLog,
+		// 只保留逻辑关联（Preload），迁移时不创建物理外键
+		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
 		logger.Fatal("连接数据库失败: %v", err)

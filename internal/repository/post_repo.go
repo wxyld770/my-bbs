@@ -38,7 +38,7 @@ func (r *PostRepository) FindPostsByUserID(userID uint) ([]model.Post, error) {
     var posts []model.Post
     result := r.db.Preload("User").
         Where("user_id = ?", userID).
-        Order("created_at DESC").
+        Order("create_time DESC").
         Find(&posts)
     if result.Error != nil {
         return nil, result.Error
@@ -51,7 +51,7 @@ func (r *PostRepository) FindAllPosts() ([]model.Post, error) {
     var posts []model.Post
     result := r.db.Preload("User").
         Where("visible = ?", 1).
-        Order("created_at DESC").
+        Order("create_time DESC").
         Find(&posts)
     if result.Error != nil {
         return nil, result.Error
@@ -72,7 +72,7 @@ func (r *PostRepository) UpdatePostVisible(id uint, visible string) error {
     return result.Error
 }
 
-// DeletePost 根据 ID 删除帖子（物理删除，若模型含 DeletedAt 则为软删除）
+// DeletePost 根据 ID 删除帖子（软删除，写入 deleted 字段）
 func (r *PostRepository) DeletePost(id uint) error {
     result := r.db.Delete(&model.Post{}, id)
     if result.Error != nil {
