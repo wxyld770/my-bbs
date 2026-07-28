@@ -1,0 +1,42 @@
+internal/repository/post_repo.go
+  s_a5a11e4636fe16::t_c5fca2be77df78 69
+internal/model/user.go
+  s_a5a11e4636fe16::t_5c4ab86a89d31f 6
+readme.md
+  s_a5a11e4636fe16::t_4786171fd9e77d 127
+  s_a5a11e4636fe16::t_e7ff177fe20738 61
+  s_a5a11e4636fe16::t_8bc1420df6c7fe 3-4,8-11,15-22,28-29,31-43,46-47,50,52-56,58-60,62-63,65-68,71,73,75-77,79-83,85,87,89,91,93,95-97,99,101-107,109,111-113,115-126,128-149,151-152
+  h_994034d8bcd203 44-45,69
+internal/service/post_service.go
+  s_a5a11e4636fe16::t_f7ac9447bca2d9 28,34
+  s_a5a11e4636fe16::t_f5421c04ab954e 86
+  s_a5a11e4636fe16::t_5da908497e5584 17,23,85
+internal/model/post.go
+  s_a5a11e4636fe16::t_256c604163fd7a 9-23
+  s_a5a11e4636fe16::t_1bb4eeaf771e2e 3-8,30
+internal/handler/post_handler.go
+  s_a5a11e4636fe16::t_e557fcb3f9f484 144,166
+internal/modules/post/module.go
+  s_a5a11e4636fe16::t_c349c596228045 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "42cb9d50675506935eee58c52fe04152c1919675",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
