@@ -14,23 +14,24 @@ func NewPostService(postRepo *repository.PostRepository) *PostService {
 	return &PostService{postRepo: postRepo}
 }
 
-// CreatePost 创建帖子
+// CreatePost 创建帖子（默认公开）
 func (s *PostService) CreatePost(userID uint, title, content string) error {
 	post := &model.Post{
 		UserID:  userID,
 		Title:   title,
 		Content: content,
+		Visible: model.VisiblePublic,
 	}
 	return s.postRepo.CreatePost(post)
 }
 
-// GetPostByID 根据 ID 获取帖子（含作者信息）
+// GetPostByID 根据 ID 获取公开帖子；私密帖不可通过此接口访问
 func (s *PostService) GetPostByID(id uint) (*model.Post, error) {
 	post, err := s.postRepo.FindPostByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if post == nil {
+	if post == nil || post.IsPrivate() {
 		return nil, bizerr.ErrPostNotFound
 	}
 	return post, nil
@@ -81,8 +82,8 @@ func (s *PostService) DeletePost(postID uint, userID uint) error {
 }
 
 // SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
-func (s *PostService) SetPostVisible(postID uint, userID uint, visible string) error {
-	if visible != "0" && visible != "1" {
+func (s *PostService) SetPostVisible(postID uint, userID uint, visible uint8) error {
+	if !model.IsValidVisible(visible) {
 		return bizerr.ErrInvalidVisible
 	}
 	post, err := s.postRepo.FindPostByID(postID)

@@ -141,7 +141,7 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 }
 
 type SetVisibleRequest struct {
-	Visible string `json:"visible" binding:"required,oneof=0 1"`
+	Visible *uint8 `json:"visible" binding:"required,oneof=0 1"`
 }
 
 func (h *PostHandler) SetVisible(c *gin.Context) {
@@ -163,7 +163,7 @@ func (h *PostHandler) SetVisible(c *gin.Context) {
 		return
 	}
 
-	if err := h.postService.SetPostVisible(uint(id), userID, req.Visible); err != nil {
+	if err := h.postService.SetPostVisible(uint(id), userID, *req.Visible); err != nil {
 		response.Fail(c, err)
 		return
 	}

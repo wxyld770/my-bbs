@@ -1,12 +1,33 @@
 package model
 
+// 帖子可见性
+const (
+	VisiblePrivate uint8 = 0 // 仅自己可见
+	VisiblePublic  uint8 = 1 // 所有人可见
+)
+
+// IsValidVisible 校验可见性取值是否合法；新增类型时只改这里
+func IsValidVisible(visible uint8) bool {
+	switch visible {
+		case VisiblePrivate, VisiblePublic:
+			return true
+		default:
+			return false
+	}
+}
+
+// IsPrivate 是否仅自己可见
+func (p *Post) IsPrivate() bool {
+	return p.Visible == VisiblePrivate
+}
+
 // Post 帖子模型
 type Post struct {
 	BaseModel
 	UserID  uint   `gorm:"index;not null" json:"user_id"`
 	Title   string `gorm:"type:varchar(255);not null" json:"title"`
 	Content string `gorm:"type:text;not null" json:"content"`
-	Visible string `gorm:"type:tinyint(4);not null;default:1;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
+	Visible uint8  `gorm:"type:tinyint(4);not null;default:1;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
 	User    *User  `gorm:"foreignKey:UserID" json:"user"` // 逻辑关联，用于 Preload；物理外键已在 Config 中禁用
 }
 

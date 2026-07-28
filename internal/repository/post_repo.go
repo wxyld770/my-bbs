@@ -66,7 +66,7 @@ func (r *PostRepository) UpdatePost(post *model.Post) error {
 }
 
 // UpdatePostVisible 更新帖子可见性
-func (r *PostRepository) UpdatePostVisible(id uint, visible string) error {
+func (r *PostRepository) UpdatePostVisible(id uint, visible uint8) error {
     result := r.db.Model(&model.Post{}).Where("id = ?", id).
         Update("visible", visible)
     return result.Error

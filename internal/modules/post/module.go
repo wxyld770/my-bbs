@@ -24,7 +24,7 @@ func Initialize(db *gorm.DB) *Module {
 
 // Register 实现 router.RouteRegister 接口
 func (m *Module) Register(r *gin.RouterGroup) {
-    // 公开路由
+    // 公开路由（详情仅返回公开帖）
     r.GET("/posts", m.Handler.GetAllPosts)
     r.GET("/posts/:id", m.Handler.GetPost)
 

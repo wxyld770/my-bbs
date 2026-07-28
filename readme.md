@@ -1,158 +1,152 @@
 ## 项目介绍
-一个基于 Go 语言、Gin 框架和 GORM 构建的轻量级 BBS（论坛/广场）项目。
- - 学习 Go 语法、Gin 基础、GORM 之后，用来检验学习成果的实战练习。 
+
+一个基于 Go 语言、Gin 框架和 GORM 构建的轻量级 BBS（论坛/广场）项目。  
+学习 Go 语法、Gin 基础、GORM 之后，用来检验学习成果的实战练习。
 
 ## 项目目标
 
-这是我在完成 Go 语言基础学习（包括标准库、并发模型、结构体与接口）后，进一步学习 Gin 和 GORM 时产生的练手项目。主要目标：
-- 将所学的 Go 语法、Gin 路由与中间件、GORM 数据库操作串联起来
-- 实现一个具备完整用户体系和帖子管理功能的简易 BBS
-- 熟悉分层架构（Handler → Service → Repository）在实际项目中的运用
-- 掌握 JWT 认证、密码加密、RESTful API 设计等常见业务场景
+- 将 Go 语法、Gin 路由与中间件、GORM 数据库操作串联起来
+- 实现具备用户体系和帖子管理的简易 BBS
+- 熟悉分层架构（Handler → Service → Repository）与模块化组装
+- 掌握 JWT 认证、密码加密、统一响应、业务异常等常见能力
 
 ## 技术栈
 
-|技术 ｜ 库|版本|用途|
-|---|---|---|
-|Go|1.26+|后端主语言|
-|Gin|v1.12.0|Web 框架，路由与中间件|
-|GORM|v1.31.2|ORM，数据库操作|
-|GORM MySQL Driver|v1.6.0|连接 MySQL 数据库|
-|golang-jwt/jwt|v5.3.1|生成与解析 JWT Token|
-|[golang.org/x/crypto/bcrypt](https://golang.org/x/crypto/bcrypt)|v0.18.0|用户密码加密|
-
+| 技术 | 用途 |
+|---|---|
+| Go 1.26+ | 后端主语言 |
+| Gin | Web 框架，路由与中间件 |
+| GORM + MySQL | ORM 与数据持久化 |
+| JWT | 无状态登录认证 |
+| bcrypt | 密码哈希 |
+| 标准库 log + channel | 异步日志落盘 |
 
 ## 项目结构
 
 ```text
 my-bbs/
-├── cmd/
-│   └── main.go                # 程序入口
-├── config/
-│   └── .env                   # 配置信息（数据库账号密码、加密密钥等）
+├── cmd/main.go                 # 入口：配置、日志、DB、优雅启停
+├── config/.env                 # 本地配置（不入库）
 ├── internal/
-│   ├── config/                # 配置加载（数据库连接、JWT密钥等）
-│   ├── database/              # 初始化数据连接、数据迁移等
-│   ├── model/                 # 数据模型（User、Post）
-│   ├── repository/            # 数据访问层（CRUD）
-│   ├── service/               # 业务逻辑层（注册、发帖等）
-│   ├── handler/               # HTTP 处理器（解析请求、返回响应）
-│   ├── middleware/            # 中间件（JWT 认证）
-│   └── router/                # 路由注册
-│   └── modules/               # 模块依赖注入和router注册
-├── pkg/                       # 可复用工具（JWT、密码加密）
-├── go.mod
-├── go.sum
-└── README.md
+│   ├── config/                 # 配置加载
+│   ├── database/               # DB 初始化与迁移
+│   ├── logger/                 # 异步日志
+│   ├── model/                  # User / Post / BaseModel
+│   ├── repository/             # 数据访问
+│   ├── service/                # 业务逻辑
+│   ├── handler/                # HTTP 处理
+│   ├── middleware/             # Auth / 日志 / Recovery / ErrorHandler
+│   ├── modules/                # 模块 DI + 路由注册
+│   └── router/                 # 路由组装
+├── pkg/
+│   ├── bizerr/                 # 业务异常
+│   ├── response/               # 统一响应
+│   ├── jwt/                    # jwt加解密
+│   └── bcrypt/                 # 密码加解密
+├── logs/                       # 日志目录（gitignore）
+└── readme.md
 ```
 
-> 分层设计参考了 Go 社区常见的项目布局，有利于代码维护和测试。
+## 核心功能
 
-## ✨ 核心功能（规划 / 已实现）
+### 用户
+- ✅ 注册（用户名唯一索引，密码 bcrypt）
+- ✅ 登录（返回 JWT）
+- ✅ 修改昵称 / 个人介绍
+- ✅ 退出（客户端丢弃 Token）
 
-### 用户模块
-- ✅ 用户注册（用户名唯一，密码 bcrypt 加密）
-- ✅ 用户登录（验证密码，返回 JWT Token）
-- ✅ 用户退出（客户端移除 Token，服务端无状态）
-### 帖子模块
-- ✅ 发布帖子（需登录）
-- ✅ 查看所有帖子（广场）
-- ✅ 查看单篇帖子（可公开访问）
-- ✅ 查看个人所有帖子（个人主页）
-- ✅ 修改帖子（验证当前用户是否为作者）
-- ✅ 删除帖子（验证当前用户是否为作者）
+### 帖子
+- ✅ 发布、修改、删除（作者校验）
+- ✅ 广场列表（仅 `visible=1`）
+- ✅ 详情（仅公开帖；私密帖请走个人主页）
+- ✅ 个人主页帖子列表
+- ✅ 设置可见性（0 仅自己 / 1 所有人）
 
-> 注：当前为学习阶段实现，未来可扩展评论、点赞、关注等功能。
----
+### 工程能力
+- ✅ 统一响应 `{code,message,data}` + `bizerr`
+- ✅ 异步日志（控制台 + `logs/日期.log`）
+- ✅ 优雅启停（SIGINT/SIGTERM）
+- ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
 
-## 🚀 快速开始
+## 统一响应示例
 
-### 1. 克隆项目
+成功：
 
-bash
+```json
+{ "code": 0, "message": "ok", "data": { "token": "..." } }
+```
 
-git clone https://github.com/wxyld770/my-bbs.git
-cd my-bbs
+失败：
 
-### 2. 安装依赖
+```json
+{ "code": 40105, "message": "用户名或密码错误" }
+```
 
-bash
+## 快速开始
 
+### 1. 安装依赖
+
+```bash
 go mod tidy
+```
 
-### 3. 配置数据库
+### 2. 配置
 
-- 创建 MySQL 数据库（如 `my_bbs`）
-- 修改 `config/.env.example` 为  `config/.env` 
-- 修改 ` .env ` 中的数据库连接
+```bash
+cp config/.env.example config/.env
+```
 
+编辑 `config/.env`：
 
-### 4. 运行服务
+```bash
+DB_DSN="root:密码@tcp(127.0.0.1:3306)/库名?charset=utf8mb4&parseTime=True"
+APP_MODE="debug"
+APP_PORT="8080"
+LOG_DIR="logs"
+JWT_SECRET="换成你的密钥"
+```
 
-bash
+> 若表仍是旧字段（`created_at` 等），开发环境可删表后重启，让 AutoMigrate 重建；或手动改列名。
 
+### 3. 运行
+
+```bash
 go run cmd/main.go
+```
 
-服务默认运行在 `http://localhost:8080`。
+服务监听 `http://localhost:{APP_PORT}`。`Ctrl+C` 触发优雅关闭。
 
-### 5. 接口测试（使用 Postman 或 curl）
+## 接口一览
 
-- `POST /api/register` – 注册
-    
-- `POST /api/login` – 登录
-    
-- `GET /api/posts/list` – 广场（公开）
-    
-- `POST /api/posts/create` – 发帖（需认证，Header: `Authorization: Bearer <token>`）
-    
-- `POST /api/user/posts` – 个人主页（需认证）
-    
-- `POST /api/posts/update/:id` – 修改（需认证且为作者）
-    
-- `POST /api/posts/del/:id` – 删除（需认证且为作者）
-    
----
+| 方法 | 路径 | 认证 | 说明 |
+|---|---|---|---|
+| POST | `/api/register` | 否 | 注册 |
+| POST | `/api/login` | 否 | 登录，返回 token |
+| POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
+| GET | `/api/posts` | 否 | 广场（公开帖） |
+| GET | `/api/posts/:id` | 否 | 详情（仅公开帖；私密帖 404） |
+| POST | `/api/posts/create` | 是 | 发帖 |
+| POST | `/api/posts/update/:id` | 是 | 修改（作者） |
+| POST | `/api/posts/del/:id` | 是 | 删除（作者） |
+| POST | `/api/posts/visible/:id` | 是 | 设置可见性 |
+| POST | `/api/user/posts` | 是 | 我的帖子 |
 
-## 📚 学习收获
+认证 Header：`Authorization: Bearer <token>`
 
-通过这个项目，我加深了对以下知识的理解：
+设置可见性 body：
 
-- **Go 语法进阶**：结构体方法、接口、错误处理、包管理
-    
-- **Gin 框架**：路由分组、中间件、参数绑定、响应渲染
-    
-- **GORM**：模型定义、自动迁移、关联查询（后续可扩展）
-    
-- **项目组织**：分层架构、依赖注入思想、配置管理
-    
-- **实战技巧**：JWT 无状态认证、密码加密、RESTful API 设计
-    
+```json
+{ "visible": 0 }
+```
 
----
+## 后续计划
 
-## 📌 后续计划（个人扩展）
-    
-- □ 
-    
-    增加评论功能（帖子详情页）
-    
-- □ 
-    
-    使用 `golang.org/x/sync/errgroup` 优化并发查询
-    
-- □ 
-    
-    编写单元测试（针对 service 和 repository）
-    
-- □ 
-    
-    添加 Swagger 文档（使用 `swaggo/gin-swagger`）
-    
+- □ 分页 + errgroup 并发 count
+- □ 评论 / 点赞
+- □ Redis 缓存
+- □ 单测 + Swagger + Docker
 
----
+## 反馈
 
-## 💬 反馈与交流
-
-如果你也是 Go 初学者，欢迎交流学习心得；如果发现了代码中的不足或 bug，也欢迎提 Issue / PR。
-
-> 本项目主要用于个人学习，目前不计划用于生产环境，但代码风格和结构可以供初学者参考。
+欢迎交流学习心得；发现问题可提 Issue / PR。  
+本项目主要用于个人学习，不计划直接用于生产环境。
