@@ -9,10 +9,10 @@ const (
 // IsValidVisible 校验可见性取值是否合法；新增类型时只改这里
 func IsValidVisible(visible uint8) bool {
 	switch visible {
-		case VisiblePrivate, VisiblePublic:
-			return true
-		default:
-			return false
+	case VisiblePrivate, VisiblePublic:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -28,7 +28,7 @@ type Post struct {
 	Title   string `gorm:"type:varchar(255);not null" json:"title"`
 	Content string `gorm:"type:text;not null" json:"content"`
 	Visible uint8  `gorm:"type:tinyint(4);not null;default:1;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
-	User    *User  `gorm:"foreignKey:UserID" json:"user"` // 逻辑关联，用于 Preload；物理外键已在 Config 中禁用
+	User    *User  `json:"user" gorm:"-"` // 非 ORM 关联，由 Service 手动填充
 }
 
 func (Post) TableComment() string {

@@ -16,8 +16,9 @@ type Module struct {
 
 // Initialize 初始化帖子模块
 func Initialize(db *gorm.DB) *Module {
-    repo := repository.NewPostRepository(db)
-    svc := service.NewPostService(repo)
+    postRepo := repository.NewPostRepository(db)
+    userRepo := repository.NewUserRepository(db)
+    svc := service.NewPostService(postRepo, userRepo)
     hdl := handler.NewPostHandler(svc)
     return &Module{Handler: hdl}
 }

@@ -4,14 +4,19 @@ import (
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
+	"my-bbs/pkg/set"
 )
 
 type PostService struct {
 	postRepo *repository.PostRepository
+	userRepo *repository.UserRepository
 }
 
-func NewPostService(postRepo *repository.PostRepository) *PostService {
-	return &PostService{postRepo: postRepo}
+func NewPostService(postRepo *repository.PostRepository, userRepo *repository.UserRepository) *PostService {
+	return &PostService{
+		postRepo: postRepo,
+		userRepo: userRepo,
+	}
 }
 
 // CreatePost 创建帖子（默认公开）
@@ -34,32 +39,42 @@ func (s *PostService) GetPostByID(id uint) (*model.Post, error) {
 	if post == nil || post.IsPrivate() {
 		return nil, bizerr.ErrPostNotFound
 	}
+	if err := s.fillUsers([]*model.Post{post}); err != nil {
+		return nil, err
+	}
 	return post, nil
 }
 
 // GetPostsByUser 获取某用户的所有帖子（个人主页）
 func (s *PostService) GetPostsByUser(userID uint) ([]model.Post, error) {
-	return s.postRepo.FindPostsByUserID(userID)
+	posts, err := s.postRepo.FindPostsByUserID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 // GetAllPosts 获取所有帖子（广场）
 func (s *PostService) GetAllPosts() ([]model.Post, error) {
-	return s.postRepo.FindAllPosts()
+	posts, err := s.postRepo.FindAllPosts()
+	if err != nil {
+		return nil, err
+	}
+	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 // UpdatePost 更新帖子，需验证当前用户是否为作者
 func (s *PostService) UpdatePost(postID uint, userID uint, title, content string) error {
-	post, err := s.postRepo.FindPostByID(postID)
+	post, err := s.requireAuthor(postID, userID)
 	if err != nil {
 		return err
 	}
-	if post == nil {
-		return bizerr.ErrPostNotFound
-	}
-	if post.UserID != userID {
-		return bizerr.ErrPostNoPermission
-	}
-
 	post.Title = title
 	post.Content = content
 	return s.postRepo.UpdatePost(post)
@@ -67,17 +82,9 @@ func (s *PostService) UpdatePost(postID uint, userID uint, title, content string
 
 // DeletePost 删除帖子，需验证当前用户是否为作者
 func (s *PostService) DeletePost(postID uint, userID uint) error {
-	post, err := s.postRepo.FindPostByID(postID)
-	if err != nil {
+	if _, err := s.requireAuthor(postID, userID); err != nil {
 		return err
 	}
-	if post == nil {
-		return bizerr.ErrPostNotFound
-	}
-	if post.UserID != userID {
-		return bizerr.ErrPostNoPermission
-	}
-
 	return s.postRepo.DeletePost(postID)
 }
 
@@ -86,15 +93,61 @@ func (s *PostService) SetPostVisible(postID uint, userID uint, visible uint8) er
 	if !model.IsValidVisible(visible) {
 		return bizerr.ErrInvalidVisible
 	}
+	if _, err := s.requireAuthor(postID, userID); err != nil {
+		return err
+	}
+	return s.postRepo.UpdatePostVisible(postID, visible)
+}
+
+// requireAuthor 加载帖子并校验当前用户是否为作者
+func (s *PostService) requireAuthor(postID, userID uint) (*model.Post, error) {
 	post, err := s.postRepo.FindPostByID(postID)
+	if err != nil {
+		return nil, err
+	}
+	if post == nil {
+		return nil, bizerr.ErrPostNotFound
+	}
+	if post.UserID != userID {
+		return nil, bizerr.ErrPostNoPermission
+	}
+	return post, nil
+}
+
+// fillUsers 批量填充帖子作者信息
+func (s *PostService) fillUsers(posts []*model.Post) error {
+	if len(posts) == 0 {
+		return nil
+	}
+
+	ids := make([]uint, 0, len(posts))
+	for _, post := range posts {
+		if post != nil {
+			ids = append(ids, post.UserID)
+		}
+	}
+
+	users, err := s.userRepo.FindUsersByIDs(set.FromSlice(ids).ToSlice())
 	if err != nil {
 		return err
 	}
-	if post == nil {
-		return bizerr.ErrPostNotFound
+
+	userMap := make(map[uint]*model.User, len(users))
+	for i := range users {
+		userMap[users[i].ID] = &users[i]
 	}
-	if post.UserID != userID {
-		return bizerr.ErrPostNoPermission
+	for _, post := range posts {
+		if post != nil {
+			post.User = userMap[post.UserID]
+		}
 	}
-	return s.postRepo.UpdatePostVisible(postID, visible)
+	return nil
+}
+
+func toPostPtrs(posts []model.Post) []*model.Post {
+	ptrs := make([]*model.Post, len(posts))
+	for i := range posts {
+		ptrs[i] = &posts[i]
+	}
+	return ptrs
 }
