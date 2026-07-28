@@ -1,0 +1,34 @@
+internal/repository/post_repo.go
+  s_a5a11e4636fe16::t_1d3fd0ee0e0a8b 41,54
+  s_a5a11e4636fe16::t_242aebe1ff06ac 75
+internal/model/post.go
+  s_a5a11e4636fe16::t_bb142b4a154e5d 5-9,14-15
+  s_a5a11e4636fe16::t_0691afa05f4e29 10
+internal/model/user.go
+  s_a5a11e4636fe16::t_7b8efeba53ab30 5-10,14-15
+internal/model/base.go
+  s_a5a11e4636fe16::t_598af6334a8c41 1-15
+internal/database/db.go
+  s_a5a11e4636fe16::t_70249c1e1739b5 30-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "2b1579673130b64a5c64ca3fec1af8b03c17d182",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_a5a11e4636fe16": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1a20c783-312c-4357-ae70-905b07042d66",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
