@@ -1,103 +1,88 @@
 package handler
 
 import (
-    "net/http"
-    "my-bbs/internal/middleware"
-    "my-bbs/internal/service"
-    "github.com/gin-gonic/gin"
+	"my-bbs/internal/middleware"
+	"my-bbs/internal/service"
+	"my-bbs/pkg/bizerr"
+	"my-bbs/pkg/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 type UserHandler struct {
-    userService *service.UserService
+	userService *service.UserService
 }
 
 func NewUserHandler(userService *service.UserService) *UserHandler {
-    return &UserHandler{userService: userService}
+	return &UserHandler{userService: userService}
 }
 
 type RegisterRequest struct {
-    Username string `json:"username" binding:"required,min=3,max=64"`
-    Password string `json:"password" binding:"required,min=6,max=64"`
-    Nickname string `json:"nickname"`
+	Username string `json:"username" binding:"required,min=3,max=64"`
+	Password string `json:"password" binding:"required,min=6,max=64"`
+	Nickname string `json:"nickname"`
 }
 
 func (h *UserHandler) Register(c *gin.Context) {
-    var req RegisterRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{
-            "error": "参数错误: " + err.Error(),
-        })
-        return
-    }
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, bizerr.ErrBadRequest.WithMessage("参数错误: "+err.Error()))
+		return
+	}
 
-    err := h.userService.Register(req.Username, req.Password, req.Nickname)
-    if err != nil {
-        if err.Error() == "用户名已存在" {
-            c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-            return
-        }
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	if err := h.userService.Register(req.Username, req.Password, req.Nickname); err != nil {
+		response.Fail(c, err)
+		return
+	}
 
-    c.JSON(http.StatusCreated, gin.H{
-        "message": "注册成功",
-    })
+	response.OKMsg(c, "注册成功")
 }
 
 type LoginRequest struct {
-    Username string `json:"username" binding:"required"`
-    Password string `json:"password" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 func (h *UserHandler) Login(c *gin.Context) {
-    var req LoginRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{
-            "error": "参数错误: " + err.Error(),
-        })
-        return
-    }
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, bizerr.ErrBadRequest.WithMessage("参数错误: "+err.Error()))
+		return
+	}
 
-    token, err := h.userService.Login(req.Username, req.Password)
-    if err != nil {
-        if err.Error() == "用户名或密码错误" {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-            return
-        }
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	token, err := h.userService.Login(req.Username, req.Password)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{
-        "token":   token,
-        "message": "登录成功",
-    })
+	response.OK(c, gin.H{
+		"token": token,
+	})
 }
 
 type UpdateProfileRequest struct {
-    Nickname     string `json:"nickname" binding:"max=64"`
-    Introduction string `json:"introduction" binding:"max=1024"`
+	Nickname     string `json:"nickname" binding:"max=64"`
+	Introduction string `json:"introduction" binding:"max=1024"`
 }
 
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
-    userID, ok := middleware.GetUserID(c)
-    if !ok {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
-        return
-    }
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.Fail(c, bizerr.ErrUnauthorized)
+		return
+	}
 
-    var req UpdateProfileRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
-        return
-    }
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Fail(c, bizerr.ErrBadRequest.WithMessage("参数错误: "+err.Error()))
+		return
+	}
 
-    err := h.userService.UpdateProfile(userID, req.Nickname, req.Introduction)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	if err := h.userService.UpdateProfile(userID, req.Nickname, req.Introduction); err != nil {
+		response.Fail(c, err)
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "资料更新成功"})
+	response.OKMsg(c, "资料更新成功")
 }

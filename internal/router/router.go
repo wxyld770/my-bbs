@@ -13,7 +13,11 @@ type RouterDeps struct {
 // SetupRouter 配置路由
 func SetupRouter(deps RouterDeps) *gin.Engine {
     r := gin.New()
-    r.Use(middleware.RequestLogger(), middleware.Recovery())
+    r.Use(
+        middleware.RequestLogger(),
+        middleware.Recovery(),
+        middleware.ErrorHandler(),
+    )
 
     api := r.Group("/api")
 
