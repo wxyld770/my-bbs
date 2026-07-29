@@ -4,6 +4,7 @@ import (
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
+	"my-bbs/pkg/pagination"
 	"my-bbs/pkg/set"
 )
 
@@ -45,28 +46,30 @@ func (s *PostService) GetPostByID(id uint) (*model.Post, error) {
 	return post, nil
 }
 
-// GetPostsByUser 获取某用户的所有帖子（个人主页）
-func (s *PostService) GetPostsByUser(userID uint) ([]model.Post, error) {
-	posts, err := s.postRepo.FindPostsByUserID(userID)
+// GetPostsByUser 分页获取某用户的帖子（个人主页，无限下拉）
+func (s *PostService) GetPostsByUser(userID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+	q.Normalize()
+	posts, err := s.postRepo.FindPostsByUserID(userID, q.Offset(), q.PageSize)
 	if err != nil {
-		return nil, err
+		return pagination.Result[model.Post]{}, err
 	}
 	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
-		return nil, err
+		return pagination.Result[model.Post]{}, err
 	}
-	return posts, nil
+	return pagination.NewResult(posts, q), nil
 }
 
-// GetAllPosts 获取所有帖子（广场）
-func (s *PostService) GetAllPosts() ([]model.Post, error) {
-	posts, err := s.postRepo.FindAllPosts()
+// GetAllPosts 分页获取公开帖子（广场，无限下拉）
+func (s *PostService) GetAllPosts(q pagination.Query) (pagination.Result[model.Post], error) {
+	q.Normalize()
+	posts, err := s.postRepo.FindPublicPosts(q.Offset(), q.PageSize)
 	if err != nil {
-		return nil, err
+		return pagination.Result[model.Post]{}, err
 	}
 	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
-		return nil, err
+		return pagination.Result[model.Post]{}, err
 	}
-	return posts, nil
+	return pagination.NewResult(posts, q), nil
 }
 
 // UpdatePost 更新帖子，需验证当前用户是否为作者

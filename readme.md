@@ -57,13 +57,14 @@ my-bbs/
 
 ### 帖子
 - ✅ 发布、修改、删除（作者校验）
-- ✅ 广场列表（仅 `visible=1`）
+- ✅ 广场列表（仅 `visible=1`，分页）
 - ✅ 详情（仅公开帖；私密帖请走个人主页）
-- ✅ 个人主页帖子列表
+- ✅ 个人主页帖子列表（分页）
 - ✅ 设置可见性（0 仅自己 / 1 所有人）
 
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
+- ✅ 分页 `pageNo/pageSize/hasMore`（无限下拉，不做 total count）
 - ✅ 异步日志（控制台 + `logs/日期.log`）
 - ✅ 优雅启停（SIGINT/SIGTERM）
 - ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
@@ -123,15 +124,36 @@ go run cmd/main.go
 | POST | `/api/register` | 否 | 注册 |
 | POST | `/api/login` | 否 | 登录，返回 token |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
-| GET | `/api/posts` | 否 | 广场（公开帖） |
+| GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/:id` | 否 | 详情（仅公开帖；私密帖 404） |
 | POST | `/api/posts/create` | 是 | 发帖 |
 | POST | `/api/posts/update/:id` | 是 | 修改（作者） |
 | POST | `/api/posts/del/:id` | 是 | 删除（作者） |
 | POST | `/api/posts/visible/:id` | 是 | 设置可见性 |
-| POST | `/api/user/posts` | 是 | 我的帖子 |
+| POST | `/api/user/posts` | 是 | 我的帖子（支持 `pageNo`/`pageSize`） |
 
 认证 Header：`Authorization: Bearer <token>`
+
+分页查询（广场 / 我的帖子）：
+
+```text
+GET  /api/posts?pageNo=1&pageSize=10
+POST /api/user/posts?pageNo=1&pageSize=10
+```
+
+响应 `data`：
+
+```json
+{
+  "list": [],
+  "pageNo": 1,
+  "pageSize": 10,
+  "hasMore": true
+}
+```
+
+默认 `pageNo=1`，`pageSize=10`，`pageSize` 上限 50。  
+客户端根据 `hasMore` 决定是否继续下拉加载，无需 total。
 
 设置可见性 body：
 
@@ -141,7 +163,6 @@ go run cmd/main.go
 
 ## 后续计划
 
-- □ 分页 + errgroup 并发 count
 - □ 评论 / 点赞
 - □ Redis 缓存
 - □ 单测 + Swagger + Docker

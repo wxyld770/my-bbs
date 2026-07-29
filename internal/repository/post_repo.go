@@ -18,8 +18,7 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 
 // CreatePost 创建帖子
 func (r *PostRepository) CreatePost(post *model.Post) error {
-	result := r.db.Create(post)
-	return result.Error
+	return r.db.Create(post).Error
 }
 
 // FindPostByID 根据 ID 查找帖子（不含作者信息）
@@ -35,43 +34,39 @@ func (r *PostRepository) FindPostByID(id uint) (*model.Post, error) {
 	return &post, nil
 }
 
-// FindPostsByUserID 查询某用户的所有帖子（用于个人主页）
-func (r *PostRepository) FindPostsByUserID(userID uint) ([]model.Post, error) {
+// FindPublicPosts 分页查询公开帖子
+func (r *PostRepository) FindPublicPosts(offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
-	result := r.db.
-		Where("user_id = ?", userID).
-		Order("create_time DESC").
-		Find(&posts)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return posts, nil
-}
-
-// FindAllPosts 查询所有公开帖子（广场），按创建时间倒序
-func (r *PostRepository) FindAllPosts() ([]model.Post, error) {
-	var posts []model.Post
-	result := r.db.
+	err := r.db.
 		Where("visible = ?", model.VisiblePublic).
 		Order("create_time DESC").
-		Find(&posts)
-	if result.Error != nil {
-		return nil, result.Error
-	}
-	return posts, nil
+		Offset(offset).
+		Limit(limit).
+		Find(&posts).Error
+	return posts, err
+}
+
+// FindPostsByUserID 分页查询某用户的帖子
+func (r *PostRepository) FindPostsByUserID(userID uint, offset, limit int) ([]model.Post, error) {
+	var posts []model.Post
+	err := r.db.
+		Where("user_id = ?", userID).
+		Order("create_time DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&posts).Error
+	return posts, err
 }
 
 // UpdatePost 更新帖子
 func (r *PostRepository) UpdatePost(post *model.Post) error {
-	result := r.db.Updates(post)
-	return result.Error
+	return r.db.Updates(post).Error
 }
 
 // UpdatePostVisible 更新帖子可见性
 func (r *PostRepository) UpdatePostVisible(id uint, visible uint8) error {
-	result := r.db.Model(&model.Post{}).Where("id = ?", id).
-		Update("visible", visible)
-	return result.Error
+	return r.db.Model(&model.Post{}).Where("id = ?", id).
+		Update("visible", visible).Error
 }
 
 // DeletePost 根据 ID 删除帖子（软删除，写入 deleted 字段）

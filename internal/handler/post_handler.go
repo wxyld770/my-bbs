@@ -6,6 +6,7 @@ import (
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
+	"my-bbs/pkg/pagination"
 	"my-bbs/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -62,13 +63,13 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 }
 
 func (h *PostHandler) GetAllPosts(c *gin.Context) {
-	posts, err := h.postService.GetAllPosts()
+	q := parsePageQuery(c)
+	result, err := h.postService.GetAllPosts(q)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
-
-	response.OK(c, gin.H{"posts": posts})
+	response.OK(c, result)
 }
 
 func (h *PostHandler) GetMyPosts(c *gin.Context) {
@@ -78,13 +79,22 @@ func (h *PostHandler) GetMyPosts(c *gin.Context) {
 		return
 	}
 
-	posts, err := h.postService.GetPostsByUser(userID)
+	q := parsePageQuery(c)
+	result, err := h.postService.GetPostsByUser(userID, q)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
+	response.OK(c, result)
+}
 
-	response.OK(c, gin.H{"posts": posts})
+// parsePageQuery 从 query 解析分页参数
+func parsePageQuery(c *gin.Context) pagination.Query {
+	pageNo, _ := strconv.Atoi(c.DefaultQuery("pageNo", strconv.Itoa(pagination.DefaultPageNo)))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(pagination.DefaultPageSize)))
+	q := pagination.Query{PageNo: pageNo, PageSize: pageSize}
+	q.Normalize()
+	return q
 }
 
 type UpdatePostRequest struct {
