@@ -1,0 +1,27 @@
+readme.md
+  s_0b60c284d9323b::t_d902baee08f0b0 34,38-39
+  s_0b60c284d9323b::t_a6e91439f5ff13 132,138-141
+  s_0b60c284d9323b::t_d1da18c9cb75f3 172-194,197
+  s_0b60c284d9323b::t_3edd18e9e69345 61,65-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "7a4302ba19048f417e1e0f671425fcf29700cb3d",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b60c284d9323b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5caad0e1-f8fb-4e57-ba1d-17839416dd8a",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
