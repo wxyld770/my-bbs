@@ -1,0 +1,57 @@
+internal/modules/post/module.go
+  s_0b60c284d9323b::t_cb5946643ff7ac 4-10,15,20-26,31-33,35-45
+internal/modules/comment/module.go
+  s_0b60c284d9323b::t_9390074759eda5 1-38
+pkg/bizerr/bizerr.go
+  s_0b60c284d9323b::t_193c2e28bd452c 68-74
+internal/service/like_service.go
+  s_0b60c284d9323b::t_81238a9161f8b2 1-4,6-86,88
+  s_0b60c284d9323b::t_8a02d37caa2ba6 5,87
+internal/repository/comment_repo.go
+  s_0b60c284d9323b::t_cbaaad70ac3ab6 1-66
+internal/handler/like_handler.go
+  s_0b60c284d9323b::t_e92b816f3f3457 1-42
+cmd/main.go
+  s_0b60c284d9323b::t_7c6081a385a6ec 14-15
+  s_0b60c284d9323b::t_ac2b3144035ff8 49-50,57-58
+internal/repository/like_repo.go
+  s_0b60c284d9323b::t_31566fae3eb7e6 1-57
+internal/service/comment_service.go
+  s_0b60c284d9323b::t_f18a909a5856e1 1-105
+internal/model/comment.go
+  s_0b60c284d9323b::t_d6e9e2e681e8d1 6,9
+  s_0b60c284d9323b::t_a2e7cc64654c17 1-5,7-8,10-14
+internal/database/db.go
+  s_0b60c284d9323b::t_969eb8546f2866 46-47
+internal/handler/comment_handler.go
+  s_0b60c284d9323b::t_686335d0e97759 1-88
+internal/service/post_service.go
+  s_0b60c284d9323b::t_ab8308e9375756 12-15,18-23,25-28,32-39,51-52,63-86
+internal/model/post_like.go
+  s_0b60c284d9323b::t_3c8ef7c67a5575 1-20
+internal/modules/like/module.go
+  s_0b60c284d9323b::t_ad1be7a1978602 1-34
+internal/handler/post_handler.go
+  s_0b60c284d9323b::t_495d6ba2fe1ed4 56-61,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "d7b5a527e9455b031573882cd02332092a846355",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b60c284d9323b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5caad0e1-f8fb-4e57-ba1d-17839416dd8a",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
