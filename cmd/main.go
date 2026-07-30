@@ -11,6 +11,8 @@ import (
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
 	"my-bbs/internal/logger"
+	"my-bbs/internal/modules/comment"
+	"my-bbs/internal/modules/like"
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/router"
@@ -44,12 +46,16 @@ func main() {
 	// 5. 初始化各模块（每个模块封装了自己的依赖）
 	userMod := user.Initialize(db)
 	postMod := post.Initialize(db)
+	commentMod := comment.Initialize(db)
+	likeMod := like.Initialize(db)
 
 	// 6. 配置路由
 	deps := router.RouterDeps{
 		Modules: []router.RouteRegister{
 			userMod,
 			postMod,
+			commentMod,
+			likeMod,
 		},
 	}
 	r := router.SetupRouter(deps)

@@ -9,15 +9,32 @@ import (
 )
 
 type PostService struct {
-	postRepo *repository.PostRepository
-	userRepo *repository.UserRepository
+	postRepo    *repository.PostRepository
+	userRepo    *repository.UserRepository
+	commentRepo *repository.CommentRepository
+	likeRepo    *repository.LikeRepository
 }
 
-func NewPostService(postRepo *repository.PostRepository, userRepo *repository.UserRepository) *PostService {
+func NewPostService(
+	postRepo *repository.PostRepository,
+	userRepo *repository.UserRepository,
+	commentRepo *repository.CommentRepository,
+	likeRepo *repository.LikeRepository,
+) *PostService {
 	return &PostService{
-		postRepo: postRepo,
-		userRepo: userRepo,
+		postRepo:    postRepo,
+		userRepo:    userRepo,
+		commentRepo: commentRepo,
+		likeRepo:    likeRepo,
 	}
+}
+
+// PostDetail 帖子详情（含互动字段）
+type PostDetail struct {
+	Post         model.Post `json:"post"`
+	LikeCount    int64      `json:"like_count"`
+	CommentCount int64      `json:"comment_count"`
+	IsLiked      bool       `json:"is_liked"`
 }
 
 // CreatePost 创建帖子（默认公开）
@@ -31,8 +48,8 @@ func (s *PostService) CreatePost(userID uint, title, content string) error {
 	return s.postRepo.CreatePost(post)
 }
 
-// GetPostByID 根据 ID 获取公开帖子；私密帖不可通过此接口访问
-func (s *PostService) GetPostByID(id uint) (*model.Post, error) {
+// GetPostByID 根据 ID 获取公开帖子详情；viewerID>0 时填充 is_liked
+func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
 	post, err := s.postRepo.FindPostByID(id)
 	if err != nil {
 		return nil, err
@@ -43,7 +60,30 @@ func (s *PostService) GetPostByID(id uint) (*model.Post, error) {
 	if err := s.fillUsers([]*model.Post{post}); err != nil {
 		return nil, err
 	}
-	return post, nil
+
+	likeCount, err := s.likeRepo.CountByPostID(id)
+	if err != nil {
+		return nil, err
+	}
+	commentCount, err := s.commentRepo.CountByPostID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	isLiked := false
+	if viewerID > 0 {
+		isLiked, err = s.likeRepo.ExistsByUserAndPost(viewerID, id)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &PostDetail{
+		Post:         *post,
+		LikeCount:    likeCount,
+		CommentCount: commentCount,
+		IsLiked:      isLiked,
+	}, nil
 }
 
 // GetPostsByUser 分页获取某用户的帖子（个人主页，无限下拉）

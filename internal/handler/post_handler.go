@@ -53,13 +53,18 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 		return
 	}
 
-	post, err := h.postService.GetPostByID(uint(id))
+	var viewerID uint
+	if uid, ok := middleware.GetUserID(c); ok {
+		viewerID = uid
+	}
+
+	detail, err := h.postService.GetPostByID(uint(id), viewerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
 	}
 
-	response.OK(c, gin.H{"post": post})
+	response.OK(c, detail)
 }
 
 func (h *PostHandler) GetAllPosts(c *gin.Context) {

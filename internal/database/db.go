@@ -43,6 +43,8 @@ func AutoMigrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.Post{},
+		&model.Comment{},
+		&model.PostLike{},
 	); err != nil {
 		return err
 	}
