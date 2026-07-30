@@ -31,12 +31,12 @@ my-bbs/
 │   ├── config/                 # 配置加载
 │   ├── database/               # DB 初始化与迁移
 │   ├── logger/                 # 异步日志
-│   ├── model/                  # User / Post / BaseModel
+│   ├── model/                  # User / Post / Comment / PostLike / BaseModel
 │   ├── repository/             # 数据访问
 │   ├── service/                # 业务逻辑
 │   ├── handler/                # HTTP 处理
-│   ├── middleware/             # Auth / 日志 / Recovery / ErrorHandler
-│   ├── modules/                # 模块 DI + 路由注册
+│   ├── middleware/             # Auth / OptionalAuth / 日志 / Recovery / ErrorHandler
+│   ├── modules/                # 模块 DI + 路由注册（user/post/comment/like）
 │   └── router/                 # 路由组装
 ├── pkg/
 │   ├── bizerr/                 # 业务异常
@@ -58,9 +58,13 @@ my-bbs/
 ### 帖子
 - ✅ 发布、修改、删除（作者校验）
 - ✅ 广场列表（仅 `visible=1`，分页）
-- ✅ 详情（仅公开帖；私密帖请走个人主页）
+- ✅ 详情（仅公开帖；私密帖请走个人主页；含点赞/评论数与 `is_liked`）
 - ✅ 个人主页帖子列表（分页）
 - ✅ 设置可见性（0 仅自己 / 1 所有人）
+
+### 互动
+- ✅ 评论（发表 / 分页列表 / 作者删除）
+- ✅ 点赞（切换；返回 `liked` + `like_count`）
 
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
@@ -125,12 +129,16 @@ go run cmd/main.go
 | POST | `/api/login` | 否 | 登录，返回 token |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
 | GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
-| GET | `/api/posts/:id` | 否 | 详情（仅公开帖；私密帖 404） |
+| GET | `/api/posts/:id` | 可选 | 详情（仅公开帖；带 Token 时返回 `is_liked`） |
 | POST | `/api/posts/create` | 是 | 发帖 |
 | POST | `/api/posts/update/:id` | 是 | 修改（作者） |
 | POST | `/api/posts/del/:id` | 是 | 删除（作者） |
 | POST | `/api/posts/visible/:id` | 是 | 设置可见性 |
 | POST | `/api/user/posts` | 是 | 我的帖子（支持 `pageNo`/`pageSize`） |
+| GET | `/api/posts/:id/comments` | 否 | 评论列表（公开帖，分页） |
+| POST | `/api/posts/:id/comments/create` | 是 | 发表评论 |
+| POST | `/api/comments/del/:id` | 是 | 删除评论（评论作者） |
+| POST | `/api/posts/:id/like` | 是 | 切换点赞 |
 
 认证 Header：`Authorization: Bearer <token>`
 
@@ -161,9 +169,32 @@ POST /api/user/posts?pageNo=1&pageSize=10
 { "visible": 0 }
 ```
 
+帖子详情 `data`：
+
+```json
+{
+  "post": { "id": 1, "title": "...", "user": { "id": 1, "username": "..." } },
+  "like_count": 3,
+  "comment_count": 5,
+  "is_liked": false
+}
+```
+
+发表评论 body：
+
+```json
+{ "content": "说得对" }
+```
+
+点赞切换响应 `data`：
+
+```json
+{ "liked": true, "like_count": 4 }
+```
+
 ## 后续计划
 
-- □ 评论 / 点赞
+- □ GET /user/me
 - □ Redis 缓存
 - □ 单测 + Swagger + Docker
 
