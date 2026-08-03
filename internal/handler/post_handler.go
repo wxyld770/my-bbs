@@ -103,8 +103,9 @@ func parsePageQuery(c *gin.Context) pagination.Query {
 }
 
 type UpdatePostRequest struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	// 指针用于区分“字段未传”和“传了空字符串”。这是部分更新接口的关键。
+	Title   *string `json:"title" binding:"omitempty,max=255"`
+	Content *string `json:"content"`
 }
 
 func (h *PostHandler) UpdatePost(c *gin.Context) {

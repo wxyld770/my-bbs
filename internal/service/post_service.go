@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strings"
+
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
@@ -39,6 +41,15 @@ type PostDetail struct {
 
 // CreatePost 创建帖子（默认公开）
 func (s *PostService) CreatePost(userID uint, title, content string) error {
+	title = strings.TrimSpace(title)
+	content = strings.TrimSpace(content)
+	if title == "" {
+		return bizerr.ErrBadRequest.WithMessage("帖子标题不能为空")
+	}
+	if content == "" {
+		return bizerr.ErrBadRequest.WithMessage("帖子内容不能为空")
+	}
+
 	post := &model.Post{
 		UserID:  userID,
 		Title:   title,
@@ -112,14 +123,31 @@ func (s *PostService) GetAllPosts(q pagination.Query) (pagination.Result[model.P
 	return pagination.NewResult(posts, q), nil
 }
 
-// UpdatePost 更新帖子，需验证当前用户是否为作者
-func (s *PostService) UpdatePost(postID uint, userID uint, title, content string) error {
+// UpdatePost 部分更新帖子：title 和 content 至少提供一个，未提供的字段保持原值。
+// 需验证当前用户是否为作者。
+func (s *PostService) UpdatePost(postID uint, userID uint, title, content *string) error {
+	if title == nil && content == nil {
+		return bizerr.ErrBadRequest.WithMessage("请至少提供 title 或 content 之一")
+	}
+
 	post, err := s.requireAuthor(postID, userID)
 	if err != nil {
 		return err
 	}
-	post.Title = title
-	post.Content = content
+	if title != nil {
+		trimmedTitle := strings.TrimSpace(*title)
+		if trimmedTitle == "" {
+			return bizerr.ErrBadRequest.WithMessage("帖子标题不能为空")
+		}
+		post.Title = trimmedTitle
+	}
+	if content != nil {
+		trimmedContent := strings.TrimSpace(*content)
+		if trimmedContent == "" {
+			return bizerr.ErrBadRequest.WithMessage("帖子内容不能为空")
+		}
+		post.Content = trimmedContent
+	}
 	return s.postRepo.UpdatePost(post)
 }
 

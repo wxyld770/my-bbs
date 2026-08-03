@@ -89,6 +89,33 @@ my-bbs/
 
 ## 快速开始
 
+### 方式 A：Docker（推荐，最容易复现）
+
+前提：已安装 Docker Desktop。执行：
+
+```bash
+docker compose up --build -d
+```
+
+这会启动 MySQL 和应用，数据库表会在应用启动时自动迁移。服务启动后访问
+`http://localhost:8080`。查看应用日志：
+
+```bash
+docker compose logs -f app
+```
+
+停止服务但保留数据库数据：
+
+```bash
+docker compose down
+```
+
+> `docker-compose.yml` 中的数据库密码和 JWT 密钥仅供本地开发；部署到公网前必须替换。
+
+### 方式 B：本地运行
+
+前提：Go 1.26+、本地 MySQL 8+，且已创建数据库 `my_bbs`。
+
 ### 1. 安装依赖
 
 ```bash
@@ -101,14 +128,14 @@ go mod tidy
 cp config/.env.example config/.env
 ```
 
-编辑 `config/.env`：
+编辑 `config/.env`（将 `DB_DSN` 中的密码和 `JWT_SECRET` 替换为自己的值）：
 
 ```bash
-DB_DSN="root:密码@tcp(127.0.0.1:3306)/库名?charset=utf8mb4&parseTime=True"
+DB_DSN="root:密码@tcp(127.0.0.1:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
 APP_MODE="debug"
 APP_PORT="8080"
 LOG_DIR="logs"
-JWT_SECRET="换成你的密钥"
+JWT_SECRET="换成一段足够长的随机密钥"
 ```
 
 > 若表仍是旧字段（`created_at` 等），开发环境可删表后重启，让 AutoMigrate 重建；或手动改列名。
@@ -120,6 +147,16 @@ go run cmd/main.go
 ```
 
 服务监听 `http://localhost:{APP_PORT}`。`Ctrl+C` 触发优雅关闭。
+
+也可使用 Makefile：
+
+```bash
+make run       # 本地启动
+make test      # 运行测试
+make vet       # 静态检查
+make up        # Docker 启动
+make down      # 停止 Docker 服务
+```
 
 ## 接口一览
 
@@ -168,6 +205,14 @@ POST /api/user/posts?pageNo=1&pageSize=10
 ```json
 { "visible": 0 }
 ```
+
+更新帖子 body（部分更新，至少传一个字段；未传字段保持不变）：
+
+```json
+{ "title": "新标题" }
+```
+
+`title` 或 `content` 不能是空字符串或仅空白字符。
 
 帖子详情 `data`：
 

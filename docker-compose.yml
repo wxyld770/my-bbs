@@ -1,0 +1,33 @@
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: my_bbs
+      MYSQL_ROOT_PASSWORD: change-me
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pchange-me"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    environment:
+      APP_MODE: release
+      APP_PORT: "8080"
+      LOG_DIR: logs
+      DB_DSN: "root:change-me@tcp(db:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
+      JWT_SECRET: "replace-this-before-any-public-deployment"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
