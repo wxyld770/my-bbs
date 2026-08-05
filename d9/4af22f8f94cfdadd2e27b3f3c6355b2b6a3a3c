@@ -1,0 +1,32 @@
+readme.md
+  s_0b60c284d9323b::t_dd6e3b23affbdb 168
+  s_0b60c284d9323b::t_ced6a4889031ec 55
+  s_0b60c284d9323b::t_bff6f4669aa8ae 245-246
+internal/handler/user_handler.go
+  s_0b60c284d9323b::t_cbf907f482a59d 64-79
+internal/service/user_service.go
+  s_0b60c284d9323b::t_148035f0605eff 63-74
+internal/modules/user/module.go
+  s_0b60c284d9323b::t_151dda7c6086db 34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "d94af22f8f94cfdadd2e27b3f3c6355b2b6a3a3c",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_0b60c284d9323b": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "5caad0e1-f8fb-4e57-ba1d-17839416dd8a",
+        "model": "default"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
