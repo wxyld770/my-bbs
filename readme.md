@@ -52,6 +52,7 @@ my-bbs/
 ### 用户
 - ✅ 注册（用户名唯一索引，密码 bcrypt）
 - ✅ 登录（返回 JWT）
+- ✅ 当前用户资料 `GET /user/me`
 - ✅ 修改昵称 / 个人介绍
 - ✅ 退出（客户端丢弃 Token）
 
@@ -164,6 +165,7 @@ make down      # 停止 Docker 服务
 |---|---|---|---|
 | POST | `/api/register` | 否 | 注册 |
 | POST | `/api/login` | 否 | 登录，返回 token |
+| GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
 | GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/:id` | 可选 | 详情（仅公开帖；带 Token 时返回 `is_liked`） |
@@ -239,9 +241,9 @@ POST /api/user/posts?pageNo=1&pageSize=10
 
 ## 后续计划
 
-- □ GET /user/me
 - □ Redis 缓存
-- □ 单测 + Swagger + Docker
+- □ 单测 + Swagger
+- □ /healthz
 
 ## 反馈
 

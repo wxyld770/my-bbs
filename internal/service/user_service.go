@@ -3,8 +3,8 @@ package service
 import (
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
-	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/bcrypt"
+	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/jwt"
 )
 
@@ -58,6 +58,18 @@ func (s *UserService) Login(username, password string) (string, error) {
 		return "", err
 	}
 	return token, nil
+}
+
+// GetMe 获取当前登录用户资料（不含密码）
+func (s *UserService) GetMe(userID uint) (*model.User, error) {
+	user, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, bizerr.ErrUserNotFound
+	}
+	return user, nil
 }
 
 // UpdateProfile 更新当前用户的昵称和介绍

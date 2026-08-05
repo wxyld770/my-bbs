@@ -61,6 +61,22 @@ func (h *UserHandler) Login(c *gin.Context) {
 	})
 }
 
+func (h *UserHandler) GetMe(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.Fail(c, bizerr.ErrUnauthorized)
+		return
+	}
+
+	user, err := h.userService.GetMe(userID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+
+	response.OK(c, gin.H{"user": user})
+}
+
 type UpdateProfileRequest struct {
 	Nickname     string `json:"nickname" binding:"max=64"`
 	Introduction string `json:"introduction" binding:"max=1024"`
