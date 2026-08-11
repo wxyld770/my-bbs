@@ -1,0 +1,49 @@
+internal/config/config.go
+  s_657710e5376b63::t_b164d2f27f202f 4,6,33,40-51
+internal/model/post.go
+  s_657710e5376b63::t_de36a5ca8b70eb 30
+internal/handler/user_handler.go
+  s_657710e5376b63::t_5dea7098e5d90d 4-5
+  s_657710e5376b63::t_6271d3c8d4150c 82-97
+internal/repository/post_repo.go
+  s_657710e5376b63::t_ec6b26a8937ffa 61-72
+internal/modules/user/module.go
+  s_657710e5376b63::t_db47e7a674580b 15-16,24,31,34
+internal/modules/post/module.go
+  s_657710e5376b63::t_b03e2e52357878 15-16,27,35,39
+  s_657710e5376b63::t_2c676384565f52 32
+internal/service/post_service.go
+  s_657710e5376b63::t_5787f9a46c7b0a 62-63,69-72,104,117-128
+internal/model/user.go
+  s_657710e5376b63::t_8f8b78232d7be0 3-8,19-21
+internal/modules/like/module.go
+  s_657710e5376b63::t_fc5fafae4f5fc7 15-16,23,26,32
+internal/modules/comment/module.go
+  s_657710e5376b63::t_710f696e694849 15-16,26,34
+internal/service/user_service.go
+  s_657710e5376b63::t_385cbf0b572b02 70,75,90
+  s_657710e5376b63::t_1682f566d68dcd 38,43,57-59,71-74,89,91-98
+internal/middleware/auth.go
+  s_657710e5376b63::t_333ccd60304878 4-5,14-20,50-63,70-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "655ee988e391aa3f22886017e8b779a852880eeb",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_657710e5376b63": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8eb7b570-bee3-4f97-bf6c-a006a984c0bf",
+        "model": "grok-4.5"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
