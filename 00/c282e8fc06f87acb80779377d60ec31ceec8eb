@@ -1,0 +1,31 @@
+go.mod
+  s_657710e5376b63::t_c2e9fc3cc6b48d 21,24,31,43,52-55
+pkg/jwt/jwt.go
+  s_657710e5376b63::t_a8ee71c9828aa8 4-8,12-16,20-37,42-57,62-85,88,90-93,95-97,99-101,103-106,108
+cmd/main.go
+  s_657710e5376b63::t_8c7de99a342a3a 6,8,21
+  s_657710e5376b63::t_56e97050e032ad 30,32-35,43
+pkg/bizerr/bizerr.go
+  s_657710e5376b63::t_b2bc7fe1373c58 68,71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "00c282e8fc06f87acb80779377d60ec31ceec8eb",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_657710e5376b63": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8eb7b570-bee3-4f97-bf6c-a006a984c0bf",
+        "model": "grok-4.5"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
