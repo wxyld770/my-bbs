@@ -1,0 +1,32 @@
+tests/testutil/db.go
+  s_657710e5376b63::t_9279cd7223314b 1-39
+tests/api/api_test.go
+  s_657710e5376b63::t_62f007eff2d406 1-316
+tests/service/post_service_test.go
+  s_657710e5376b63::t_985b91973f1fba 1-103
+tests/service/user_service_test.go
+  s_657710e5376b63::t_8463b63d4c6c8e 1-96
+tests/config/config_test.go
+  s_657710e5376b63::t_bd5941c6edfc27 1-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "0ce5f71b16ba68ed3a569ef88515df3b4b7d820e",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_657710e5376b63": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8eb7b570-bee3-4f97-bf6c-a006a984c0bf",
+        "model": "grok-4.5"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
