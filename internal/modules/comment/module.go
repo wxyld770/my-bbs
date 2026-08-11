@@ -12,7 +12,8 @@ import (
 
 // Module 评论模块
 type Module struct {
-	Handler *handler.CommentHandler
+	Handler  *handler.CommentHandler
+	userRepo *repository.UserRepository
 }
 
 // Initialize 初始化评论模块
@@ -22,7 +23,7 @@ func Initialize(db *gorm.DB) *Module {
 	userRepo := repository.NewUserRepository(db)
 	svc := service.NewCommentService(commentRepo, postRepo, userRepo)
 	hdl := handler.NewCommentHandler(svc)
-	return &Module{Handler: hdl}
+	return &Module{Handler: hdl, userRepo: userRepo}
 }
 
 // Register 实现 router.RouteRegister 接口
@@ -30,7 +31,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	r.GET("/posts/:id/comments", m.Handler.ListComments)
 
 	auth := r.Group("/")
-	auth.Use(middleware.Auth())
+	auth.Use(middleware.Auth(m.userRepo))
 	{
 		auth.POST("/posts/:id/comments/create", m.Handler.CreateComment)
 		auth.POST("/comments/del/:id", m.Handler.DeleteComment)

@@ -27,7 +27,7 @@ type Post struct {
 	UserID  uint   `gorm:"index;not null" json:"user_id"`
 	Title   string `gorm:"type:varchar(255);not null" json:"title"`
 	Content string `gorm:"type:text;not null" json:"content"`
-	Visible uint8  `gorm:"type:tinyint(4);not null;default:1;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
+	Visible uint8  `gorm:"type:tinyint(4);not null;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
 	User    *User  `json:"user" gorm:"-"` // 非 ORM 关联，由 Service 手动填充
 }
 

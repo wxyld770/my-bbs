@@ -59,13 +59,17 @@ func (s *PostService) CreatePost(userID uint, title, content string) error {
 	return s.postRepo.CreatePost(post)
 }
 
-// GetPostByID 根据 ID 获取公开帖子详情；viewerID>0 时填充 is_liked
+// GetPostByID 根据 ID 获取帖子详情。
+// 公开帖任何人可读；私密帖仅作者可读（viewerID 为作者）。viewerID>0 时填充 is_liked。
 func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
 	post, err := s.postRepo.FindPostByID(id)
 	if err != nil {
 		return nil, err
 	}
-	if post == nil || post.IsPrivate() {
+	if post == nil {
+		return nil, bizerr.ErrPostNotFound
+	}
+	if post.IsPrivate() && post.UserID != viewerID {
 		return nil, bizerr.ErrPostNotFound
 	}
 	if err := s.fillUsers([]*model.Post{post}); err != nil {
@@ -97,10 +101,31 @@ func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
 	}, nil
 }
 
-// GetPostsByUser 分页获取某用户的帖子（个人主页，无限下拉）
+// GetPostsByUser 分页获取某用户的帖子（个人主页，含私密，无限下拉）
 func (s *PostService) GetPostsByUser(userID uint, q pagination.Query) (pagination.Result[model.Post], error) {
 	q.Normalize()
 	posts, err := s.postRepo.FindPostsByUserID(userID, q.Offset(), q.PageSize)
+	if err != nil {
+		return pagination.Result[model.Post]{}, err
+	}
+	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+		return pagination.Result[model.Post]{}, err
+	}
+	return pagination.NewResult(posts, q), nil
+}
+
+// GetPublicPostsByUser 分页获取某用户的公开帖（他人主页）
+func (s *PostService) GetPublicPostsByUser(targetUserID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+	user, err := s.userRepo.FindUserByID(targetUserID)
+	if err != nil {
+		return pagination.Result[model.Post]{}, err
+	}
+	if user == nil {
+		return pagination.Result[model.Post]{}, bizerr.ErrUserNotFound
+	}
+
+	q.Normalize()
+	posts, err := s.postRepo.FindPublicPostsByUserID(targetUserID, q.Offset(), q.PageSize)
 	if err != nil {
 		return pagination.Result[model.Post]{}, err
 	}

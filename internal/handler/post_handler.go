@@ -93,6 +93,22 @@ func (h *PostHandler) GetMyPosts(c *gin.Context) {
 	response.OK(c, result)
 }
 
+func (h *PostHandler) GetUserPublicPosts(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		response.Fail(c, bizerr.ErrInvalidUserID)
+		return
+	}
+
+	q := parsePageQuery(c)
+	result, err := h.postService.GetPublicPostsByUser(uint(id), q)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+	response.OK(c, result)
+}
+
 // parsePageQuery 从 query 解析分页参数
 func parsePageQuery(c *gin.Context) pagination.Query {
 	pageNo, _ := strconv.Atoi(c.DefaultQuery("pageNo", strconv.Itoa(pagination.DefaultPageNo)))

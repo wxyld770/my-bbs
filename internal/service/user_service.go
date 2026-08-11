@@ -35,11 +35,12 @@ func (s *UserService) Register(username, password, nickname string) error {
 		Username: username,
 		Password: hashed,
 		Nickname: nickname,
+		Status:   model.UserStatusNormal,
 	}
 	return s.userRepo.CreateUser(user)
 }
 
-// Login 登录，验证密码，生成 JWT
+// Login 登录，验证密码与账号状态，生成 JWT
 func (s *UserService) Login(username, password string) (string, error) {
 	user, err := s.userRepo.FindUserByUsername(username)
 	if err != nil {
@@ -53,6 +54,10 @@ func (s *UserService) Login(username, password string) (string, error) {
 		return "", bizerr.ErrLoginFailed
 	}
 
+	if !user.IsActive() {
+		return "", bizerr.ErrUserMuted
+	}
+
 	token, err := jwt.GenerateToken(user.ID)
 	if err != nil {
 		return "", err
@@ -62,14 +67,12 @@ func (s *UserService) Login(username, password string) (string, error) {
 
 // GetMe 获取当前登录用户资料（不含密码）
 func (s *UserService) GetMe(userID uint) (*model.User, error) {
-	user, err := s.userRepo.FindUserByID(userID)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, bizerr.ErrUserNotFound
-	}
-	return user, nil
+	return s.getUserOrNotFound(userID)
+}
+
+// GetPublicProfile 获取公开用户资料
+func (s *UserService) GetPublicProfile(userID uint) (*model.User, error) {
+	return s.getUserOrNotFound(userID)
 }
 
 // UpdateProfile 更新当前用户的昵称和介绍
@@ -82,4 +85,15 @@ func (s *UserService) UpdateProfile(userID uint, nickname, introduction string) 
 		return bizerr.ErrUserNotFound
 	}
 	return s.userRepo.UpdateProfile(userID, nickname, introduction)
+}
+
+func (s *UserService) getUserOrNotFound(userID uint) (*model.User, error) {
+	user, err := s.userRepo.FindUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, bizerr.ErrUserNotFound
+	}
+	return user, nil
 }

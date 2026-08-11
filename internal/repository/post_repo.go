@@ -58,6 +58,18 @@ func (r *PostRepository) FindPostsByUserID(userID uint, offset, limit int) ([]mo
 	return posts, err
 }
 
+// FindPublicPostsByUserID 分页查询某用户的公开帖子
+func (r *PostRepository) FindPublicPostsByUserID(userID uint, offset, limit int) ([]model.Post, error) {
+	var posts []model.Post
+	err := r.db.
+		Where("user_id = ? AND visible = ?", userID, model.VisiblePublic).
+		Order("create_time DESC").
+		Offset(offset).
+		Limit(limit).
+		Find(&posts).Error
+	return posts, err
+}
+
 // UpdatePost 更新帖子
 func (r *PostRepository) UpdatePost(post *model.Post) error {
 	return r.db.Updates(post).Error

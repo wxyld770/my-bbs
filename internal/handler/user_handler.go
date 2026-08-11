@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
@@ -69,6 +71,22 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 	}
 
 	user, err := h.userService.GetMe(userID)
+	if err != nil {
+		response.Fail(c, err)
+		return
+	}
+
+	response.OK(c, gin.H{"user": user})
+}
+
+func (h *UserHandler) GetPublicProfile(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		response.Fail(c, bizerr.ErrInvalidUserID)
+		return
+	}
+
+	user, err := h.userService.GetPublicProfile(uint(id))
 	if err != nil {
 		response.Fail(c, err)
 		return
