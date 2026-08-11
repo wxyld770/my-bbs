@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/router"
+	"my-bbs/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,8 +27,12 @@ import (
 const shutdownTimeout = 10 * time.Second
 
 func main() {
-	// 1. 加载配置
+	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET 直接退出）
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "配置错误: %v\n", err)
+		os.Exit(1)
+	}
 
 	// 2. 初始化日志（写入当前目录下的日志文件夹）
 	if err := logger.Init(cfg.LogDir); err != nil {
@@ -33,6 +40,7 @@ func main() {
 	}
 	defer logger.Close()
 
+	jwt.Init(cfg.JWTSecret)
 	gin.SetMode(cfg.AppMode)
 
 	// 3. 初始化基础设施

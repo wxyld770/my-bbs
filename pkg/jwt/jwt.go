@@ -1,82 +1,109 @@
 package jwt
 
 import (
-    "errors"
-    "time"
-    "github.com/golang-jwt/jwt/v5"
-	"my-bbs/internal/config"
+	"errors"
+	"sync"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var (
-    secretKey = []byte(SECRET_KEY())
-    ErrTokenExpired = errors.New("令牌已过期")
-    ErrTokenInvalid = errors.New("令牌无效")
+	secretMu        sync.RWMutex
+	secretKey       []byte
+	ErrTokenExpired = errors.New("令牌已过期")
+	ErrTokenInvalid = errors.New("令牌无效")
+	ErrSecretEmpty  = errors.New("JWT secret 未初始化")
 )
 
 type Claims struct {
-    UserID uint `json:"user_id"`
-    jwt.RegisteredClaims
+	UserID uint `json:"user_id"`
+	jwt.RegisteredClaims
+}
+
+// Init 设置签名密钥；应在进程启动且配置校验通过后调用一次。
+func Init(secret string) {
+	secretMu.Lock()
+	defer secretMu.Unlock()
+	secretKey = []byte(secret)
+}
+
+func getSecretKey() ([]byte, error) {
+	secretMu.RLock()
+	defer secretMu.RUnlock()
+	if len(secretKey) == 0 {
+		return nil, ErrSecretEmpty
+	}
+	return secretKey, nil
 }
 
 // GenerateToken 生成JWT，有效期24小时
 func GenerateToken(userID uint) (string, error) {
-    claims := Claims{
-        UserID: userID,
-        RegisteredClaims: jwt.RegisteredClaims{
-            ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 过期时间
-            IssuedAt:  jwt.NewNumericDate(time.Now()), // 签发时间
-            NotBefore: jwt.NewNumericDate(time.Now()), // 生效时间
-            Issuer:    "my-bbs", // 签发人
-        },
-    }
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString(secretKey)
+	key, err := getSecretKey()
+	if err != nil {
+		return "", err
+	}
+
+	claims := Claims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "my-bbs",
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(key)
 }
 
 // ParseToken 解析并验证JWT，返回用户ID
 func ParseToken(tokenString string) (uint, error) {
-    token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-        // 验证签名算法
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, ErrTokenInvalid
-        }
-        return secretKey, nil
-    })
+	key, err := getSecretKey()
+	if err != nil {
+		return 0, err
+	}
 
-    if err != nil {
-        if errors.Is(err, jwt.ErrTokenExpired) {
-            return 0, ErrTokenExpired
-        }
-        return 0, ErrTokenInvalid
-    }
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, ErrTokenInvalid
+		}
+		return key, nil
+	})
 
-    if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-        return claims.UserID, nil
-    }
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return 0, ErrTokenExpired
+		}
+		return 0, ErrTokenInvalid
+	}
 
-    return 0, ErrTokenInvalid
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims.UserID, nil
+	}
+
+	return 0, ErrTokenInvalid
 }
 
-// 用于token刷新
+// RefreshToken 用于 token 刷新
 func RefreshToken(tokenString string) (string, error) {
-    token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-        return secretKey, nil
-    })
+	key, err := getSecretKey()
+	if err != nil {
+		return "", err
+	}
 
-    if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
-        return "", ErrTokenInvalid
-    }
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return key, nil
+	})
 
-    claims, ok := token.Claims.(*Claims)
-    if !ok {
-        return "", ErrTokenInvalid
-    }
+	if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
+		return "", ErrTokenInvalid
+	}
 
-    return GenerateToken(claims.UserID)
-}
+	claims, ok := token.Claims.(*Claims)
+	if !ok {
+		return "", ErrTokenInvalid
+	}
 
-// 从配置读取secret_key
-func SECRET_KEY() string {
-	cfg := config.Load()
-	return cfg.JWTSecret
+	return GenerateToken(claims.UserID)
 }
