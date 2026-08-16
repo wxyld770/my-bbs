@@ -12,17 +12,17 @@ import (
 )
 
 type PostService struct {
-	postRepo    *repository.PostRepository
-	userRepo    *repository.UserRepository
-	commentRepo *repository.CommentRepository
-	likeRepo    *repository.LikeRepository
+	postRepo    repository.PostRepository
+	userRepo    repository.UserReader
+	commentRepo repository.CommentCounter
+	likeRepo    repository.LikeReader
 }
 
 func NewPostService(
-	postRepo *repository.PostRepository,
-	userRepo *repository.UserRepository,
-	commentRepo *repository.CommentRepository,
-	likeRepo *repository.LikeRepository,
+	postRepo repository.PostRepository,
+	userRepo repository.UserReader,
+	commentRepo repository.CommentCounter,
+	likeRepo repository.LikeReader,
 ) *PostService {
 	return &PostService{
 		postRepo:    postRepo,

@@ -3,13 +3,10 @@ package service
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
-
-	"gorm.io/gorm"
 )
 
 // LikeToggleResult 点赞切换结果
@@ -19,11 +16,11 @@ type LikeToggleResult struct {
 }
 
 type LikeService struct {
-	likeRepo *repository.LikeRepository
-	postRepo *repository.PostRepository
+	likeRepo repository.LikeRepository
+	postRepo repository.PostReader
 }
 
-func NewLikeService(likeRepo *repository.LikeRepository, postRepo *repository.PostRepository) *LikeService {
+func NewLikeService(likeRepo repository.LikeRepository, postRepo repository.PostReader) *LikeService {
 	return &LikeService{
 		likeRepo: likeRepo,
 		postRepo: postRepo,
@@ -51,7 +48,7 @@ func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeTog
 		like := &model.PostLike{PostID: postID, UserID: userID}
 		if err := s.likeRepo.Create(ctx, like); err != nil {
 			// 并发下唯一索引冲突：视为已点赞
-			if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateKey(err) {
+			if errors.Is(err, repository.ErrAlreadyExists) {
 				liked = true
 			} else {
 				return nil, err
@@ -77,13 +74,4 @@ func (s *LikeService) requirePublicPost(ctx context.Context, postID uint) error 
 		return bizerr.ErrPostNotFound
 	}
 	return nil
-}
-
-// isDuplicateKey 判断 MySQL 唯一键冲突（1062）
-func isDuplicateKey(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "Duplicate entry") || strings.Contains(msg, "1062")
 }

@@ -32,8 +32,9 @@ my-bbs/
 │   ├── database/               # DB 初始化与迁移
 │   ├── logger/                 # 异步日志
 │   ├── model/                  # User / Post / Comment / PostLike / BaseModel
-│   ├── repository/             # 数据访问
-│   ├── service/                # 业务逻辑
+│   ├── repository/             # Repository Port 接口与通用错误
+│   │   └── gormrepo/           # GORM Repository Adapter
+│   ├── service/                # 业务逻辑，只依赖 Repository Port
 │   ├── handler/                # HTTP 处理
 │   │   └── httpresponse/       # 独立对外响应模型及边界转换
 │   ├── middleware/             # Auth / OptionalAuth / 日志 / Recovery / ErrorHandler
@@ -71,6 +72,7 @@ my-bbs/
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
 - ✅ 独立 HTTP Response，避免直接序列化 GORM / Service 对象
+- ✅ Repository Port 与 GORM Adapter 分离，Service 只依赖 Repository 契约
 - ✅ 分页 `pageNo/pageSize/hasMore`（无限下拉，不做 total count）
 - ✅ 异步日志（控制台 + `logs/日期.log`）
 - ✅ 优雅启停（SIGINT/SIGTERM）

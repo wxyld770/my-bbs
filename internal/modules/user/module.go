@@ -3,7 +3,7 @@ package user
 import (
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +13,12 @@ import (
 // Module 用户模块
 type Module struct {
 	Handler  *handler.UserHandler
-	userRepo *repository.UserRepository
+	userRepo middleware.UserLookup
 }
 
 // Initialize 初始化用户模块
 func Initialize(db *gorm.DB) *Module {
-	repo := repository.NewUserRepository(db)
+	repo := gormrepo.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 	hdl := handler.NewUserHandler(svc)
 	return &Module{Handler: hdl, userRepo: repo}

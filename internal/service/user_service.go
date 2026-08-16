@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -11,10 +12,10 @@ import (
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
+	userRepo repository.UserRepository
 }
 
-func NewUserService(userRepo *repository.UserRepository) *UserService {
+func NewUserService(userRepo repository.UserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
@@ -39,7 +40,13 @@ func (s *UserService) Register(ctx context.Context, username, password, nickname
 		Nickname: nickname,
 		Status:   model.UserStatusNormal,
 	}
-	return s.userRepo.CreateUser(ctx, user)
+	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+		if errors.Is(err, repository.ErrAlreadyExists) {
+			return bizerr.ErrUsernameExists
+		}
+		return err
+	}
+	return nil
 }
 
 // Login 登录，验证密码与账号状态，生成 JWT

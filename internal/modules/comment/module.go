@@ -3,7 +3,7 @@ package comment
 import (
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -13,14 +13,14 @@ import (
 // Module 评论模块
 type Module struct {
 	Handler  *handler.CommentHandler
-	userRepo *repository.UserRepository
+	userRepo middleware.UserLookup
 }
 
 // Initialize 初始化评论模块
 func Initialize(db *gorm.DB) *Module {
-	commentRepo := repository.NewCommentRepository(db)
-	postRepo := repository.NewPostRepository(db)
-	userRepo := repository.NewUserRepository(db)
+	commentRepo := gormrepo.NewCommentRepository(db)
+	postRepo := gormrepo.NewPostRepository(db)
+	userRepo := gormrepo.NewUserRepository(db)
 	svc := service.NewCommentService(commentRepo, postRepo, userRepo)
 	hdl := handler.NewCommentHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo}

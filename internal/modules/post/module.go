@@ -3,7 +3,7 @@ package post
 import (
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -13,15 +13,15 @@ import (
 // Module 帖子模块
 type Module struct {
 	Handler  *handler.PostHandler
-	userRepo *repository.UserRepository
+	userRepo middleware.UserLookup
 }
 
 // Initialize 初始化帖子模块
 func Initialize(db *gorm.DB) *Module {
-	postRepo := repository.NewPostRepository(db)
-	userRepo := repository.NewUserRepository(db)
-	commentRepo := repository.NewCommentRepository(db)
-	likeRepo := repository.NewLikeRepository(db)
+	postRepo := gormrepo.NewPostRepository(db)
+	userRepo := gormrepo.NewUserRepository(db)
+	commentRepo := gormrepo.NewCommentRepository(db)
+	likeRepo := gormrepo.NewLikeRepository(db)
 	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo)
 	hdl := handler.NewPostHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo}
