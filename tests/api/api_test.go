@@ -2,11 +2,13 @@ package api_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/modules/comment"
@@ -21,6 +23,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+type readinessCheckerFunc func(context.Context) error
+
+func (f readinessCheckerFunc) PingContext(ctx context.Context) error {
+	return f(ctx)
+}
 
 func setupTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
@@ -64,6 +72,35 @@ func decodeResp(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 		t.Fatalf("decode response: %v body=%s", err, w.Body.String())
 	}
 	return resp
+}
+
+func TestAPI_HealthChecks(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	readyRouter := router.SetupRouter(router.RouterDeps{
+		ReadinessChecker: readinessCheckerFunc(func(ctx context.Context) error {
+			if _, ok := ctx.Deadline(); !ok {
+				t.Fatal("readiness context should have a deadline")
+			}
+			return nil
+		}),
+		HealthTimeout: 100 * time.Millisecond,
+	})
+
+	w := doJSON(t, readyRouter, http.MethodGet, "/livez", "", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("livez status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, readyRouter, http.MethodGet, "/readyz", "", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("readyz status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	unavailableRouter := router.SetupRouter(router.RouterDeps{})
+	w = doJSON(t, unavailableRouter, http.MethodGet, "/readyz", "", nil)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readyz without checker status=%d body=%s", w.Code, w.Body.String())
+	}
 }
 
 func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
@@ -165,7 +202,7 @@ func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
 	data, _ := loginResp["data"].(map[string]any)
 	token, _ := data["token"].(string)
 
-	user, err := userRepo.FindUserByUsername("mutedapi")
+	user, err := userRepo.FindUserByUsername(context.Background(), "mutedapi")
 	if err != nil || user == nil {
 		t.Fatalf("find user: %v", err)
 	}

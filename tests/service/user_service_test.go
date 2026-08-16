@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -12,15 +13,16 @@ import (
 )
 
 func TestUserService_Login_RejectsMutedUser(t *testing.T) {
+	ctx := context.Background()
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
 	repo := repository.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
-	if err := svc.Register("muted_user", "password1", "Muted"); err != nil {
+	if err := svc.Register(ctx, "muted_user", "password1", "Muted"); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	user, err := repo.FindUserByUsername("muted_user")
+	user, err := repo.FindUserByUsername(ctx, "muted_user")
 	if err != nil || user == nil {
 		t.Fatalf("find user: %v", err)
 	}
@@ -28,21 +30,22 @@ func TestUserService_Login_RejectsMutedUser(t *testing.T) {
 		t.Fatalf("mute user: %v", err)
 	}
 
-	_, err = svc.Login("muted_user", "password1")
+	_, err = svc.Login(ctx, "muted_user", "password1")
 	if !errors.Is(err, bizerr.ErrUserMuted) {
 		t.Fatalf("want ErrUserMuted, got %v", err)
 	}
 }
 
 func TestUserService_Login_OK(t *testing.T) {
+	ctx := context.Background()
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
 	svc := service.NewUserService(repository.NewUserRepository(db))
 
-	if err := svc.Register("alice", "password1", "Alice"); err != nil {
+	if err := svc.Register(ctx, "alice", "password1", "Alice"); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	token, err := svc.Login("alice", "password1")
+	token, err := svc.Login(ctx, "alice", "password1")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
@@ -52,19 +55,20 @@ func TestUserService_Login_OK(t *testing.T) {
 }
 
 func TestUserService_GetPublicProfile(t *testing.T) {
+	ctx := context.Background()
 	db := testutil.NewTestDB(t)
 	repo := repository.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
-	if err := svc.Register("bob", "password1", "Bob"); err != nil {
+	if err := svc.Register(ctx, "bob", "password1", "Bob"); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	user, err := repo.FindUserByUsername("bob")
+	user, err := repo.FindUserByUsername(ctx, "bob")
 	if err != nil || user == nil {
 		t.Fatalf("find: %v", err)
 	}
 
-	profile, err := svc.GetPublicProfile(user.ID)
+	profile, err := svc.GetPublicProfile(ctx, user.ID)
 	if err != nil {
 		t.Fatalf("GetPublicProfile: %v", err)
 	}
@@ -72,21 +76,22 @@ func TestUserService_GetPublicProfile(t *testing.T) {
 		t.Fatalf("unexpected profile: %+v", profile)
 	}
 
-	_, err = svc.GetPublicProfile(99999)
+	_, err = svc.GetPublicProfile(ctx, 99999)
 	if !errors.Is(err, bizerr.ErrUserNotFound) {
 		t.Fatalf("want ErrUserNotFound, got %v", err)
 	}
 }
 
 func TestUserService_Register_SetsNormalStatus(t *testing.T) {
+	ctx := context.Background()
 	db := testutil.NewTestDB(t)
 	repo := repository.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
-	if err := svc.Register("carol", "password1", "Carol"); err != nil {
+	if err := svc.Register(ctx, "carol", "password1", "Carol"); err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	user, err := repo.FindUserByUsername("carol")
+	user, err := repo.FindUserByUsername(ctx, "carol")
 	if err != nil || user == nil {
 		t.Fatalf("find: %v", err)
 	}

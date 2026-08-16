@@ -3,6 +3,7 @@ package config_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"my-bbs/internal/config"
 )
@@ -55,8 +56,19 @@ func TestValidate_RequiresDBDSNAndJWTSecret(t *testing.T) {
 func TestValidate_OK(t *testing.T) {
 	t.Parallel()
 	cfg := &config.Config{
-		DBDSN:     "root:x@tcp(127.0.0.1:3306)/db",
-		JWTSecret: "a-long-enough-secret",
+		DBDSN:                 "root:x@tcp(127.0.0.1:3306)/db",
+		DBMaxOpenConns:        25,
+		DBMaxIdleConns:        10,
+		DBConnMaxLifetime:     30 * time.Minute,
+		DBConnMaxIdleTime:     5 * time.Minute,
+		JWTSecret:             "a-long-enough-secret",
+		AppPort:               "8080",
+		HTTPReadHeaderTimeout: 5 * time.Second,
+		HTTPReadTimeout:       10 * time.Second,
+		HTTPWriteTimeout:      15 * time.Second,
+		HTTPIdleTimeout:       time.Minute,
+		HTTPShutdownTimeout:   10 * time.Second,
+		HealthCheckTimeout:    2 * time.Second,
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
