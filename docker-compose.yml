@@ -21,12 +21,27 @@ services:
       APP_PORT: "8080"
       LOG_DIR: logs
       DB_DSN: "root:change-me@tcp(db:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
+      DB_MAX_OPEN_CONNS: "25"
+      DB_MAX_IDLE_CONNS: "10"
+      DB_CONN_MAX_LIFETIME: "30m"
+      DB_CONN_MAX_IDLE_TIME: "5m"
       JWT_SECRET: "replace-this-before-any-public-deployment"
+      HTTP_READ_HEADER_TIMEOUT: "5s"
+      HTTP_READ_TIMEOUT: "10s"
+      HTTP_WRITE_TIMEOUT: "15s"
+      HTTP_IDLE_TIMEOUT: "60s"
+      HTTP_SHUTDOWN_TIMEOUT: "10s"
+      HEALTH_CHECK_TIMEOUT: "2s"
     ports:
       - "8080:8080"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     restart: unless-stopped
 
 volumes:

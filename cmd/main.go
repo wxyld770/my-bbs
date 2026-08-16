@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
@@ -22,9 +21,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-// 优雅关闭超时：等待在途请求完成的最长时间
-const shutdownTimeout = 10 * time.Second
 
 func main() {
 	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET 直接退出）
@@ -44,7 +40,21 @@ func main() {
 	gin.SetMode(cfg.AppMode)
 
 	// 3. 初始化基础设施
-	db := database.InitDB(cfg.DBDSN)
+	db, sqlDB, err := database.InitDB(cfg.DBDSN, database.PoolConfig{
+		MaxOpenConns:    cfg.DBMaxOpenConns,
+		MaxIdleConns:    cfg.DBMaxIdleConns,
+		ConnMaxLifetime: cfg.DBConnMaxLifetime,
+		ConnMaxIdleTime: cfg.DBConnMaxIdleTime,
+	})
+	if err != nil {
+		logger.Fatal("数据库初始化失败: %v", err)
+	}
+	startupCtx, startupCancel := context.WithTimeout(context.Background(), cfg.HealthCheckTimeout)
+	if err := sqlDB.PingContext(startupCtx); err != nil {
+		startupCancel()
+		logger.Fatal("数据库连通性检查失败: %v", err)
+	}
+	startupCancel()
 
 	// 4. 执行迁移
 	if err := database.AutoMigrate(db); err != nil {
@@ -65,6 +75,8 @@ func main() {
 			commentMod,
 			likeMod,
 		},
+		ReadinessChecker: sqlDB,
+		HealthTimeout:    cfg.HealthCheckTimeout,
 	}
 	r := router.SetupRouter(deps)
 
@@ -73,7 +85,10 @@ func main() {
 	srv := &http.Server{
 		Addr:              addr,
 		Handler:           r,
-		ReadHeaderTimeout: 5 * time.Second,
+		ReadHeaderTimeout: cfg.HTTPReadHeaderTimeout,
+		ReadTimeout:       cfg.HTTPReadTimeout,
+		WriteTimeout:      cfg.HTTPWriteTimeout,
+		IdleTimeout:       cfg.HTTPIdleTimeout,
 	}
 
 	// 监听 SIGINT / SIGTERM，收到后取消 ctx
@@ -93,7 +108,7 @@ func main() {
 	logger.Info("收到退出信号，开始优雅关闭...")
 
 	// 8. 优雅关闭：停止接新请求，等待在途请求结束（或超时）
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.HTTPShutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
@@ -103,7 +118,7 @@ func main() {
 	}
 
 	// 9. 释放资源：数据库 → 日志（日志在 defer 中最后关闭）
-	if err := database.Close(db); err != nil {
+	if err := database.Close(sqlDB); err != nil {
 		logger.Error("数据库关闭异常: %v", err)
 	} else {
 		logger.Info("数据库连接已关闭")

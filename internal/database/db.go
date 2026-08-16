@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+	"fmt"
 	"log"
 	"time"
 
@@ -12,7 +14,16 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-func InitDB(dsn string) *gorm.DB {
+// PoolConfig 描述 database/sql 连接池参数。
+type PoolConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+}
+
+// InitDB 初始化 GORM 及其底层 database/sql 连接池。
+func InitDB(dsn string, pool PoolConfig) (*gorm.DB, *sql.DB, error) {
 	// 用标准库 log 的 Writer 构建 GORM Logger，
 	// 这样 GORM 的 SQL 日志也走同一个输出（logger.Init 已经接管了 log 的输出）
 	gormLog := gormlogger.New(
@@ -31,11 +42,26 @@ func InitDB(dsn string) *gorm.DB {
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {
-		logger.Fatal("连接数据库失败: %v", err)
+		return nil, nil, fmt.Errorf("连接数据库失败: %w", err)
 	}
 
-	logger.Info("数据库连接成功")
-	return db
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, nil, fmt.Errorf("获取底层数据库连接失败: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(pool.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(pool.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(pool.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(pool.ConnMaxIdleTime)
+
+	logger.Info(
+		"数据库连接成功，连接池 maxOpen=%d maxIdle=%d maxLifetime=%s maxIdleTime=%s",
+		pool.MaxOpenConns,
+		pool.MaxIdleConns,
+		pool.ConnMaxLifetime,
+		pool.ConnMaxIdleTime,
+	)
+	return db, sqlDB, nil
 }
 
 // AutoMigrate 自动迁移（独立函数，便于调用）
@@ -53,13 +79,9 @@ func AutoMigrate(db *gorm.DB) error {
 }
 
 // Close 关闭底层数据库连接（优雅停机时调用）
-func Close(db *gorm.DB) error {
+func Close(db *sql.DB) error {
 	if db == nil {
 		return nil
 	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return err
-	}
-	return sqlDB.Close()
+	return db.Close()
 }
