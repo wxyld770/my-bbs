@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "41174f034eaef3a7fc722d3fc0ca02dba607a17c",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
