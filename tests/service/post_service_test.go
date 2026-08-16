@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"my-bbs/internal/model"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/pagination"
@@ -16,13 +16,13 @@ import (
 func TestPostService_GetPostByID_AuthorCanReadPrivate(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.NewTestDB(t)
-	userRepo := repository.NewUserRepository(db)
-	postRepo := repository.NewPostRepository(db)
+	userRepo := gormrepo.NewUserRepository(db)
+	postRepo := gormrepo.NewPostRepository(db)
 	svc := service.NewPostService(
 		postRepo,
 		userRepo,
-		repository.NewCommentRepository(db),
-		repository.NewLikeRepository(db),
+		gormrepo.NewCommentRepository(db),
+		gormrepo.NewLikeRepository(db),
 	)
 
 	author := &model.User{Username: "author1", Password: "x", Nickname: "A", Status: model.UserStatusNormal}
@@ -66,13 +66,13 @@ func TestPostService_GetPostByID_AuthorCanReadPrivate(t *testing.T) {
 func TestPostService_GetPublicPostsByUser_FiltersPrivate(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.NewTestDB(t)
-	userRepo := repository.NewUserRepository(db)
-	postRepo := repository.NewPostRepository(db)
+	userRepo := gormrepo.NewUserRepository(db)
+	postRepo := gormrepo.NewPostRepository(db)
 	svc := service.NewPostService(
 		postRepo,
 		userRepo,
-		repository.NewCommentRepository(db),
-		repository.NewLikeRepository(db),
+		gormrepo.NewCommentRepository(db),
+		gormrepo.NewLikeRepository(db),
 	)
 
 	user := &model.User{Username: "pubuser", Password: "x", Nickname: "P", Status: model.UserStatusNormal}

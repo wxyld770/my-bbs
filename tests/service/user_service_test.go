@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"my-bbs/internal/model"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/tests/testutil"
@@ -16,7 +16,7 @@ func TestUserService_Login_RejectsMutedUser(t *testing.T) {
 	ctx := context.Background()
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
-	repo := repository.NewUserRepository(db)
+	repo := gormrepo.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
 	if err := svc.Register(ctx, "muted_user", "password1", "Muted"); err != nil {
@@ -40,7 +40,7 @@ func TestUserService_Login_OK(t *testing.T) {
 	ctx := context.Background()
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
-	svc := service.NewUserService(repository.NewUserRepository(db))
+	svc := service.NewUserService(gormrepo.NewUserRepository(db))
 
 	if err := svc.Register(ctx, "alice", "password1", "Alice"); err != nil {
 		t.Fatalf("register: %v", err)
@@ -57,7 +57,7 @@ func TestUserService_Login_OK(t *testing.T) {
 func TestUserService_GetPublicProfile(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.NewTestDB(t)
-	repo := repository.NewUserRepository(db)
+	repo := gormrepo.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
 	if err := svc.Register(ctx, "bob", "password1", "Bob"); err != nil {
@@ -85,7 +85,7 @@ func TestUserService_GetPublicProfile(t *testing.T) {
 func TestUserService_Register_SetsNormalStatus(t *testing.T) {
 	ctx := context.Background()
 	db := testutil.NewTestDB(t)
-	repo := repository.NewUserRepository(db)
+	repo := gormrepo.NewUserRepository(db)
 	svc := service.NewUserService(repo)
 
 	if err := svc.Register(ctx, "carol", "password1", "Carol"); err != nil {

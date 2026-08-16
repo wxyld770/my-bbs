@@ -15,7 +15,7 @@ import (
 	"my-bbs/internal/modules/like"
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/user"
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/router"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/tests/testutil"
@@ -183,7 +183,7 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 
 func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
 	r, db := setupTestRouter(t)
-	userRepo := repository.NewUserRepository(db)
+	userRepo := gormrepo.NewUserRepository(db)
 
 	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
 		"username": "mutedapi",

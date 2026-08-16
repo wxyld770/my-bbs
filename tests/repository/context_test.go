@@ -5,13 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"my-bbs/internal/repository"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/tests/testutil"
 )
 
 func TestUserRepository_HonorsCanceledContext(t *testing.T) {
 	db := testutil.NewTestDB(t)
-	repo := repository.NewUserRepository(db)
+	repo := gormrepo.NewUserRepository(db)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
