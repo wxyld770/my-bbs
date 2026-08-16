@@ -1,30 +1,39 @@
 package router
 
 import (
-    "my-bbs/internal/middleware"
-    "github.com/gin-gonic/gin"
+	"time"
+
+	"my-bbs/internal/handler"
+	"my-bbs/internal/middleware"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RouterDeps 路由依赖
 type RouterDeps struct {
-    Modules []RouteRegister
+	Modules          []RouteRegister
+	ReadinessChecker handler.ReadinessChecker
+	HealthTimeout    time.Duration
 }
 
 // SetupRouter 配置路由
 func SetupRouter(deps RouterDeps) *gin.Engine {
-    r := gin.New()
-    r.Use(
-        middleware.RequestLogger(),
-        middleware.Recovery(),
-        middleware.ErrorHandler(),
-    )
+	r := gin.New()
+	r.Use(
+		middleware.RequestLogger(),
+		middleware.Recovery(),
+		middleware.ErrorHandler(),
+	)
+	health := handler.NewHealthHandler(deps.ReadinessChecker, deps.HealthTimeout)
+	r.GET("/livez", health.Live)
+	r.GET("/readyz", health.Ready)
 
-    api := r.Group("/api")
+	api := r.Group("/api")
 
-    // 每个模块自己注册路由
-    for _, mod := range deps.Modules {
-        mod.Register(api)
-    }
+	// 每个模块自己注册路由
+	for _, mod := range deps.Modules {
+		mod.Register(api)
+	}
 
-    return r
+	return r
 }

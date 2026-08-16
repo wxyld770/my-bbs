@@ -42,7 +42,7 @@ func (h *CommentHandler) CreateComment(c *gin.Context) {
 		return
 	}
 
-	if err := h.commentService.CreateComment(uint(postID), userID, req.Content); err != nil {
+	if err := h.commentService.CreateComment(c.Request.Context(), uint(postID), userID, req.Content); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -58,7 +58,7 @@ func (h *CommentHandler) ListComments(c *gin.Context) {
 	}
 
 	q := parsePageQuery(c)
-	result, err := h.commentService.ListComments(uint(postID), q)
+	result, err := h.commentService.ListComments(c.Request.Context(), uint(postID), q)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -79,7 +79,7 @@ func (h *CommentHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 
-	if err := h.commentService.DeleteComment(uint(id), userID); err != nil {
+	if err := h.commentService.DeleteComment(c.Request.Context(), uint(id), userID); err != nil {
 		response.Fail(c, err)
 		return
 	}

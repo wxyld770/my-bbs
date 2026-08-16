@@ -38,7 +38,7 @@ func (h *PostHandler) CreatePost(c *gin.Context) {
 		return
 	}
 
-	if err := h.postService.CreatePost(userID, req.Title, req.Content); err != nil {
+	if err := h.postService.CreatePost(c.Request.Context(), userID, req.Title, req.Content); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -58,7 +58,7 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 		viewerID = uid
 	}
 
-	detail, err := h.postService.GetPostByID(uint(id), viewerID)
+	detail, err := h.postService.GetPostByID(c.Request.Context(), uint(id), viewerID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -69,7 +69,7 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 
 func (h *PostHandler) GetAllPosts(c *gin.Context) {
 	q := parsePageQuery(c)
-	result, err := h.postService.GetAllPosts(q)
+	result, err := h.postService.GetAllPosts(c.Request.Context(), q)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -85,7 +85,7 @@ func (h *PostHandler) GetMyPosts(c *gin.Context) {
 	}
 
 	q := parsePageQuery(c)
-	result, err := h.postService.GetPostsByUser(userID, q)
+	result, err := h.postService.GetPostsByUser(c.Request.Context(), userID, q)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -101,7 +101,7 @@ func (h *PostHandler) GetUserPublicPosts(c *gin.Context) {
 	}
 
 	q := parsePageQuery(c)
-	result, err := h.postService.GetPublicPostsByUser(uint(id), q)
+	result, err := h.postService.GetPublicPostsByUser(c.Request.Context(), uint(id), q)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -143,7 +143,7 @@ func (h *PostHandler) UpdatePost(c *gin.Context) {
 		return
 	}
 
-	if err := h.postService.UpdatePost(uint(id), userID, req.Title, req.Content); err != nil {
+	if err := h.postService.UpdatePost(c.Request.Context(), uint(id), userID, req.Title, req.Content); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -164,7 +164,7 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		return
 	}
 
-	if err := h.postService.DeletePost(uint(id), userID); err != nil {
+	if err := h.postService.DeletePost(c.Request.Context(), uint(id), userID); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -195,7 +195,7 @@ func (h *PostHandler) SetVisible(c *gin.Context) {
 		return
 	}
 
-	if err := h.postService.SetPostVisible(uint(id), userID, *req.Visible); err != nil {
+	if err := h.postService.SetPostVisible(c.Request.Context(), uint(id), userID, *req.Visible); err != nil {
 		response.Fail(c, err)
 		return
 	}

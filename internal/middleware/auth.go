@@ -1,19 +1,21 @@
 package middleware
 
 import (
+	"context"
+	"strings"
+
 	"my-bbs/internal/logger"
 	"my-bbs/internal/model"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/jwt"
 	"my-bbs/pkg/response"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 // UserLookup Auth 校验用户状态时使用的最小查询接口
 type UserLookup interface {
-	FindUserByID(id uint) (*model.User, error)
+	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 }
 
 // Auth 中间件：验证 JWT Token，校验用户存在且未禁言，将用户 ID 注入上下文
@@ -47,7 +49,7 @@ func Auth(users UserLookup) gin.HandlerFunc {
 			return
 		}
 
-		user, err := users.FindUserByID(userID)
+		user, err := users.FindUserByID(c.Request.Context(), userID)
 		if err != nil {
 			response.AbortFail(c, bizerr.ErrInternal)
 			return

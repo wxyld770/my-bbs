@@ -32,7 +32,7 @@ func (h *LikeHandler) ToggleLike(c *gin.Context) {
 		return
 	}
 
-	result, err := h.likeService.Toggle(uint(postID), userID)
+	result, err := h.likeService.Toggle(c.Request.Context(), uint(postID), userID)
 	if err != nil {
 		response.Fail(c, err)
 		return

@@ -72,6 +72,9 @@ my-bbs/
 - ✅ 分页 `pageNo/pageSize/hasMore`（无限下拉，不做 total count）
 - ✅ 异步日志（控制台 + `logs/日期.log`）
 - ✅ 优雅启停（SIGINT/SIGTERM）
+- ✅ 请求 `context.Context` 全链路传递与数据库取消
+- ✅ HTTP 超时、数据库连接池与启动连通性检查
+- ✅ 存活检查 `/livez`、数据库就绪检查 `/readyz`
 - ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
 
 ## 统一响应示例
@@ -133,11 +136,23 @@ cp config/.env.example config/.env
 
 ```bash
 DB_DSN="root:密码@tcp(127.0.0.1:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
+DB_MAX_OPEN_CONNS="25"
+DB_MAX_IDLE_CONNS="10"
+DB_CONN_MAX_LIFETIME="30m"
+DB_CONN_MAX_IDLE_TIME="5m"
 APP_MODE="debug"
 APP_PORT="8080"
 LOG_DIR="logs"
 JWT_SECRET="换成一段足够长的随机密钥"
+HTTP_READ_HEADER_TIMEOUT="5s"
+HTTP_READ_TIMEOUT="10s"
+HTTP_WRITE_TIMEOUT="15s"
+HTTP_IDLE_TIMEOUT="60s"
+HTTP_SHUTDOWN_TIMEOUT="10s"
+HEALTH_CHECK_TIMEOUT="2s"
 ```
+
+时长配置使用 Go `time.ParseDuration` 格式，例如 `500ms`、`10s`、`5m`。
 
 > 若表仍是旧字段（`created_at` 等），开发环境可删表后重启，让 AutoMigrate 重建；或手动改列名。
 
@@ -163,6 +178,8 @@ make down      # 停止 Docker 服务
 
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
+| GET | `/livez` | 否 | 进程存活检查，不访问外部依赖 |
+| GET | `/readyz` | 否 | 服务就绪检查，限定时间内执行数据库 Ping |
 | POST | `/api/register` | 否 | 注册 |
 | POST | `/api/login` | 否 | 登录，返回 token |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
@@ -180,6 +197,9 @@ make down      # 停止 Docker 服务
 | POST | `/api/posts/:id/like` | 是 | 切换点赞 |
 
 认证 Header：`Authorization: Bearer <token>`
+
+健康检查成功返回 `200 {"status":"ok"}`；数据库不可用或检查超时，`/readyz`
+返回 `503 {"status":"unavailable"}`。
 
 分页查询（广场 / 我的帖子）：
 
@@ -242,8 +262,8 @@ POST /api/user/posts?pageNo=1&pageSize=10
 ## 后续计划
 
 - □ Redis 缓存
-- □ 单测 + Swagger
-- □ /healthz
+- □ 提高边界场景测试覆盖率
+- □ OpenAPI / Swagger
 
 ## 反馈
 

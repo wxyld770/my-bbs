@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -30,25 +31,25 @@ func NewLikeService(likeRepo *repository.LikeRepository, postRepo *repository.Po
 }
 
 // Toggle 切换点赞：已赞则取消，未赞则点赞
-func (s *LikeService) Toggle(postID, userID uint) (*LikeToggleResult, error) {
-	if err := s.requirePublicPost(postID); err != nil {
+func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeToggleResult, error) {
+	if err := s.requirePublicPost(ctx, postID); err != nil {
 		return nil, err
 	}
 
-	existing, err := s.likeRepo.FindByUserAndPost(userID, postID)
+	existing, err := s.likeRepo.FindByUserAndPost(ctx, userID, postID)
 	if err != nil {
 		return nil, err
 	}
 
 	liked := false
 	if existing != nil {
-		if err := s.likeRepo.DeleteByUserAndPost(userID, postID); err != nil {
+		if err := s.likeRepo.DeleteByUserAndPost(ctx, userID, postID); err != nil {
 			return nil, err
 		}
 		liked = false
 	} else {
 		like := &model.PostLike{PostID: postID, UserID: userID}
-		if err := s.likeRepo.Create(like); err != nil {
+		if err := s.likeRepo.Create(ctx, like); err != nil {
 			// 并发下唯一索引冲突：视为已点赞
 			if errors.Is(err, gorm.ErrDuplicatedKey) || isDuplicateKey(err) {
 				liked = true
@@ -60,15 +61,15 @@ func (s *LikeService) Toggle(postID, userID uint) (*LikeToggleResult, error) {
 		}
 	}
 
-	count, err := s.likeRepo.CountByPostID(postID)
+	count, err := s.likeRepo.CountByPostID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
 	return &LikeToggleResult{Liked: liked, LikeCount: count}, nil
 }
 
-func (s *LikeService) requirePublicPost(postID uint) error {
-	post, err := s.postRepo.FindPostByID(postID)
+func (s *LikeService) requirePublicPost(ctx context.Context, postID uint) error {
+	post, err := s.postRepo.FindPostByID(ctx, postID)
 	if err != nil {
 		return err
 	}

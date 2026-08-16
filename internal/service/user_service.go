@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bcrypt"
@@ -17,8 +19,8 @@ func NewUserService(userRepo *repository.UserRepository) *UserService {
 }
 
 // Register 注册新用户
-func (s *UserService) Register(username, password, nickname string) error {
-	existing, err := s.userRepo.FindUserByUsername(username)
+func (s *UserService) Register(ctx context.Context, username, password, nickname string) error {
+	existing, err := s.userRepo.FindUserByUsername(ctx, username)
 	if err != nil {
 		return err
 	}
@@ -37,12 +39,12 @@ func (s *UserService) Register(username, password, nickname string) error {
 		Nickname: nickname,
 		Status:   model.UserStatusNormal,
 	}
-	return s.userRepo.CreateUser(user)
+	return s.userRepo.CreateUser(ctx, user)
 }
 
 // Login 登录，验证密码与账号状态，生成 JWT
-func (s *UserService) Login(username, password string) (string, error) {
-	user, err := s.userRepo.FindUserByUsername(username)
+func (s *UserService) Login(ctx context.Context, username, password string) (string, error) {
+	user, err := s.userRepo.FindUserByUsername(ctx, username)
 	if err != nil {
 		return "", err
 	}
@@ -66,29 +68,29 @@ func (s *UserService) Login(username, password string) (string, error) {
 }
 
 // GetMe 获取当前登录用户资料（不含密码）
-func (s *UserService) GetMe(userID uint) (*model.User, error) {
-	return s.getUserOrNotFound(userID)
+func (s *UserService) GetMe(ctx context.Context, userID uint) (*model.User, error) {
+	return s.getUserOrNotFound(ctx, userID)
 }
 
 // GetPublicProfile 获取公开用户资料
-func (s *UserService) GetPublicProfile(userID uint) (*model.User, error) {
-	return s.getUserOrNotFound(userID)
+func (s *UserService) GetPublicProfile(ctx context.Context, userID uint) (*model.User, error) {
+	return s.getUserOrNotFound(ctx, userID)
 }
 
 // UpdateProfile 更新当前用户的昵称和介绍
-func (s *UserService) UpdateProfile(userID uint, nickname, introduction string) error {
-	user, err := s.userRepo.FindUserByID(userID)
+func (s *UserService) UpdateProfile(ctx context.Context, userID uint, nickname, introduction string) error {
+	user, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return err
 	}
 	if user == nil {
 		return bizerr.ErrUserNotFound
 	}
-	return s.userRepo.UpdateProfile(userID, nickname, introduction)
+	return s.userRepo.UpdateProfile(ctx, userID, nickname, introduction)
 }
 
-func (s *UserService) getUserOrNotFound(userID uint) (*model.User, error) {
-	user, err := s.userRepo.FindUserByID(userID)
+func (s *UserService) getUserOrNotFound(ctx context.Context, userID uint) (*model.User, error) {
+	user, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}

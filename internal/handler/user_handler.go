@@ -32,7 +32,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.Register(req.Username, req.Password, req.Nickname); err != nil {
+	if err := h.userService.Register(c.Request.Context(), req.Username, req.Password, req.Nickname); err != nil {
 		response.Fail(c, err)
 		return
 	}
@@ -52,7 +52,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.userService.Login(req.Username, req.Password)
+	token, err := h.userService.Login(c.Request.Context(), req.Username, req.Password)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -70,7 +70,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.GetMe(userID)
+	user, err := h.userService.GetMe(c.Request.Context(), userID)
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -86,7 +86,7 @@ func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.GetPublicProfile(uint(id))
+	user, err := h.userService.GetPublicProfile(c.Request.Context(), uint(id))
 	if err != nil {
 		response.Fail(c, err)
 		return
@@ -113,7 +113,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateProfile(userID, req.Nickname, req.Introduction); err != nil {
+	if err := h.userService.UpdateProfile(c.Request.Context(), userID, req.Nickname, req.Introduction); err != nil {
 		response.Fail(c, err)
 		return
 	}

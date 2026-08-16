@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"my-bbs/internal/model"
@@ -40,7 +41,7 @@ type PostDetail struct {
 }
 
 // CreatePost 创建帖子（默认公开）
-func (s *PostService) CreatePost(userID uint, title, content string) error {
+func (s *PostService) CreatePost(ctx context.Context, userID uint, title, content string) error {
 	title = strings.TrimSpace(title)
 	content = strings.TrimSpace(content)
 	if title == "" {
@@ -56,13 +57,13 @@ func (s *PostService) CreatePost(userID uint, title, content string) error {
 		Content: content,
 		Visible: model.VisiblePublic,
 	}
-	return s.postRepo.CreatePost(post)
+	return s.postRepo.CreatePost(ctx, post)
 }
 
 // GetPostByID 根据 ID 获取帖子详情。
 // 公开帖任何人可读；私密帖仅作者可读（viewerID 为作者）。viewerID>0 时填充 is_liked。
-func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
-	post, err := s.postRepo.FindPostByID(id)
+func (s *PostService) GetPostByID(ctx context.Context, id uint, viewerID uint) (*PostDetail, error) {
+	post, err := s.postRepo.FindPostByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -72,22 +73,22 @@ func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
 	if post.IsPrivate() && post.UserID != viewerID {
 		return nil, bizerr.ErrPostNotFound
 	}
-	if err := s.fillUsers([]*model.Post{post}); err != nil {
+	if err := s.fillUsers(ctx, []*model.Post{post}); err != nil {
 		return nil, err
 	}
 
-	likeCount, err := s.likeRepo.CountByPostID(id)
+	likeCount, err := s.likeRepo.CountByPostID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	commentCount, err := s.commentRepo.CountByPostID(id)
+	commentCount, err := s.commentRepo.CountByPostID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	isLiked := false
 	if viewerID > 0 {
-		isLiked, err = s.likeRepo.ExistsByUserAndPost(viewerID, id)
+		isLiked, err = s.likeRepo.ExistsByUserAndPost(ctx, viewerID, id)
 		if err != nil {
 			return nil, err
 		}
@@ -102,21 +103,21 @@ func (s *PostService) GetPostByID(id uint, viewerID uint) (*PostDetail, error) {
 }
 
 // GetPostsByUser 分页获取某用户的帖子（个人主页，含私密，无限下拉）
-func (s *PostService) GetPostsByUser(userID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+func (s *PostService) GetPostsByUser(ctx context.Context, userID uint, q pagination.Query) (pagination.Result[model.Post], error) {
 	q.Normalize()
-	posts, err := s.postRepo.FindPostsByUserID(userID, q.Offset(), q.PageSize)
+	posts, err := s.postRepo.FindPostsByUserID(ctx, userID, q.Offset(), q.PageSize)
 	if err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
-	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
 	return pagination.NewResult(posts, q), nil
 }
 
 // GetPublicPostsByUser 分页获取某用户的公开帖（他人主页）
-func (s *PostService) GetPublicPostsByUser(targetUserID uint, q pagination.Query) (pagination.Result[model.Post], error) {
-	user, err := s.userRepo.FindUserByID(targetUserID)
+func (s *PostService) GetPublicPostsByUser(ctx context.Context, targetUserID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+	user, err := s.userRepo.FindUserByID(ctx, targetUserID)
 	if err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
@@ -125,24 +126,24 @@ func (s *PostService) GetPublicPostsByUser(targetUserID uint, q pagination.Query
 	}
 
 	q.Normalize()
-	posts, err := s.postRepo.FindPublicPostsByUserID(targetUserID, q.Offset(), q.PageSize)
+	posts, err := s.postRepo.FindPublicPostsByUserID(ctx, targetUserID, q.Offset(), q.PageSize)
 	if err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
-	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
 	return pagination.NewResult(posts, q), nil
 }
 
 // GetAllPosts 分页获取公开帖子（广场，无限下拉）
-func (s *PostService) GetAllPosts(q pagination.Query) (pagination.Result[model.Post], error) {
+func (s *PostService) GetAllPosts(ctx context.Context, q pagination.Query) (pagination.Result[model.Post], error) {
 	q.Normalize()
-	posts, err := s.postRepo.FindPublicPosts(q.Offset(), q.PageSize)
+	posts, err := s.postRepo.FindPublicPosts(ctx, q.Offset(), q.PageSize)
 	if err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
-	if err := s.fillUsers(toPostPtrs(posts)); err != nil {
+	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
 		return pagination.Result[model.Post]{}, err
 	}
 	return pagination.NewResult(posts, q), nil
@@ -150,12 +151,12 @@ func (s *PostService) GetAllPosts(q pagination.Query) (pagination.Result[model.P
 
 // UpdatePost 部分更新帖子：title 和 content 至少提供一个，未提供的字段保持原值。
 // 需验证当前用户是否为作者。
-func (s *PostService) UpdatePost(postID uint, userID uint, title, content *string) error {
+func (s *PostService) UpdatePost(ctx context.Context, postID uint, userID uint, title, content *string) error {
 	if title == nil && content == nil {
 		return bizerr.ErrBadRequest.WithMessage("请至少提供 title 或 content 之一")
 	}
 
-	post, err := s.requireAuthor(postID, userID)
+	post, err := s.requireAuthor(ctx, postID, userID)
 	if err != nil {
 		return err
 	}
@@ -173,31 +174,31 @@ func (s *PostService) UpdatePost(postID uint, userID uint, title, content *strin
 		}
 		post.Content = trimmedContent
 	}
-	return s.postRepo.UpdatePost(post)
+	return s.postRepo.UpdatePost(ctx, post)
 }
 
 // DeletePost 删除帖子，需验证当前用户是否为作者
-func (s *PostService) DeletePost(postID uint, userID uint) error {
-	if _, err := s.requireAuthor(postID, userID); err != nil {
+func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) error {
+	if _, err := s.requireAuthor(ctx, postID, userID); err != nil {
 		return err
 	}
-	return s.postRepo.DeletePost(postID)
+	return s.postRepo.DeletePost(ctx, postID)
 }
 
 // SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
-func (s *PostService) SetPostVisible(postID uint, userID uint, visible uint8) error {
+func (s *PostService) SetPostVisible(ctx context.Context, postID uint, userID uint, visible uint8) error {
 	if !model.IsValidVisible(visible) {
 		return bizerr.ErrInvalidVisible
 	}
-	if _, err := s.requireAuthor(postID, userID); err != nil {
+	if _, err := s.requireAuthor(ctx, postID, userID); err != nil {
 		return err
 	}
-	return s.postRepo.UpdatePostVisible(postID, visible)
+	return s.postRepo.UpdatePostVisible(ctx, postID, visible)
 }
 
 // requireAuthor 加载帖子并校验当前用户是否为作者
-func (s *PostService) requireAuthor(postID, userID uint) (*model.Post, error) {
-	post, err := s.postRepo.FindPostByID(postID)
+func (s *PostService) requireAuthor(ctx context.Context, postID, userID uint) (*model.Post, error) {
+	post, err := s.postRepo.FindPostByID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func (s *PostService) requireAuthor(postID, userID uint) (*model.Post, error) {
 }
 
 // fillUsers 批量填充帖子作者信息
-func (s *PostService) fillUsers(posts []*model.Post) error {
+func (s *PostService) fillUsers(ctx context.Context, posts []*model.Post) error {
 	if len(posts) == 0 {
 		return nil
 	}
@@ -223,7 +224,7 @@ func (s *PostService) fillUsers(posts []*model.Post) error {
 		}
 	}
 
-	users, err := s.userRepo.FindUsersByIDs(set.FromSlice(ids).ToSlice())
+	users, err := s.userRepo.FindUsersByIDs(ctx, set.FromSlice(ids).ToSlice())
 	if err != nil {
 		return err
 	}

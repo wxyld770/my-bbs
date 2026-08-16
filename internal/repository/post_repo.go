@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"my-bbs/internal/model"
@@ -17,14 +18,14 @@ func NewPostRepository(db *gorm.DB) *PostRepository {
 }
 
 // CreatePost 创建帖子
-func (r *PostRepository) CreatePost(post *model.Post) error {
-	return r.db.Create(post).Error
+func (r *PostRepository) CreatePost(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Create(post).Error
 }
 
 // FindPostByID 根据 ID 查找帖子（不含作者信息）
-func (r *PostRepository) FindPostByID(id uint) (*model.Post, error) {
+func (r *PostRepository) FindPostByID(ctx context.Context, id uint) (*model.Post, error) {
 	var post model.Post
-	result := r.db.First(&post, id)
+	result := r.db.WithContext(ctx).First(&post, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -35,9 +36,9 @@ func (r *PostRepository) FindPostByID(id uint) (*model.Post, error) {
 }
 
 // FindPublicPosts 分页查询公开帖子
-func (r *PostRepository) FindPublicPosts(offset, limit int) ([]model.Post, error) {
+func (r *PostRepository) FindPublicPosts(ctx context.Context, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Where("visible = ?", model.VisiblePublic).
 		Order("create_time DESC").
 		Offset(offset).
@@ -47,9 +48,9 @@ func (r *PostRepository) FindPublicPosts(offset, limit int) ([]model.Post, error
 }
 
 // FindPostsByUserID 分页查询某用户的帖子
-func (r *PostRepository) FindPostsByUserID(userID uint, offset, limit int) ([]model.Post, error) {
+func (r *PostRepository) FindPostsByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Where("user_id = ?", userID).
 		Order("create_time DESC").
 		Offset(offset).
@@ -59,9 +60,9 @@ func (r *PostRepository) FindPostsByUserID(userID uint, offset, limit int) ([]mo
 }
 
 // FindPublicPostsByUserID 分页查询某用户的公开帖子
-func (r *PostRepository) FindPublicPostsByUserID(userID uint, offset, limit int) ([]model.Post, error) {
+func (r *PostRepository) FindPublicPostsByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Where("user_id = ? AND visible = ?", userID, model.VisiblePublic).
 		Order("create_time DESC").
 		Offset(offset).
@@ -71,19 +72,19 @@ func (r *PostRepository) FindPublicPostsByUserID(userID uint, offset, limit int)
 }
 
 // UpdatePost 更新帖子
-func (r *PostRepository) UpdatePost(post *model.Post) error {
-	return r.db.Updates(post).Error
+func (r *PostRepository) UpdatePost(ctx context.Context, post *model.Post) error {
+	return r.db.WithContext(ctx).Updates(post).Error
 }
 
 // UpdatePostVisible 更新帖子可见性
-func (r *PostRepository) UpdatePostVisible(id uint, visible uint8) error {
-	return r.db.Model(&model.Post{}).Where("id = ?", id).
+func (r *PostRepository) UpdatePostVisible(ctx context.Context, id uint, visible uint8) error {
+	return r.db.WithContext(ctx).Model(&model.Post{}).Where("id = ?", id).
 		Update("visible", visible).Error
 }
 
 // DeletePost 根据 ID 删除帖子（软删除，写入 deleted 字段）
-func (r *PostRepository) DeletePost(id uint) error {
-	result := r.db.Delete(&model.Post{}, id)
+func (r *PostRepository) DeletePost(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&model.Post{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

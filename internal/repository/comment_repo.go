@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"errors"
 
 	"my-bbs/internal/model"
@@ -17,14 +18,14 @@ func NewCommentRepository(db *gorm.DB) *CommentRepository {
 }
 
 // Create 创建评论
-func (r *CommentRepository) Create(comment *model.Comment) error {
-	return r.db.Create(comment).Error
+func (r *CommentRepository) Create(ctx context.Context, comment *model.Comment) error {
+	return r.db.WithContext(ctx).Create(comment).Error
 }
 
 // FindByID 根据 ID 查找评论
-func (r *CommentRepository) FindByID(id uint) (*model.Comment, error) {
+func (r *CommentRepository) FindByID(ctx context.Context, id uint) (*model.Comment, error) {
 	var comment model.Comment
-	result := r.db.First(&comment, id)
+	result := r.db.WithContext(ctx).First(&comment, id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -35,9 +36,9 @@ func (r *CommentRepository) FindByID(id uint) (*model.Comment, error) {
 }
 
 // FindByPostID 分页查询某帖评论（按创建时间升序，楼层顺序）
-func (r *CommentRepository) FindByPostID(postID uint, offset, limit int) ([]model.Comment, error) {
+func (r *CommentRepository) FindByPostID(ctx context.Context, postID uint, offset, limit int) ([]model.Comment, error) {
 	var comments []model.Comment
-	err := r.db.
+	err := r.db.WithContext(ctx).
 		Where("post_id = ?", postID).
 		Order("create_time ASC").
 		Offset(offset).
@@ -47,8 +48,8 @@ func (r *CommentRepository) FindByPostID(postID uint, offset, limit int) ([]mode
 }
 
 // SoftDelete 软删除评论
-func (r *CommentRepository) SoftDelete(id uint) error {
-	result := r.db.Delete(&model.Comment{}, id)
+func (r *CommentRepository) SoftDelete(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&model.Comment{}, id)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -59,8 +60,8 @@ func (r *CommentRepository) SoftDelete(id uint) error {
 }
 
 // CountByPostID 统计某帖评论数
-func (r *CommentRepository) CountByPostID(postID uint) (int64, error) {
+func (r *CommentRepository) CountByPostID(ctx context.Context, postID uint) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.Comment{}).Where("post_id = ?", postID).Count(&count).Error
+	err := r.db.WithContext(ctx).Model(&model.Comment{}).Where("post_id = ?", postID).Count(&count).Error
 	return count, err
 }
