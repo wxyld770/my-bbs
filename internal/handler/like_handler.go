@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
@@ -38,5 +39,5 @@ func (h *LikeHandler) ToggleLike(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, result)
+	response.OK(c, httpresp.NewLikeToggleResponse(result))
 }

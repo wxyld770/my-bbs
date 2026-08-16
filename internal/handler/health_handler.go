@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/logger"
 
 	"github.com/gin-gonic/gin"
@@ -31,13 +32,13 @@ func NewHealthHandler(checker ReadinessChecker, timeout time.Duration) *HealthHa
 
 // Live 表示进程仍能处理 HTTP 请求，不检查外部依赖。
 func (h *HealthHandler) Live(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, httpresp.HealthOK())
 }
 
 // Ready 表示服务依赖可用；当前检查数据库连接。
 func (h *HealthHandler) Ready(c *gin.Context) {
 	if h.checker == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+		c.JSON(http.StatusServiceUnavailable, httpresp.HealthUnavailable())
 		return
 	}
 
@@ -45,9 +46,9 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	defer cancel()
 	if err := h.checker.PingContext(ctx); err != nil {
 		logger.Warn("数据库就绪检查失败: %v", err)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+		c.JSON(http.StatusServiceUnavailable, httpresp.HealthUnavailable())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, httpresp.HealthOK())
 }

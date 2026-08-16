@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
@@ -58,9 +59,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{
-		"token": token,
-	})
+	response.OK(c, httpresp.NewLoginResponse(token))
 }
 
 func (h *UserHandler) GetMe(c *gin.Context) {
@@ -76,7 +75,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{"user": user})
+	response.OK(c, httpresp.NewUserProfileResponse(user))
 }
 
 func (h *UserHandler) GetPublicProfile(c *gin.Context) {
@@ -92,7 +91,7 @@ func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, gin.H{"user": user})
+	response.OK(c, httpresp.NewUserProfileResponse(user))
 }
 
 type UpdateProfileRequest struct {

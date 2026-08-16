@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
@@ -63,7 +64,7 @@ func (h *CommentHandler) ListComments(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, result)
+	response.OK(c, httpresp.NewCommentPageResponse(result))
 }
 
 func (h *CommentHandler) DeleteComment(c *gin.Context) {

@@ -14,8 +14,8 @@ import (
 
 // LikeToggleResult 点赞切换结果
 type LikeToggleResult struct {
-	Liked     bool  `json:"liked"`
-	LikeCount int64 `json:"like_count"`
+	Liked     bool
+	LikeCount int64
 }
 
 type LikeService struct {

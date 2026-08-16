@@ -3,6 +3,7 @@ package handler
 import (
 	"strconv"
 
+	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
@@ -64,7 +65,7 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, detail)
+	response.OK(c, httpresp.NewPostDetailResponse(detail))
 }
 
 func (h *PostHandler) GetAllPosts(c *gin.Context) {
@@ -74,7 +75,7 @@ func (h *PostHandler) GetAllPosts(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, result)
+	response.OK(c, httpresp.NewPostPageResponse(result))
 }
 
 func (h *PostHandler) GetMyPosts(c *gin.Context) {
@@ -90,7 +91,7 @@ func (h *PostHandler) GetMyPosts(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, result)
+	response.OK(c, httpresp.NewPostPageResponse(result))
 }
 
 func (h *PostHandler) GetUserPublicPosts(c *gin.Context) {
@@ -106,7 +107,7 @@ func (h *PostHandler) GetUserPublicPosts(c *gin.Context) {
 		response.Fail(c, err)
 		return
 	}
-	response.OK(c, result)
+	response.OK(c, httpresp.NewPostPageResponse(result))
 }
 
 // parsePageQuery 从 query 解析分页参数

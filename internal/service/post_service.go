@@ -34,10 +34,10 @@ func NewPostService(
 
 // PostDetail 帖子详情（含互动字段）
 type PostDetail struct {
-	Post         model.Post `json:"post"`
-	LikeCount    int64      `json:"like_count"`
-	CommentCount int64      `json:"comment_count"`
-	IsLiked      bool       `json:"is_liked"`
+	Post         model.Post
+	LikeCount    int64
+	CommentCount int64
+	IsLiked      bool
 }
 
 // CreatePost 创建帖子（默认公开）
