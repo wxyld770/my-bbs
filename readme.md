@@ -35,6 +35,7 @@ my-bbs/
 │   ├── repository/             # 数据访问
 │   ├── service/                # 业务逻辑
 │   ├── handler/                # HTTP 处理
+│   │   └── httpresponse/       # 独立对外响应模型及边界转换
 │   ├── middleware/             # Auth / OptionalAuth / 日志 / Recovery / ErrorHandler
 │   ├── modules/                # 模块 DI + 路由注册（user/post/comment/like）
 │   └── router/                 # 路由组装
@@ -69,6 +70,7 @@ my-bbs/
 
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
+- ✅ 独立 HTTP Response，避免直接序列化 GORM / Service 对象
 - ✅ 分页 `pageNo/pageSize/hasMore`（无限下拉，不做 total count）
 - ✅ 异步日志（控制台 + `logs/日期.log`）
 - ✅ 优雅启停（SIGINT/SIGTERM）
