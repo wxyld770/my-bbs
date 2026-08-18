@@ -62,10 +62,11 @@ func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error
 }
 
 func (r *UserRepository) UpdateProfile(ctx context.Context, id uint, nickname, introduction string) error {
-	return translateError(r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", id).
+	result := r.db.WithContext(ctx).Model(&model.User{}).Where("id = ?", id).
 		Select("nickname", "introduction").
 		Updates(map[string]any{
 			"nickname":     nickname,
 			"introduction": introduction,
-		}).Error)
+		})
+	return translateError(result.Error)
 }

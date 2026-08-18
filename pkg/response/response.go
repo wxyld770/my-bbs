@@ -53,6 +53,17 @@ func Fail(c *gin.Context, err error) {
 	})
 }
 
+// ReportError reports an error to ErrorHandler and stops the remaining
+// handlers. It deliberately does not write a response: the middleware owns
+// error logging and conversion to the public response format.
+func ReportError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+	_ = c.Error(err)
+	c.Abort()
+}
+
 // AbortFail 失败并中断后续处理（中间件用）
 func AbortFail(c *gin.Context, err error) {
 	Fail(c, err)

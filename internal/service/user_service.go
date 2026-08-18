@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -21,6 +22,22 @@ func NewUserService(userRepo repository.UserRepository) *UserService {
 
 // Register 注册新用户
 func (s *UserService) Register(ctx context.Context, username, password, nickname string) error {
+	username = strings.TrimSpace(username)
+	nickname = strings.TrimSpace(nickname)
+	if err := validateRuneLength(username, "用户名", 3, 64); err != nil {
+		return err
+	}
+	if err := validateRuneLength(password, "密码", 6, 64); err != nil {
+		return err
+	}
+	// bcrypt 只接受最多 72 字节；字符数校验无法覆盖多字节密码。
+	if err := validateByteLength(password, "密码", 72); err != nil {
+		return err
+	}
+	if err := validateRuneLength(nickname, "昵称", 0, 64); err != nil {
+		return err
+	}
+
 	existing, err := s.userRepo.FindUserByUsername(ctx, username)
 	if err != nil {
 		return err
@@ -51,6 +68,7 @@ func (s *UserService) Register(ctx context.Context, username, password, nickname
 
 // Login 登录，验证密码与账号状态，生成 JWT
 func (s *UserService) Login(ctx context.Context, username, password string) (string, error) {
+	username = strings.TrimSpace(username)
 	user, err := s.userRepo.FindUserByUsername(ctx, username)
 	if err != nil {
 		return "", err
@@ -86,6 +104,15 @@ func (s *UserService) GetPublicProfile(ctx context.Context, userID uint) (*model
 
 // UpdateProfile 更新当前用户的昵称和介绍
 func (s *UserService) UpdateProfile(ctx context.Context, userID uint, nickname, introduction string) error {
+	nickname = strings.TrimSpace(nickname)
+	introduction = strings.TrimSpace(introduction)
+	if err := validateRuneLength(nickname, "昵称", 0, 64); err != nil {
+		return err
+	}
+	if err := validateRuneLength(introduction, "个人介绍", 0, 1024); err != nil {
+		return err
+	}
+
 	user, err := s.userRepo.FindUserByID(ctx, userID)
 	if err != nil {
 		return err
@@ -93,7 +120,13 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint, nickname, 
 	if user == nil {
 		return bizerr.ErrUserNotFound
 	}
-	return s.userRepo.UpdateProfile(ctx, userID, nickname, introduction)
+	if err := s.userRepo.UpdateProfile(ctx, userID, nickname, introduction); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return bizerr.ErrUserNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *UserService) getUserOrNotFound(ctx context.Context, userID uint) (*model.User, error) {

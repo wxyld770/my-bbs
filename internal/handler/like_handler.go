@@ -23,19 +23,19 @@ func NewLikeHandler(likeService *service.LikeService) *LikeHandler {
 func (h *LikeHandler) ToggleLike(c *gin.Context) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
-		response.Fail(c, bizerr.ErrInvalidPostID)
+		response.ReportError(c, bizerr.ErrInvalidPostID)
 		return
 	}
 
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		response.Fail(c, bizerr.ErrUnauthorized)
+		response.ReportError(c, bizerr.ErrUnauthorized)
 		return
 	}
 
 	result, err := h.likeService.Toggle(c.Request.Context(), uint(postID), userID)
 	if err != nil {
-		response.Fail(c, err)
+		response.ReportError(c, err)
 		return
 	}
 

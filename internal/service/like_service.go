@@ -41,7 +41,10 @@ func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeTog
 	liked := false
 	if existing != nil {
 		if err := s.likeRepo.DeleteByUserAndPost(ctx, userID, postID); err != nil {
-			return nil, err
+			// 记录可能在查询后被并发取消；此时目标状态已达成。
+			if !errors.Is(err, repository.ErrNotFound) {
+				return nil, err
+			}
 		}
 		liked = false
 	} else {

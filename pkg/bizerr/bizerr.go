@@ -51,12 +51,15 @@ func As(err error) (*Error, bool) {
 
 // 预定义业务异常（code 段：4xxxx 客户端，5xxxx 服务端）
 var (
-	ErrBadRequest   = New(http.StatusBadRequest, 40000, "参数错误")
-	ErrUnauthorized = New(http.StatusUnauthorized, 40100, "未登录")
-	ErrForbidden    = New(http.StatusForbidden, 40300, "无权限")
-	ErrNotFound     = New(http.StatusNotFound, 40400, "资源不存在")
-	ErrConflict     = New(http.StatusConflict, 40900, "资源冲突")
-	ErrInternal     = New(http.StatusInternalServerError, 50000, "服务器内部错误")
+	ErrBadRequest           = New(http.StatusBadRequest, 40000, "参数错误")
+	ErrUnauthorized         = New(http.StatusUnauthorized, 40100, "未登录")
+	ErrForbidden            = New(http.StatusForbidden, 40300, "无权限")
+	ErrNotFound             = New(http.StatusNotFound, 40400, "资源不存在")
+	ErrMethodNotAllowed     = New(http.StatusMethodNotAllowed, 40500, "请求方法不支持")
+	ErrConflict             = New(http.StatusConflict, 40900, "资源冲突")
+	ErrPayloadTooLarge      = New(http.StatusRequestEntityTooLarge, 41300, "请求体过大")
+	ErrUnsupportedMediaType = New(http.StatusUnsupportedMediaType, 41500, "仅支持 application/json 请求")
+	ErrInternal             = New(http.StatusInternalServerError, 50000, "服务器内部错误")
 
 	ErrInvalidToken        = New(http.StatusUnauthorized, 40101, "无效的认证令牌")
 	ErrTokenExpired        = New(http.StatusUnauthorized, 40102, "认证令牌已过期，请重新登录")

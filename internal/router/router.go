@@ -5,6 +5,8 @@ import (
 
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
+	"my-bbs/pkg/bizerr"
+	"my-bbs/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,11 +21,19 @@ type RouterDeps struct {
 // SetupRouter 配置路由
 func SetupRouter(deps RouterDeps) *gin.Engine {
 	r := gin.New()
+	r.HandleMethodNotAllowed = true
 	r.Use(
+		middleware.RequestID(),
 		middleware.RequestLogger(),
 		middleware.Recovery(),
 		middleware.ErrorHandler(),
 	)
+	r.NoRoute(func(c *gin.Context) {
+		response.ReportError(c, bizerr.ErrNotFound)
+	})
+	r.NoMethod(func(c *gin.Context) {
+		response.ReportError(c, bizerr.ErrMethodNotAllowed)
+	})
 	health := handler.NewHealthHandler(deps.ReadinessChecker, deps.HealthTimeout)
 	r.GET("/livez", health.Live)
 	r.GET("/readyz", health.Ready)

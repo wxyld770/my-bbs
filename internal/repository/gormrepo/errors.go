@@ -16,6 +16,10 @@ func translateError(err error) error {
 		return nil
 	}
 
+	// gorm.ErrRecordNotFound 是 Adapter 的实现细节，不向 Port 调用方泄漏。
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return repository.ErrNotFound
+	}
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return wrapRepositoryError(repository.ErrAlreadyExists, err)
 	}
@@ -34,6 +38,19 @@ func translateError(err error) error {
 		return wrapRepositoryError(repository.ErrAlreadyExists, err)
 	}
 	return err
+}
+
+// translateDeleteResult 把删除的零影响行数转换为稳定的 Port 错误。
+// 更新操作不能复用这条规则：MySQL 默认会在“值没有变化”时返回
+// RowsAffected == 0，此时记录仍然存在。
+func translateDeleteResult(result *gorm.DB) error {
+	if result.Error != nil {
+		return translateError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return repository.ErrNotFound
+	}
+	return nil
 }
 
 // mysqlRepositoryError 按 MySQL 错误码转换为 Repository Port 的稳定错误语义。

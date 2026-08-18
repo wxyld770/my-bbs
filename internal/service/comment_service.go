@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -30,6 +31,14 @@ func NewCommentService(
 
 // CreateComment 在公开帖下发表评论
 func (s *CommentService) CreateComment(ctx context.Context, postID, userID uint, content string) error {
+	var err error
+	content, err = requiredTrimmed(content, "评论内容不能为空")
+	if err != nil {
+		return err
+	}
+	if err := validateByteLength(content, "评论内容", maxTextFieldBytes); err != nil {
+		return err
+	}
 	if err := s.requirePublicPost(ctx, postID); err != nil {
 		return err
 	}
@@ -69,7 +78,13 @@ func (s *CommentService) DeleteComment(ctx context.Context, commentID, userID ui
 	if comment.UserID != userID {
 		return bizerr.ErrCommentNoPermission
 	}
-	return s.commentRepo.SoftDelete(ctx, commentID)
+	if err := s.commentRepo.SoftDelete(ctx, commentID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return bizerr.ErrCommentNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // requirePublicPost 校验帖子存在且公开

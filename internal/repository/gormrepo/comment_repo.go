@@ -45,14 +45,7 @@ func (r *CommentRepository) FindByPostID(ctx context.Context, postID uint, offse
 }
 
 func (r *CommentRepository) SoftDelete(ctx context.Context, id uint) error {
-	result := r.db.WithContext(ctx).Delete(&model.Comment{}, id)
-	if result.Error != nil {
-		return translateError(result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return translateDeleteResult(r.db.WithContext(ctx).Delete(&model.Comment{}, id))
 }
 
 func (r *CommentRepository) CountByPostID(ctx context.Context, postID uint) (int64, error) {

@@ -76,12 +76,5 @@ func (r *PostRepository) UpdatePostVisible(ctx context.Context, id uint, visible
 }
 
 func (r *PostRepository) DeletePost(ctx context.Context, id uint) error {
-	result := r.db.WithContext(ctx).Delete(&model.Post{}, id)
-	if result.Error != nil {
-		return translateError(result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
-	}
-	return nil
+	return translateDeleteResult(r.db.WithContext(ctx).Delete(&model.Post{}, id))
 }

@@ -34,7 +34,9 @@ func (r *LikeRepository) FindByUserAndPost(ctx context.Context, userID, postID u
 }
 
 func (r *LikeRepository) DeleteByUserAndPost(ctx context.Context, userID, postID uint) error {
-	return translateError(r.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, postID).Delete(&model.PostLike{}).Error)
+	return translateDeleteResult(r.db.WithContext(ctx).
+		Where("user_id = ? AND post_id = ?", userID, postID).
+		Delete(&model.PostLike{}))
 }
 
 func (r *LikeRepository) CountByPostID(ctx context.Context, postID uint) (int64, error) {

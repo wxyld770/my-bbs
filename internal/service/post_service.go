@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"strings"
+	"errors"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -42,13 +42,20 @@ type PostDetail struct {
 
 // CreatePost 创建帖子（默认公开）
 func (s *PostService) CreatePost(ctx context.Context, userID uint, title, content string) error {
-	title = strings.TrimSpace(title)
-	content = strings.TrimSpace(content)
-	if title == "" {
-		return bizerr.ErrBadRequest.WithMessage("帖子标题不能为空")
+	var err error
+	title, err = requiredTrimmed(title, "帖子标题不能为空")
+	if err != nil {
+		return err
 	}
-	if content == "" {
-		return bizerr.ErrBadRequest.WithMessage("帖子内容不能为空")
+	content, err = requiredTrimmed(content, "帖子内容不能为空")
+	if err != nil {
+		return err
+	}
+	if err := validateRuneLength(title, "帖子标题", 0, 255); err != nil {
+		return err
+	}
+	if err := validateByteLength(content, "帖子内容", maxTextFieldBytes); err != nil {
+		return err
 	}
 
 	post := &model.Post{
@@ -161,20 +168,26 @@ func (s *PostService) UpdatePost(ctx context.Context, postID uint, userID uint, 
 		return err
 	}
 	if title != nil {
-		trimmedTitle := strings.TrimSpace(*title)
-		if trimmedTitle == "" {
-			return bizerr.ErrBadRequest.WithMessage("帖子标题不能为空")
+		trimmedTitle, err := requiredTrimmed(*title, "帖子标题不能为空")
+		if err != nil {
+			return err
+		}
+		if err := validateRuneLength(trimmedTitle, "帖子标题", 0, 255); err != nil {
+			return err
 		}
 		post.Title = trimmedTitle
 	}
 	if content != nil {
-		trimmedContent := strings.TrimSpace(*content)
-		if trimmedContent == "" {
-			return bizerr.ErrBadRequest.WithMessage("帖子内容不能为空")
+		trimmedContent, err := requiredTrimmed(*content, "帖子内容不能为空")
+		if err != nil {
+			return err
+		}
+		if err := validateByteLength(trimmedContent, "帖子内容", maxTextFieldBytes); err != nil {
+			return err
 		}
 		post.Content = trimmedContent
 	}
-	return s.postRepo.UpdatePost(ctx, post)
+	return mapPostMutationError(s.postRepo.UpdatePost(ctx, post))
 }
 
 // DeletePost 删除帖子，需验证当前用户是否为作者
@@ -182,7 +195,7 @@ func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) 
 	if _, err := s.requireAuthor(ctx, postID, userID); err != nil {
 		return err
 	}
-	return s.postRepo.DeletePost(ctx, postID)
+	return mapPostMutationError(s.postRepo.DeletePost(ctx, postID))
 }
 
 // SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
@@ -193,7 +206,7 @@ func (s *PostService) SetPostVisible(ctx context.Context, postID uint, userID ui
 	if _, err := s.requireAuthor(ctx, postID, userID); err != nil {
 		return err
 	}
-	return s.postRepo.UpdatePostVisible(ctx, postID, visible)
+	return mapPostMutationError(s.postRepo.UpdatePostVisible(ctx, postID, visible))
 }
 
 // requireAuthor 加载帖子并校验当前用户是否为作者
@@ -209,6 +222,13 @@ func (s *PostService) requireAuthor(ctx context.Context, postID, userID uint) (*
 		return nil, bizerr.ErrPostNoPermission
 	}
 	return post, nil
+}
+
+func mapPostMutationError(err error) error {
+	if errors.Is(err, repository.ErrNotFound) {
+		return bizerr.ErrPostNotFound
+	}
+	return err
 }
 
 // fillUsers 批量填充帖子作者信息

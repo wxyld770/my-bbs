@@ -7,6 +7,7 @@ import (
 
 	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/logger"
+	"my-bbs/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,7 +46,7 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), h.timeout)
 	defer cancel()
 	if err := h.checker.PingContext(ctx); err != nil {
-		logger.Warn("数据库就绪检查失败: %v", err)
+		logger.Warn("数据库就绪检查失败 | request_id=%s | error=%v", middleware.GetRequestID(c), err)
 		c.JSON(http.StatusServiceUnavailable, httpresp.HealthUnavailable())
 		return
 	}

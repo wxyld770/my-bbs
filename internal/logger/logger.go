@@ -25,11 +25,12 @@ var (
 // asyncWriter 基于 channel 的异步日志写入器（生产者-消费者模型）
 // 业务协程只负责把日志投递进 channel，后台 goroutine 负责真正写磁盘/控制台
 type asyncWriter struct {
-	ch     chan []byte
-	out    io.Writer
-	wg     sync.WaitGroup
-	closed bool
-	mu     sync.Mutex
+	ch      chan []byte
+	out     io.Writer
+	wg      sync.WaitGroup
+	closed  bool
+	stateMu sync.RWMutex
+	outMu   sync.Mutex
 }
 
 func newAsyncWriter(out io.Writer, queueSize int) *asyncWriter {
@@ -45,24 +46,28 @@ func newAsyncWriter(out io.Writer, queueSize int) *asyncWriter {
 // Write 实现 io.Writer：把日志内容拷贝后投递到 channel（不阻塞业务太久）
 // 注意：必须 copy，因为标准库 log 会复用底层 buffer
 func (w *asyncWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	closed := w.closed
-	w.mu.Unlock()
-	if closed {
-		return w.out.Write(p)
-	}
-
 	buf := make([]byte, len(p))
 	copy(buf, p)
+
+	// Keep a read lock through the send. close takes the write lock before
+	// closing the channel, so it cannot close ch between the state check and
+	// this select (the former implementation could panic with send-on-closed).
+	w.stateMu.RLock()
+	if w.closed {
+		w.stateMu.RUnlock()
+		return 0, io.ErrClosedPipe
+	}
 
 	select {
 	case w.ch <- buf:
 		// 投递成功，由消费协程异步落盘
+		w.stateMu.RUnlock()
 	default:
 		// channel 满了：降级为同步写，避免丢日志，同时给请求侧一点背压
 		_, _ = fmt.Fprint(os.Stderr, "[logger] queue full, fallback to sync write\n")
-		_, err := w.out.Write(buf)
-		return len(p), err
+		written, err := w.writeOutput(buf)
+		w.stateMu.RUnlock()
+		return written, err
 	}
 	return len(p), nil
 }
@@ -71,21 +76,27 @@ func (w *asyncWriter) Write(p []byte) (int, error) {
 func (w *asyncWriter) consume() {
 	defer w.wg.Done()
 	for msg := range w.ch {
-		_, _ = w.out.Write(msg)
+		_, _ = w.writeOutput(msg)
 	}
+}
+
+func (w *asyncWriter) writeOutput(p []byte) (int, error) {
+	w.outMu.Lock()
+	defer w.outMu.Unlock()
+	return w.out.Write(p)
 }
 
 // close 关闭 channel，等待消费协程把剩余日志写完
 func (w *asyncWriter) close() {
-	w.mu.Lock()
+	w.stateMu.Lock()
 	if w.closed {
-		w.mu.Unlock()
+		w.stateMu.Unlock()
+		w.wg.Wait()
 		return
 	}
 	w.closed = true
-	w.mu.Unlock()
-
 	close(w.ch)
+	w.stateMu.Unlock()
 	w.wg.Wait()
 }
 

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net"
-	"net/http/httputil"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -20,27 +19,24 @@ func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
 
 		c.Next()
 
 		latency := time.Since(start)
 		status := c.Writer.Status()
-		clientIP := c.ClientIP()
 		method := c.Request.Method
-		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
-
-		if query != "" {
-			path = path + "?" + query
+		route := c.FullPath()
+		if route == "" {
+			route = "unmatched"
 		}
 
-		logger.Info("HTTP status=%d | latency=%v | ip=%s | method=%-7s | path=%s %s",
+		logger.Info("HTTP request_id=%s | method=%s | route=%s | path=%s | status=%d | latency=%v",
+			GetRequestID(c),
+			method,
+			route,
+			path,
 			status,
 			latency,
-			clientIP,
-			method,
-			path,
-			errorMessage,
 		)
 	}
 }
@@ -61,9 +57,14 @@ func Recovery() gin.HandlerFunc {
 					}
 				}
 
-				httpRequest, _ := httputil.DumpRequest(c.Request, false)
 				if brokenPipe {
-					logger.Warn("Recovery broken pipe | error=%v | request=%s", err, string(httpRequest))
+					logger.Warn("Recovery broken pipe | request_id=%s | method=%s | route=%s | path=%s | error=%v",
+						GetRequestID(c),
+						c.Request.Method,
+						requestRoute(c),
+						c.Request.URL.Path,
+						err,
+					)
 					if e, ok := err.(error); ok {
 						_ = c.Error(e)
 					}
@@ -71,11 +72,16 @@ func Recovery() gin.HandlerFunc {
 					return
 				}
 
-				logger.Error("Recovery panic recovered | error=%v\nrequest=%s\nstack=%s",
+				logger.Error("Recovery panic recovered | request_id=%s | method=%s | route=%s | path=%s | error=%v\nstack=%s",
+					GetRequestID(c),
+					c.Request.Method,
+					requestRoute(c),
+					c.Request.URL.Path,
 					err,
-					string(httpRequest),
 					debug.Stack(),
 				)
+				// A panic unwinds ErrorHandler before it reaches its post-c.Next
+				// response logic, so Recovery must write the safe 500 itself.
 				response.AbortFail(c, bizerr.ErrInternal)
 			}
 		}()
@@ -92,12 +98,32 @@ func ErrorHandler() gin.HandlerFunc {
 		if len(c.Errors) == 0 {
 			return
 		}
-		// 已经写过响应（如 Handler 自己调用了 response.Fail）则不再重复写
+
+		err := c.Errors.Last().Err
+		businessError, isBusinessError := bizerr.As(err)
+		if !isBusinessError || businessError.HTTPStatus >= 500 {
+			logger.Error("HTTP unhandled error | request_id=%s | method=%s | route=%s | path=%s | error=%v",
+				GetRequestID(c),
+				c.Request.Method,
+				requestRoute(c),
+				c.Request.URL.Path,
+				err,
+			)
+		}
+
+		// 兼容已经写过响应的上游中间件，避免重复写响应体。
 		if c.Writer.Written() {
 			return
 		}
 
-		err := c.Errors.Last().Err
 		response.Fail(c, err)
 	}
+}
+
+func requestRoute(c *gin.Context) string {
+	route := c.FullPath()
+	if route == "" {
+		return "unmatched"
+	}
+	return route
 }

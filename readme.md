@@ -36,6 +36,7 @@ my-bbs/
 │   │   └── gormrepo/           # GORM Repository Adapter
 │   ├── service/                # 业务逻辑，只依赖 Repository Port
 │   ├── handler/                # HTTP 处理
+│   │   ├── httprequest/        # 独立请求模型、严格 JSON 绑定与验证错误转换
 │   │   └── httpresponse/       # 独立对外响应模型及边界转换
 │   ├── middleware/             # Auth / OptionalAuth / 日志 / Recovery / ErrorHandler
 │   ├── modules/                # 模块 DI + 路由注册（user/post/comment/like）
@@ -72,6 +73,9 @@ my-bbs/
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
 - ✅ 独立 HTTP Response，避免直接序列化 GORM / Service 对象
+- ✅ 独立 HTTP Request：限制 body、拒绝未知字段/多 JSON、统一 400/413/415
+- ✅ 统一错误生命周期：Handler 上报、中间件记录原始 cause、安全响应
+- ✅ `X-Request-ID` 生成/透传，关联请求日志和错误日志
 - ✅ Repository Port 与 GORM Adapter 分离，Service 只依赖 Repository 契约
 - ✅ 分页 `pageNo/pageSize/hasMore`（无限下拉，不做 total count）
 - ✅ 异步日志（控制台 + `logs/日期.log`）
@@ -94,6 +98,9 @@ my-bbs/
 ```json
 { "code": 40105, "message": "用户名或密码错误" }
 ```
+
+每个响应都包含 `X-Request-ID` Header。客户端可以在反馈服务端错误时提供该值，
+用于关联请求日志。带 JSON body 的接口仅接受 `application/json`，请求体上限为 1 MiB。
 
 ## 快速开始
 
@@ -223,7 +230,7 @@ POST /api/user/posts?pageNo=1&pageSize=10
 }
 ```
 
-默认 `pageNo=1`，`pageSize=10`，`pageSize` 上限 50。  
+默认 `pageNo=1`，`pageSize=10`，`pageSize` 上限 50；非正整数、非数字或超过上限返回 400。
 客户端根据 `hasMore` 决定是否继续下拉加载，无需 total。
 
 设置可见性 body：
