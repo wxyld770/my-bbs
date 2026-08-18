@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -65,6 +66,17 @@ func doJSON(t *testing.T, r http.Handler, method, path, token string, body any) 
 	return w
 }
 
+func doRaw(t *testing.T, r http.Handler, method, path, contentType, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
 func decodeResp(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 	t.Helper()
 	var resp map[string]any
@@ -100,6 +112,119 @@ func TestAPI_HealthChecks(t *testing.T) {
 	w = doJSON(t, unavailableRouter, http.MethodGet, "/readyz", "", nil)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("readyz without checker status=%d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestAPI_UsesUnifiedErrorsForUnknownRouteAndMethod(t *testing.T) {
+	r := router.SetupRouter(router.RouterDeps{})
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		want   *bizerr.Error
+	}{
+		{name: "unknown route", method: http.MethodGet, path: "/missing", want: bizerr.ErrNotFound},
+		{name: "method not allowed", method: http.MethodPost, path: "/livez", want: bizerr.ErrMethodNotAllowed},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := doRaw(t, r, tt.method, tt.path, "", "")
+			if w.Code != tt.want.HTTPStatus {
+				t.Fatalf("status=%d, want=%d body=%s", w.Code, tt.want.HTTPStatus, w.Body.String())
+			}
+			body := decodeResp(t, w)
+			if got := int(body["code"].(float64)); got != tt.want.Code {
+				t.Fatalf("code=%d, want=%d body=%v", got, tt.want.Code, body)
+			}
+			if requestID := w.Header().Get("X-Request-ID"); requestID == "" {
+				t.Fatal("response is missing X-Request-ID")
+			}
+		})
+	}
+}
+
+func TestAPI_StrictJSONRequestBoundary(t *testing.T) {
+	r, _ := setupTestRouter(t)
+	tests := []struct {
+		name        string
+		contentType string
+		body        string
+		status      int
+		code        int
+		message     string
+	}{
+		{
+			name:        "unknown field",
+			contentType: "application/json",
+			body:        `{"username":"alice","password":"password1","role":"admin"}`,
+			status:      http.StatusBadRequest,
+			code:        bizerr.ErrBadRequest.Code,
+			message:     "请求体包含未知字段: role",
+		},
+		{
+			name:        "multiple json objects",
+			contentType: "application/json",
+			body:        `{"username":"alice","password":"password1"} {"username":"bob"}`,
+			status:      http.StatusBadRequest,
+			code:        bizerr.ErrBadRequest.Code,
+			message:     "请求体只能包含一个 JSON 对象",
+		},
+		{
+			name:        "unsupported media type",
+			contentType: "text/plain",
+			body:        `{"username":"alice","password":"password1"}`,
+			status:      http.StatusUnsupportedMediaType,
+			code:        bizerr.ErrUnsupportedMediaType.Code,
+			message:     bizerr.ErrUnsupportedMediaType.Message,
+		},
+		{
+			name:        "validation message",
+			contentType: "application/json",
+			body:        `{"username":"alice","password":"password1","nickname":"` + strings.Repeat("a", 65) + `"}`,
+			status:      http.StatusBadRequest,
+			code:        bizerr.ErrBadRequest.Code,
+			message:     "字段 nickname 长度不能超过 64 个字符",
+		},
+		{
+			name:        "payload too large",
+			contentType: "application/json",
+			body:        `{"username":"` + strings.Repeat("a", (1<<20)+1) + `"}`,
+			status:      http.StatusRequestEntityTooLarge,
+			code:        bizerr.ErrPayloadTooLarge.Code,
+			message:     bizerr.ErrPayloadTooLarge.Message,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := doRaw(t, r, http.MethodPost, "/api/register", tt.contentType, tt.body)
+			if w.Code != tt.status {
+				t.Fatalf("status=%d, want=%d body=%s", w.Code, tt.status, w.Body.String())
+			}
+			body := decodeResp(t, w)
+			if got := int(body["code"].(float64)); got != tt.code {
+				t.Fatalf("code=%d, want=%d body=%v", got, tt.code, body)
+			}
+			if got, _ := body["message"].(string); got != tt.message {
+				t.Fatalf("message=%q, want=%q", got, tt.message)
+			}
+			if requestID := w.Header().Get("X-Request-ID"); requestID == "" {
+				t.Fatal("response is missing X-Request-ID")
+			}
+		})
+	}
+}
+
+func TestAPI_RejectsMalformedPaginationQuery(t *testing.T) {
+	r, _ := setupTestRouter(t)
+	w := doRaw(t, r, http.MethodGet, "/api/posts?pageNo=not-a-number", "", "")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d, want=400 body=%s", w.Code, w.Body.String())
+	}
+	body := decodeResp(t, w)
+	if got, _ := body["message"].(string); got != "字段 pageNo 必须是正整数" {
+		t.Fatalf("message=%q", got)
 	}
 }
 
