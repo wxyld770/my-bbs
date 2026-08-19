@@ -1,0 +1,38 @@
+internal/redisstore/client.go
+  s_5cfcaa40ecf649::t_495bddfa7db946 34-42,44,49-50,59-60,62,70,73,85
+  s_5cfcaa40ecf649::t_e318caf7cdaaf9 1-33,43,45-48,51-58,61,63-69,71-72,74-84,86-125
+tests/redisstore/client_test.go
+  s_5cfcaa40ecf649::t_e318caf7cdaaf9 1-14,17-33,35-36,38-40,42-43,45-47,49-55,57-98,100-102
+  s_5cfcaa40ecf649::t_495bddfa7db946 15-16,34,37,41,44,48,56,99
+开发流程.md
+  s_5cfcaa40ecf649::t_ac5fc4ee6dc49f 64
+readme.md
+  s_5cfcaa40ecf649::t_83708941e7bf7e 166-167,200,206-210,212-219,221,223-224,237-238,241,247-248
+  s_5cfcaa40ecf649::t_495bddfa7db946 201-205,211,220,222,225,239-240,242
+  s_5cfcaa40ecf649::t_e318caf7cdaaf9 20,34,199,226-236,249-252
+  s_5cfcaa40ecf649::t_c0fecc23c24684 243-246
+go.mod
+  s_5cfcaa40ecf649::t_ba671df0ce4a51 6,13
+  s_5cfcaa40ecf649::t_a988aed03c3214 24,49,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "c9602ee45b2e1d72877de3ebca033027f5fa3b37",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
