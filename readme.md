@@ -17,6 +17,7 @@
 | Go 1.26+ | 后端主语言 |
 | Gin | Web 框架，路由与中间件 |
 | GORM + MySQL | ORM 与数据持久化 |
+| Redis + go-redis | 缓存及 Redis 数据结构客户端（业务接入待定） |
 | JWT | 无状态登录认证 |
 | bcrypt | 密码哈希 |
 | 标准库 log + channel | 异步日志落盘 |
@@ -30,6 +31,7 @@ my-bbs/
 ├── internal/
 │   ├── config/                 # 配置加载
 │   ├── database/               # DB 初始化与迁移
+│   ├── redisstore/             # Redis 配置、连接池与生命周期
 │   ├── logger/                 # 异步日志
 │   ├── model/                  # User / Post / Comment / PostLike / BaseModel
 │   ├── repository/             # Repository Port 接口与通用错误
@@ -161,6 +163,8 @@ HTTP_WRITE_TIMEOUT="15s"
 HTTP_IDLE_TIMEOUT="60s"
 HTTP_SHUTDOWN_TIMEOUT="10s"
 HEALTH_CHECK_TIMEOUT="2s"
+REDIS_ADDR="127.0.0.1:6379"
+REDIS_PASS=""
 ```
 
 时长配置使用 Go `time.ParseDuration` 格式，例如 `500ms`、`10s`、`5m`。
@@ -191,6 +195,61 @@ make down      # 停止 Docker 服务
 - 不以覆盖每个私有函数为目标；私有实现重构不应迫使契约测试跟着修改。
 - 数据库 Adapter 的行为通过 Repository 公开接口验证；MySQL 专属错误码应由真实 MySQL 集成测试覆盖，而不是直接调用私有错误转换函数。
 - 本项目统一将测试放在 `tests/`，按被测层或包分目录，并使用 `xxx_test` 外部测试包验证公开契约。
+
+### Redis 生命周期封装（暂未接入业务）
+
+`internal/redisstore` 只扩展配置、连接池、启动 `PING` 和幂等关闭，不重复包装
+go-redis 的各类命令。`*redisstore.Client` 本身实现 `redis.UniversalClient`，可以直接
+调用 String、Hash、List、Set、ZSet、Stream、Lua、Pipeline、订阅等完整 API。
+向 Service 注入时，构造参数使用更窄的官方 `redis.Cmdable`，避免把 `Close` 纳入
+Service 的依赖契约。
+
+```go
+startupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+defer cancel()
+
+redisClient, err := redisstore.Open(startupCtx, redisstore.Config{
+	Addr:         cfg.RedisAddr,
+	Password:     cfg.RedisPass,
+	PoolSize:     20,
+	MinIdleConns: 2,
+})
+if err != nil {
+	return err
+}
+defer redisClient.Close()
+
+if err := redisClient.HSet(ctx, "user:1", "nickname", "alice").Err(); err != nil {
+	return err
+}
+_, err = redisClient.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+	pipe.SAdd(ctx, "post:1:likes", userID)
+	pipe.ZIncrBy(ctx, "post:ranking", 1, postID)
+	return nil
+})
+```
+
+未来某个 Service 需要 Redis 时，只给该 Service 注入命令接口：
+
+```go
+type ExampleService struct {
+	redis redis.Cmdable
+}
+
+func NewExampleService(redisClient redis.Cmdable) *ExampleService {
+	return &ExampleService{redis: redisClient}
+}
+
+func Initialize(redisClient redis.Cmdable) *Module {
+	svc := NewExampleService(redisClient) // 直接传入，不需要额外取 Client
+	return &Module{Service: svc}
+}
+```
+
+依赖链为 `main → redisstore.Open/Close → module → service(redis.Cmdable)`；Service
+不导入 `internal/redisstore`，也不创建或关闭连接。缺失 Key 保留 go-redis 原生的
+`redis.Nil` 语义。当前没有在 `main` 或任何 Service 中初始化 Redis，等业务使用点
+明确后只注入对应模块。需要 `WATCH` 或订阅的 Service 再单独声明更合适的接口。
 
 ## 接口一览
 
