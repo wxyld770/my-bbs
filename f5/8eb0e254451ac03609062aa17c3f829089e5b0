@@ -1,0 +1,26 @@
+Makefile
+  s_5cfcaa40ecf649::t_6d026df4eca3d7 1,9-10
+tests/testutil/db.go
+  s_5cfcaa40ecf649::t_6d026df4eca3d7 5,16-17,22,30-38
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f58eb0e254451ac03609062aa17c3f829089e5b0",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
