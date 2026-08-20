@@ -14,6 +14,19 @@ services:
       timeout: 5s
       retries: 20
 
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "change-me"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "change-me", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   app:
     build: .
     environment:
@@ -25,6 +38,8 @@ services:
       DB_MAX_IDLE_CONNS: "10"
       DB_CONN_MAX_LIFETIME: "30m"
       DB_CONN_MAX_IDLE_TIME: "5m"
+      REDIS_ADDR: "redis:6379"
+      REDIS_PASS: "change-me"
       JWT_SECRET: "replace-this-before-any-public-deployment"
       HTTP_READ_HEADER_TIMEOUT: "5s"
       HTTP_READ_TIMEOUT: "10s"
@@ -37,6 +52,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/readyz"]
       interval: 10s
@@ -46,3 +63,4 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:

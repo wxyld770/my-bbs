@@ -17,8 +17,8 @@
 | Go 1.26+ | 后端主语言 |
 | Gin | Web 框架，路由与中间件 |
 | GORM + MySQL | ORM 与数据持久化 |
-| Redis + go-redis | 缓存及 Redis 数据结构客户端（业务接入待定） |
-| JWT | 无状态登录认证 |
+| Redis + go-redis | Token 撤销存储（必需依赖） |
+| JWT | 带独立 JTI 的登录认证 |
 | bcrypt | 密码哈希 |
 | 标准库 log + channel | 异步日志落盘 |
 
@@ -32,11 +32,12 @@ my-bbs/
 │   ├── config/                 # 配置加载
 │   ├── database/               # DB 初始化与迁移
 │   ├── redisstore/             # Redis 配置、连接池与生命周期
+│   ├── authsession/            # Token 撤销的 Redis 语义
 │   ├── logger/                 # 异步日志
 │   ├── model/                  # User / Post / Comment / PostLike / BaseModel
 │   ├── repository/             # Repository Port 接口与通用错误
 │   │   └── gormrepo/           # GORM Repository Adapter
-│   ├── service/                # 业务逻辑，只依赖 Repository Port
+│   ├── service/                # 业务逻辑，只依赖必要的抽象契约
 │   ├── handler/                # HTTP 处理
 │   │   ├── httprequest/        # 独立请求模型、严格 JSON 绑定与验证错误转换
 │   │   └── httpresponse/       # 独立对外响应模型及边界转换
@@ -56,10 +57,10 @@ my-bbs/
 
 ### 用户
 - ✅ 注册（用户名唯一索引，密码 bcrypt）
-- ✅ 登录（返回 JWT）
+- ✅ 登录（返回带独立 JTI 的 JWT）
 - ✅ 当前用户资料 `GET /user/me`
 - ✅ 修改昵称 / 个人介绍
-- ✅ 退出（客户端丢弃 Token）
+- ✅ 退出（服务端撤销当前 Token，不影响同一用户的其他会话）
 
 ### 帖子
 - ✅ 发布、修改、删除（作者校验）
@@ -84,7 +85,8 @@ my-bbs/
 - ✅ 优雅启停（SIGINT/SIGTERM）
 - ✅ 请求 `context.Context` 全链路传递与数据库取消
 - ✅ HTTP 超时、数据库连接池与启动连通性检查
-- ✅ 存活检查 `/livez`、数据库就绪检查 `/readyz`
+- ✅ 存活检查 `/livez`、MySQL + Redis 就绪检查 `/readyz`
+- ✅ JWT 当前 Token 撤销（Redis 记录保留到 Token 原始过期时间）
 - ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
 
 ## 统一响应示例
@@ -114,24 +116,26 @@ my-bbs/
 docker compose up --build -d
 ```
 
-这会启动 MySQL 和应用，数据库表会在应用启动时自动迁移。服务启动后访问
+这会启动 MySQL、Redis 和应用，数据库表会在应用启动时自动迁移。Redis 开启
+AOF，并通过 `redis_data` volume 持久化尚未过期的 Token 撤销记录。服务启动后访问
 `http://localhost:8080`。查看应用日志：
 
 ```bash
 docker compose logs -f app
 ```
 
-停止服务但保留数据库数据：
+停止服务但保留 MySQL 和 Redis 数据：
 
 ```bash
 docker compose down
 ```
 
-> `docker-compose.yml` 中的数据库密码和 JWT 密钥仅供本地开发；部署到公网前必须替换。
+> `docker-compose.yml` 中的 MySQL/Redis 密码和 JWT 密钥仅供本地开发；部署到公网前必须替换。
 
 ### 方式 B：本地运行
 
-前提：Go 1.26+、本地 MySQL 8+，且已创建数据库 `my_bbs`。
+前提：Go 1.26+、本地 MySQL 8+、Redis 7+，且已创建数据库 `my_bbs`。
+MySQL 和 Redis 都是启动必需依赖：任一连接检查失败，应用都会拒绝启动。
 
 ### 1. 安装依赖
 
@@ -145,7 +149,7 @@ go mod tidy
 cp config/.env.example config/.env
 ```
 
-编辑 `config/.env`（将 `DB_DSN` 中的密码和 `JWT_SECRET` 替换为自己的值）：
+编辑 `config/.env`（将数据库密码、Redis 密码和 `JWT_SECRET` 替换为自己的值）：
 
 ```bash
 DB_DSN="root:密码@tcp(127.0.0.1:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
@@ -196,7 +200,7 @@ make down      # 停止 Docker 服务
 - 数据库 Adapter 的行为通过 Repository 公开接口验证；MySQL 专属错误码应由真实 MySQL 集成测试覆盖，而不是直接调用私有错误转换函数。
 - 本项目统一将测试放在 `tests/`，按被测层或包分目录，并使用 `xxx_test` 外部测试包验证公开契约。
 
-### Redis 生命周期封装（暂未接入业务）
+### Redis 生命周期封装
 
 `internal/redisstore` 只扩展配置、连接池、启动 `PING` 和幂等关闭，不重复包装
 go-redis 的各类命令。`*redisstore.Client` 本身实现 `redis.UniversalClient`，可以直接
@@ -219,17 +223,17 @@ if err != nil {
 }
 defer redisClient.Close()
 
-if err := redisClient.HSet(ctx, "user:1", "nickname", "alice").Err(); err != nil {
+if err := redisClient.HSet(ctx, "demo:hash", "name", "alice").Err(); err != nil {
 	return err
 }
 _, err = redisClient.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-	pipe.SAdd(ctx, "post:1:likes", userID)
-	pipe.ZIncrBy(ctx, "post:ranking", 1, postID)
+	pipe.SAdd(ctx, "demo:set", "go", "redis")
+	pipe.ZIncrBy(ctx, "demo:ranking", 1, "item:1")
 	return nil
 })
 ```
 
-未来某个 Service 需要 Redis 时，只给该 Service 注入命令接口：
+向 Service 注入 Redis 时只传入命令接口：
 
 ```go
 type ExampleService struct {
@@ -248,17 +252,24 @@ func Initialize(redisClient redis.Cmdable) *Module {
 
 依赖链为 `main → redisstore.Open/Close → module → service(redis.Cmdable)`；Service
 不导入 `internal/redisstore`，也不创建或关闭连接。缺失 Key 保留 go-redis 原生的
-`redis.Nil` 语义。当前没有在 `main` 或任何 Service 中初始化 Redis，等业务使用点
-明确后只注入对应模块。需要 `WATCH` 或订阅的 Service 再单独声明更合适的接口。
+`redis.Nil` 语义。当前只将 Redis 注入 Token 撤销所需的 Service 和认证中间件。
+
+#### Token 撤销
+
+Redis 当前只用于 Token 撤销。登录生成的 JWT 包含独立 JTI；
+`POST /api/logout` 会将当前 JTI 写入 `mybbs:v1:auth:revoked:{jti}`，
+TTL 等于 Token 剩余有效期。当前 Token 立即失效，其他登录会话不受影响。
+Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需重新登录。
 
 ## 接口一览
 
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/livez` | 否 | 进程存活检查，不访问外部依赖 |
-| GET | `/readyz` | 否 | 服务就绪检查，限定时间内执行数据库 Ping |
+| GET | `/readyz` | 否 | 服务就绪检查，限定时间内检查 MySQL 和 Redis |
 | POST | `/api/register` | 否 | 注册 |
-| POST | `/api/login` | 否 | 登录，返回 token |
+| POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
+| POST | `/api/logout` | 是 | 立即撤销当前 Token |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
 | GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
@@ -275,8 +286,15 @@ func Initialize(redisClient redis.Cmdable) *Module {
 
 认证 Header：`Authorization: Bearer <token>`
 
-健康检查成功返回 `200 {"status":"ok"}`；数据库不可用或检查超时，`/readyz`
-返回 `503 {"status":"unavailable"}`。
+健康检查成功返回 `200 {"status":"ok"}`；MySQL、Redis 任一不可用或检查超时，
+`/readyz` 返回 `503 {"status":"unavailable"}`。
+
+退出当前会话：
+
+```bash
+curl -X POST http://localhost:8080/api/logout \
+  -H 'Authorization: Bearer <token>'
+```
 
 分页查询（广场 / 我的帖子）：
 
@@ -338,7 +356,7 @@ POST /api/user/posts?pageNo=1&pageSize=10
 
 ## 后续计划
 
-- □ Redis 缓存
+- □ 业务数据缓存
 - □ 提高边界场景测试覆盖率
 - □ OpenAPI / Swagger
 
