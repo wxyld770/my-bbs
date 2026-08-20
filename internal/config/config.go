@@ -70,6 +70,9 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.JWTSecret) == "" {
 		return fmt.Errorf("缺少必要配置 JWT_SECRET")
 	}
+	if strings.TrimSpace(c.RedisAddr) == "" {
+		return fmt.Errorf("缺少必要配置 REDIS_ADDR")
+	}
 	port, err := strconv.Atoi(c.AppPort)
 	if err != nil || port < 1 || port > 65535 {
 		return fmt.Errorf("APP_PORT 必须是 1-65535 之间的整数")

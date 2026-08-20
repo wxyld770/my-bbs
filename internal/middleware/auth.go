@@ -2,8 +2,11 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"time"
 
+	"my-bbs/internal/authsession"
 	"my-bbs/internal/logger"
 	"my-bbs/internal/model"
 	"my-bbs/pkg/bizerr"
@@ -11,6 +14,13 @@ import (
 	"my-bbs/pkg/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+)
+
+const (
+	userIDContextKey         = "userID"
+	tokenIDContextKey        = "tokenID"
+	tokenExpiresAtContextKey = "tokenExpiresAt"
 )
 
 // UserLookup Auth 校验用户状态时使用的最小查询接口
@@ -18,8 +28,9 @@ type UserLookup interface {
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 }
 
-// Auth 中间件：验证 JWT Token，校验用户存在且未禁言，将用户 ID 注入上下文
-func Auth(users UserLookup) gin.HandlerFunc {
+// Auth 中间件：验证 JWT Token，校验 Token 未被撤销、用户存在且未禁言。
+// Redis 是撤销校验的必需依赖；缺失或查询失败时请求按 fail-closed 处理。
+func Auth(users UserLookup, commands redis.Cmdable) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -32,24 +43,31 @@ func Auth(users UserLookup) gin.HandlerFunc {
 			response.ReportError(c, bizerr.ErrTokenFormat)
 			return
 		}
-
-		tokenString := parts[1]
-		if tokenString == "" {
+		if parts[1] == "" {
 			response.ReportError(c, bizerr.ErrTokenMissing)
 			return
 		}
 
-		userID, err := jwt.ParseToken(tokenString)
+		claims, err := jwt.ParseClaims(parts[1])
 		if err != nil {
-			if err == jwt.ErrTokenExpired {
+			if errors.Is(err, jwt.ErrTokenExpired) {
 				response.ReportError(c, bizerr.ErrTokenExpired)
 				return
 			}
 			response.ReportError(c, bizerr.ErrInvalidToken)
 			return
 		}
+		revoked, err := authsession.IsRevoked(c.Request.Context(), commands, claims.ID)
+		if err != nil {
+			response.ReportError(c, errors.Join(bizerr.ErrServiceUnavailable, err))
+			return
+		}
+		if revoked {
+			response.ReportError(c, bizerr.ErrInvalidToken)
+			return
+		}
 
-		user, err := users.FindUserByID(c.Request.Context(), userID)
+		user, err := users.FindUserByID(c.Request.Context(), claims.UserID)
 		if err != nil {
 			// 保留 Repository 原始错误，由统一错误中间件记录并安全地返回 500。
 			response.ReportError(c, err)
@@ -64,15 +82,15 @@ func Auth(users UserLookup) gin.HandlerFunc {
 			return
 		}
 
-		logger.Info("authentication succeeded | request_id=%s | user_id=%d", GetRequestID(c), userID)
-		c.Set("userID", userID)
+		logger.Info("authentication succeeded | request_id=%s | user_id=%d", GetRequestID(c), claims.UserID)
+		setTokenContext(c, claims)
 		c.Next()
 	}
 }
 
 // OptionalAuth 可选认证中间件：如果有 Token 则解析，没有则继续。
 // 不校验禁言状态（仅用于公开读接口附带 is_liked 等）。
-func OptionalAuth() gin.HandlerFunc {
+func OptionalAuth(commands redis.Cmdable) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -86,20 +104,57 @@ func OptionalAuth() gin.HandlerFunc {
 			return
 		}
 
-		userID, err := jwt.ParseToken(parts[1])
-		if err == nil {
-			c.Set("userID", userID)
+		claims, err := jwt.ParseClaims(parts[1])
+		if err != nil {
+			c.Next()
+			return
 		}
+		revoked, err := authsession.IsRevoked(c.Request.Context(), commands, claims.ID)
+		if err != nil {
+			response.ReportError(c, errors.Join(bizerr.ErrServiceUnavailable, err))
+			return
+		}
+		if revoked {
+			c.Next()
+			return
+		}
+		setTokenContext(c, claims)
 		c.Next()
 	}
 }
 
 // GetUserID 从上下文中获取用户 ID
 func GetUserID(c *gin.Context) (uint, bool) {
-	val, exists := c.Get("userID")
+	val, exists := c.Get(userIDContextKey)
 	if !exists {
 		return 0, false
 	}
 	userID, ok := val.(uint)
 	return userID, ok
+}
+
+// GetTokenID 从上下文中获取当前 JWT 的 JTI。
+func GetTokenID(c *gin.Context) (string, bool) {
+	val, exists := c.Get(tokenIDContextKey)
+	if !exists {
+		return "", false
+	}
+	tokenID, ok := val.(string)
+	return tokenID, ok && tokenID != ""
+}
+
+// GetTokenExpiresAt 从上下文中获取当前 JWT 的到期时间。
+func GetTokenExpiresAt(c *gin.Context) (time.Time, bool) {
+	val, exists := c.Get(tokenExpiresAtContextKey)
+	if !exists {
+		return time.Time{}, false
+	}
+	expiresAt, ok := val.(time.Time)
+	return expiresAt, ok && !expiresAt.IsZero()
+}
+
+func setTokenContext(c *gin.Context, claims *jwt.Claims) {
+	c.Set(userIDContextKey, claims.UserID)
+	c.Set(tokenIDContextKey, claims.ID)
+	c.Set(tokenExpiresAtContextKey, claims.ExpiresAt.Time)
 }

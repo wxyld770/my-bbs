@@ -52,6 +52,23 @@ func (h *UserHandler) Login(c *gin.Context) {
 	response.OK(c, httpresp.NewLoginResponse(token))
 }
 
+// Logout 使当前请求使用的 Token 立即失效。
+func (h *UserHandler) Logout(c *gin.Context) {
+	tokenID, tokenIDOK := middleware.GetTokenID(c)
+	expiresAt, expiresAtOK := middleware.GetTokenExpiresAt(c)
+	if !tokenIDOK || !expiresAtOK {
+		response.ReportError(c, bizerr.ErrInvalidToken)
+		return
+	}
+
+	if err := h.userService.Logout(c.Request.Context(), tokenID, expiresAt); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OKMsg(c, "退出登录成功")
+}
+
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userID, ok := middleware.GetUserID(c)
 	if !ok {

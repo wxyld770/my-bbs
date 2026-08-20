@@ -60,6 +60,7 @@ var (
 	ErrPayloadTooLarge      = New(http.StatusRequestEntityTooLarge, 41300, "请求体过大")
 	ErrUnsupportedMediaType = New(http.StatusUnsupportedMediaType, 41500, "仅支持 application/json 请求")
 	ErrInternal             = New(http.StatusInternalServerError, 50000, "服务器内部错误")
+	ErrServiceUnavailable   = New(http.StatusServiceUnavailable, 50300, "服务暂时不可用，请稍后重试")
 
 	ErrInvalidToken        = New(http.StatusUnauthorized, 40101, "无效的认证令牌")
 	ErrTokenExpired        = New(http.StatusUnauthorized, 40102, "认证令牌已过期，请重新登录")

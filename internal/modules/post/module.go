@@ -7,6 +7,7 @@ import (
 	"my-bbs/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -14,29 +15,30 @@ import (
 type Module struct {
 	Handler  *handler.PostHandler
 	userRepo middleware.UserLookup
+	redis    redis.Cmdable
 }
 
 // Initialize 初始化帖子模块
-func Initialize(db *gorm.DB) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
 	commentRepo := gormrepo.NewCommentRepository(db)
 	likeRepo := gormrepo.NewLikeRepository(db)
 	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo)
 	hdl := handler.NewPostHandler(svc)
-	return &Module{Handler: hdl, userRepo: userRepo}
+	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }
 
 // Register 实现 router.RouteRegister 接口
 func (m *Module) Register(r *gin.RouterGroup) {
 	// 公开路由（详情：公开帖所有人可读，私密帖仅作者可读；可选 Token 用于 is_liked）
 	r.GET("/posts", m.Handler.GetAllPosts)
-	r.GET("/posts/:id", middleware.OptionalAuth(), m.Handler.GetPost)
+	r.GET("/posts/:id", middleware.OptionalAuth(m.redis), m.Handler.GetPost)
 	r.GET("/users/:id/posts", m.Handler.GetUserPublicPosts)
 
 	// 需要认证的路由
 	auth := r.Group("/")
-	auth.Use(middleware.Auth(m.userRepo))
+	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	{
 		auth.POST("/posts/create", m.Handler.CreatePost)
 		auth.POST("/posts/update/:id", m.Handler.UpdatePost)

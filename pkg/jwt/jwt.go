@@ -1,6 +1,8 @@
 package jwt
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"sync"
 	"time"
@@ -15,6 +17,8 @@ var (
 	ErrTokenInvalid = errors.New("令牌无效")
 	ErrSecretEmpty  = errors.New("JWT secret 未初始化")
 )
+
+const tokenIssuer = "my-bbs"
 
 type Claims struct {
 	UserID uint `json:"user_id"`
@@ -37,73 +41,77 @@ func getSecretKey() ([]byte, error) {
 	return secretKey, nil
 }
 
-// GenerateToken 生成JWT，有效期24小时
+// GenerateToken 生成 JWT，有效期 24 小时。每个 Token 都有独立的随机 JTI，
+// 用于精确撤销当前 Token，而不影响同一用户的其他登录会话。
 func GenerateToken(userID uint) (string, error) {
 	key, err := getSecretKey()
 	if err != nil {
 		return "", err
 	}
+	tokenID, err := generateTokenID()
+	if err != nil {
+		return "", err
+	}
 
+	now := time.Now()
 	claims := Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "my-bbs",
+			ID:        tokenID,
+			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    tokenIssuer,
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(key)
 }
 
-// ParseToken 解析并验证JWT，返回用户ID
-func ParseToken(tokenString string) (uint, error) {
+// ParseClaims 解析并验证 JWT，返回认证和 Token 撤销所需的完整 Claims。
+func ParseClaims(tokenString string) (*Claims, error) {
 	key, err := getSecretKey()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, ErrTokenInvalid
-		}
-		return key, nil
-	})
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		claims,
+		func(_ *jwt.Token) (interface{}, error) { return key, nil },
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+		jwt.WithIssuer(tokenIssuer),
+		jwt.WithExpirationRequired(),
+	)
 
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return 0, ErrTokenExpired
+			return nil, ErrTokenExpired
 		}
-		return 0, ErrTokenInvalid
+		return nil, ErrTokenInvalid
 	}
 
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
-		return claims.UserID, nil
+	if !token.Valid || claims.ID == "" || claims.ExpiresAt == nil {
+		return nil, ErrTokenInvalid
 	}
-
-	return 0, ErrTokenInvalid
+	return claims, nil
 }
 
-// RefreshToken 用于 token 刷新
-func RefreshToken(tokenString string) (string, error) {
-	key, err := getSecretKey()
+// ParseToken 解析并验证 JWT，返回用户 ID。
+// 保留该 API 以兼容现有调用方；新的认证边界应使用 ParseClaims。
+func ParseToken(tokenString string) (uint, error) {
+	claims, err := ParseClaims(tokenString)
 	if err != nil {
+		return 0, err
+	}
+	return claims.UserID, nil
+}
+
+func generateTokenID() (string, error) {
+	var tokenID [16]byte
+	if _, err := rand.Read(tokenID[:]); err != nil {
 		return "", err
 	}
-
-	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		return key, nil
-	})
-
-	if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
-		return "", ErrTokenInvalid
-	}
-
-	claims, ok := token.Claims.(*Claims)
-	if !ok {
-		return "", ErrTokenInvalid
-	}
-
-	return GenerateToken(claims.UserID)
+	return base64.RawURLEncoding.EncodeToString(tokenID[:]), nil
 }

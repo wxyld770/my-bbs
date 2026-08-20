@@ -76,6 +76,11 @@ func (c *Client) Check(ctx context.Context) error {
 	return nil
 }
 
+// PingContext adapts Client to the application's readiness-check contract.
+func (c *Client) PingContext(ctx context.Context) error {
+	return c.Check(ctx)
+}
+
 // Close releases the Redis connection pool. It is safe to call more than once.
 func (c *Client) Close() error {
 	if c == nil {

@@ -4,20 +4,30 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
+	"my-bbs/internal/authsession"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bcrypt"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/jwt"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type UserService struct {
 	userRepo repository.UserRepository
+	redis    redis.Cmdable
 }
 
 func NewUserService(userRepo repository.UserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
+}
+
+// NewUserServiceWithRedis 为 Token 撤销注入 Redis 命令接口。
+func NewUserServiceWithRedis(userRepo repository.UserRepository, redisCommands redis.Cmdable) *UserService {
+	return &UserService{userRepo: userRepo, redis: redisCommands}
 }
 
 // Register 注册新用户
@@ -90,6 +100,18 @@ func (s *UserService) Login(ctx context.Context, username, password string) (str
 		return "", err
 	}
 	return token, nil
+}
+
+// Logout 撤销当前 JWT，撤销记录只保留到 Token 原始到期时间。
+// 已到期 Token 无需写 Redis，按幂等成功处理。
+func (s *UserService) Logout(ctx context.Context, tokenID string, expiresAt time.Time) error {
+	if tokenID == "" || expiresAt.IsZero() {
+		return bizerr.ErrInvalidToken
+	}
+	if err := authsession.Revoke(ctx, s.redis, tokenID, expiresAt); err != nil {
+		return errors.Join(bizerr.ErrServiceUnavailable, err)
+	}
+	return nil
 }
 
 // GetMe 获取当前登录用户资料（不含密码）

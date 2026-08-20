@@ -11,11 +11,13 @@ import (
 
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
+	"my-bbs/internal/handler"
 	"my-bbs/internal/logger"
 	"my-bbs/internal/modules/comment"
 	"my-bbs/internal/modules/like"
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/user"
+	"my-bbs/internal/redisstore"
 	"my-bbs/internal/router"
 	"my-bbs/pkg/jwt"
 
@@ -23,7 +25,7 @@ import (
 )
 
 func main() {
-	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET 直接退出）
+	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET / REDIS_ADDR 直接退出）
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "配置错误: %v\n", err)
@@ -56,16 +58,26 @@ func main() {
 	}
 	startupCancel()
 
+	redisStartupCtx, redisStartupCancel := context.WithTimeout(context.Background(), cfg.HealthCheckTimeout)
+	redisClient, err := redisstore.Open(redisStartupCtx, redisstore.Config{
+		Addr:     cfg.RedisAddr,
+		Password: cfg.RedisPass,
+	})
+	redisStartupCancel()
+	if err != nil {
+		logger.Fatal("Redis 初始化失败: %v", err)
+	}
+
 	// 4. 执行迁移
 	if err := database.AutoMigrate(db); err != nil {
 		logger.Fatal("迁移失败: %v", err)
 	}
 
 	// 5. 初始化各模块（每个模块封装了自己的依赖）
-	userMod := user.Initialize(db)
-	postMod := post.Initialize(db)
-	commentMod := comment.Initialize(db)
-	likeMod := like.Initialize(db)
+	userMod := user.Initialize(db, redisClient)
+	postMod := post.Initialize(db, redisClient)
+	commentMod := comment.Initialize(db, redisClient)
+	likeMod := like.Initialize(db, redisClient)
 
 	// 6. 配置路由
 	deps := router.RouterDeps{
@@ -75,7 +87,7 @@ func main() {
 			commentMod,
 			likeMod,
 		},
-		ReadinessChecker: sqlDB,
+		ReadinessChecker: handler.ReadinessCheckers{sqlDB, redisClient},
 		HealthTimeout:    cfg.HealthCheckTimeout,
 	}
 	r := router.SetupRouter(deps)
@@ -117,7 +129,13 @@ func main() {
 		logger.Info("HTTP 服务已关闭")
 	}
 
-	// 9. 释放资源：数据库 → 日志（日志在 defer 中最后关闭）
+	// 9. 释放资源：Redis → 数据库 → 日志（日志在 defer 中最后关闭）
+	if err := redisClient.Close(); err != nil {
+		logger.Error("Redis 连接关闭异常: %v", err)
+	} else {
+		logger.Info("Redis 连接已关闭")
+	}
+
 	if err := database.Close(sqlDB); err != nil {
 		logger.Error("数据库关闭异常: %v", err)
 	} else {

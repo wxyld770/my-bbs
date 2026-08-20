@@ -7,6 +7,7 @@ import (
 	"my-bbs/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -14,14 +15,15 @@ import (
 type Module struct {
 	Handler  *handler.UserHandler
 	userRepo middleware.UserLookup
+	redis    redis.Cmdable
 }
 
 // Initialize 初始化用户模块
-func Initialize(db *gorm.DB) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
 	repo := gormrepo.NewUserRepository(db)
-	svc := service.NewUserService(repo)
+	svc := service.NewUserServiceWithRedis(repo, redisClient)
 	hdl := handler.NewUserHandler(svc)
-	return &Module{Handler: hdl, userRepo: repo}
+	return &Module{Handler: hdl, userRepo: repo, redis: redisClient}
 }
 
 // Register 实现 router.RouteRegister 接口
@@ -31,8 +33,9 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	r.GET("/users/:id", m.Handler.GetPublicProfile)
 
 	auth := r.Group("/")
-	auth.Use(middleware.Auth(m.userRepo))
+	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	{
+		auth.POST("/logout", m.Handler.Logout)
 		auth.GET("/user/me", m.Handler.GetMe)
 		auth.POST("/user/profile", m.Handler.UpdateProfile)
 	}
