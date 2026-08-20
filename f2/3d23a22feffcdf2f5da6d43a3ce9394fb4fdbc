@@ -1,0 +1,36 @@
+readme.md
+  s_5cfcaa40ecf649::t_4554f0e8ddc1d3 359
+  s_5cfcaa40ecf649::t_0443f87ec62790 20,40,60,120
+  s_5cfcaa40ecf649::t_25f6c01131bd27 203,236,257-262
+  s_5cfcaa40ecf649::t_08acd21958e3fa 255
+  s_5cfcaa40ecf649::t_d0c1155a63387b 119,127,133,137-138,152
+  s_5cfcaa40ecf649::t_540c08e0665779 289-297
+  s_5cfcaa40ecf649::t_f8d293172ab607 256
+  s_5cfcaa40ecf649::t_84c6b016819834 21,35,63,88-89
+  s_5cfcaa40ecf649::t_236f3e02d5d77c 269,272
+  s_5cfcaa40ecf649::t_878840818fb769 226,230-231
+  s_5cfcaa40ecf649::t_be267b3e4f1b41 271
+docker-compose.yml
+  s_5cfcaa40ecf649::t_cbfc5d6c101b89 17-29,41-42,55-56,66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f23d23a22feffcdf2f5da6d43a3ce9394fb4fdbc",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
