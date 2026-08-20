@@ -1,0 +1,73 @@
+cmd/main.go
+  s_5cfcaa40ecf649::t_8d172a01ee702b 14,20,61-62,65-70,79-80,90,132-136
+  s_5cfcaa40ecf649::t_878840818fb769 28
+  s_5cfcaa40ecf649::t_6b4080973fd192 63-64,77-78
+internal/middleware/auth.go
+  s_5cfcaa40ecf649::t_7e3a01ea5d55dd 67,93,112-113,115-119
+  s_5cfcaa40ecf649::t_f4484570915412 7,9,17-23,70,85-86,107-111,121,128,135-159
+  s_5cfcaa40ecf649::t_529b075d158702 31-33
+  s_5cfcaa40ecf649::t_5ab6a052b4e8aa 46,51,53,61,63-66
+  s_5cfcaa40ecf649::t_ebe5bae776b9d8 60,62,114
+  s_5cfcaa40ecf649::t_f8818add5395c4 5
+internal/service/user_service.go
+  s_5cfcaa40ecf649::t_8a68bcf51ad7fd 28-29
+  s_5cfcaa40ecf649::t_f8818add5395c4 7,9,15-16,21,30-32,105-114
+internal/authsession/revocation.go
+  s_5cfcaa40ecf649::t_0ac6004e45777a 13,20-21,33,54
+  s_5cfcaa40ecf649::t_f4484570915412 1-12,14-19,22-32,34-49,53,55-58
+  s_5cfcaa40ecf649::t_fc1dac151602f6 50-52
+internal/handler/health_handler.go
+  s_5cfcaa40ecf649::t_1bad40acaa119e 5,23-41,69
+  s_5cfcaa40ecf649::t_2d2eba40af694e 59
+config/.env.example
+  s_5cfcaa40ecf649::t_76a1d72d6edb34 6-7
+internal/handler/user_handler.go
+  s_5cfcaa40ecf649::t_f8818add5395c4 55-71
+internal/modules/post/module.go
+  s_5cfcaa40ecf649::t_e926938ddc94db 18,29,36,41
+  s_5cfcaa40ecf649::t_f23535f90433e9 10
+  s_5cfcaa40ecf649::t_397b0e3a5e8a31 22
+pkg/bizerr/bizerr.go
+  s_5cfcaa40ecf649::t_e9b422c8ea1f3e 63
+internal/modules/user/module.go
+  s_5cfcaa40ecf649::t_8a68bcf51ad7fd 24
+  s_5cfcaa40ecf649::t_397b0e3a5e8a31 18,22,26
+  s_5cfcaa40ecf649::t_f23535f90433e9 10,36
+  s_5cfcaa40ecf649::t_5ab6a052b4e8aa 38
+internal/modules/comment/module.go
+  s_5cfcaa40ecf649::t_f23535f90433e9 10,22
+  s_5cfcaa40ecf649::t_e926938ddc94db 18,28,36
+internal/config/config.go
+  s_5cfcaa40ecf649::t_3d736333c54000 73-75
+internal/redisstore/client.go
+  s_5cfcaa40ecf649::t_1bad40acaa119e 79-83
+internal/modules/like/module.go
+  s_5cfcaa40ecf649::t_f23535f90433e9 10,22
+  s_5cfcaa40ecf649::t_e926938ddc94db 18,28,34
+pkg/jwt/jwt.go
+  s_5cfcaa40ecf649::t_80b2ddacdb0f0a 61,95
+  s_5cfcaa40ecf649::t_4167dee816351d 109
+  s_5cfcaa40ecf649::t_d82ea173433ce3 4-5,44-45,51-54,56,60,62-63,71-72,75,78,90,92,96,98,101-104,106,108,111-114,116
+  s_5cfcaa40ecf649::t_c6d37732f436ec 21-22,64,79-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "6e5c68330e3538f30847963d7d4a6b52f2732fa3",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
