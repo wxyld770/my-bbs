@@ -8,7 +8,7 @@ import (
 	"my-bbs/internal/config"
 )
 
-func TestValidate_RequiresDBDSNAndJWTSecret(t *testing.T) {
+func TestValidate_RequiresDBDSNJWTSecretAndRedis(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -30,6 +30,11 @@ func TestValidate_RequiresDBDSNAndJWTSecret(t *testing.T) {
 			name:    "missing dsn",
 			cfg:     config.Config{JWTSecret: "secret"},
 			wantSub: "DB_DSN",
+		},
+		{
+			name:    "missing redis",
+			cfg:     config.Config{DBDSN: "root:x@tcp(127.0.0.1:3306)/db", JWTSecret: "secret"},
+			wantSub: "REDIS_ADDR",
 		},
 		{
 			name:    "whitespace only",
@@ -61,6 +66,7 @@ func TestValidate_OK(t *testing.T) {
 		DBMaxIdleConns:        10,
 		DBConnMaxLifetime:     30 * time.Minute,
 		DBConnMaxIdleTime:     5 * time.Minute,
+		RedisAddr:             "127.0.0.1:6379",
 		JWTSecret:             "a-long-enough-secret",
 		AppPort:               "8080",
 		HTTPReadHeaderTimeout: 5 * time.Second,

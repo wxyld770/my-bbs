@@ -36,13 +36,14 @@ func setupTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 	gin.SetMode(gin.TestMode)
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
+	redisClient := testutil.NewTestRedis(t)
 
 	deps := router.RouterDeps{
 		Modules: []router.RouteRegister{
-			user.Initialize(db),
-			post.Initialize(db),
-			comment.Initialize(db),
-			like.Initialize(db),
+			user.Initialize(db, redisClient),
+			post.Initialize(db, redisClient),
+			comment.Initialize(db, redisClient),
+			like.Initialize(db, redisClient),
 		},
 	}
 	return router.SetupRouter(deps), db
@@ -303,6 +304,58 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 	}
 	if !detailData["is_liked"].(bool) {
 		t.Fatal("expected is_liked=true")
+	}
+}
+
+func TestAPI_LogoutRevokesOnlyCurrentToken(t *testing.T) {
+	r, _ := setupTestRouter(t)
+
+	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
+		"username": "logoutuser",
+		"password": "password1",
+		"nickname": "Logout",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("register status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	login := func() string {
+		t.Helper()
+		response := doJSON(t, r, http.MethodPost, "/api/login", "", map[string]string{
+			"username": "logoutuser",
+			"password": "password1",
+		})
+		if response.Code != http.StatusOK {
+			t.Fatalf("login status=%d body=%s", response.Code, response.Body.String())
+		}
+		body := decodeResp(t, response)
+		data, _ := body["data"].(map[string]any)
+		token, _ := data["token"].(string)
+		if token == "" {
+			t.Fatalf("login returned empty token: %v", body)
+		}
+		return token
+	}
+
+	revokedToken := login()
+	activeToken := login()
+	w = doJSON(t, r, http.MethodPost, "/api/logout", revokedToken, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("logout status=%d body=%s", w.Code, w.Body.String())
+	}
+
+	w = doJSON(t, r, http.MethodGet, "/api/user/me", revokedToken, nil)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("revoked token status=%d, want 401 body=%s", w.Code, w.Body.String())
+	}
+	body := decodeResp(t, w)
+	if got := int(body["code"].(float64)); got != bizerr.ErrInvalidToken.Code {
+		t.Fatalf("revoked token code=%d, want=%d", got, bizerr.ErrInvalidToken.Code)
+	}
+
+	w = doJSON(t, r, http.MethodGet, "/api/user/me", activeToken, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("other session status=%d, want 200 body=%s", w.Code, w.Body.String())
 	}
 }
 
