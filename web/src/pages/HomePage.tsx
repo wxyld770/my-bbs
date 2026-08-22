@@ -91,7 +91,7 @@ export function HomePage() {
           <div className="section-heading home-feed__heading">
             <div>
               <span className="eyebrow">PUBLIC SQUARE</span>
-              <h2 id="feed-heading">刚刚写下的</h2>
+              <h2 id="feed-heading">广场上的新鲜话</h2>
               <p>按发布时间向下展开，每一篇公开表达都会来到这里。</p>
             </div>
           </div>
