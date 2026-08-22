@@ -1,0 +1,14 @@
+web/src/pages/HomePage.tsx
+  h_994034d8bcd203 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "419f4e03d8bb7852071bc721bb51406e172b8a9b",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
