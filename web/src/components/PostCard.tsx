@@ -1,11 +1,12 @@
 import { ArrowUpRight, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
-import { formatRelativeTime, formatSummary, getDisplayName } from '../lib/format'
+import { formatRelativeTime, getDisplayName } from '../lib/format'
+import { getFirstPostImage, getPostTextSummary } from '../lib/postContent'
 import { POST_VISIBILITY, type Post } from '../types'
 import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
@@ -21,6 +22,12 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
   const { openAuth, openComposer, notify, refreshContent } = useUI()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busyAction, setBusyAction] = useState<'delete' | 'visibility' | null>(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const previewImage = getFirstPostImage(post.content)
+
+  useEffect(() => {
+    setPreviewFailed(false)
+  }, [previewImage])
 
   const handleFailure = (error: unknown) => {
     if (handleSessionError(error)) {
@@ -84,7 +91,20 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
           </span>
         </div>
         <h3>{post.title}</h3>
-        <p className="post-card__excerpt">{formatSummary(post.content, 150)}</p>
+        <p className="post-card__excerpt">{getPostTextSummary(post.content, 150)}</p>
+        {previewImage && !previewFailed && (
+          <span className="post-card__image" aria-hidden="true">
+            <img
+              src={previewImage}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
+              referrerPolicy="no-referrer"
+              onError={() => setPreviewFailed(true)}
+            />
+          </span>
+        )}
         <div className="post-card__footer">
           <span>{post.update_time === post.create_time ? '初次发布' : `更新于 ${formatRelativeTime(post.update_time)}`}</span>
           <span className="post-card__read">读一读 <ArrowUpRight size={15} aria-hidden="true" /></span>

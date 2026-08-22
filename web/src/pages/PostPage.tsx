@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { PostContent } from '../components/PostContent'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
@@ -216,7 +217,9 @@ export function PostPage() {
               <h1>{detail.post.title}</h1>
               {detail.post.visible === POST_VISIBILITY.PRIVATE && <span className="post-card__tag private"><LockKeyhole size={12} aria-hidden="true" /> 仅自己可见</span>}
             </header>
-            <div className="article-card__body">{detail.post.content}</div>
+            <div className="article-card__body">
+              <PostContent content={detail.post.content} />
+            </div>
             <footer className="article-card__actions">
               <button className={`stat-pill${detail.is_liked ? ' liked' : ''}`} type="button" onClick={() => void toggleLike()} disabled={liking || !commentsEnabled}>
                 <Heart size={17} fill={detail.is_liked ? 'currentColor' : 'none'} aria-hidden="true" />
