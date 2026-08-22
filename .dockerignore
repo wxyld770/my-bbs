@@ -1,0 +1,13 @@
+.git
+.gitignore
+.DS_Store
+.gocache*
+.gomodcache
+.gotmp
+.obsidian
+.vscode
+config/.env
+logs
+web/node_modules
+web/dist
+**/.DS_Store
