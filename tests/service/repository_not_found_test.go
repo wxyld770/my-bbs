@@ -135,6 +135,9 @@ type mutationNotFoundCommentRepository struct {
 func (*mutationNotFoundCommentRepository) CountByPostID(context.Context, uint) (int64, error) {
 	return 0, nil
 }
+func (*mutationNotFoundCommentRepository) CountByPostIDs(context.Context, []uint) (map[uint]int64, error) {
+	return map[uint]int64{}, nil
+}
 func (*mutationNotFoundCommentRepository) Create(context.Context, *model.Comment) error { return nil }
 func (r *mutationNotFoundCommentRepository) FindByID(context.Context, uint) (*model.Comment, error) {
 	return r.comment, nil
@@ -152,6 +155,9 @@ type concurrentlyDeletedLikeRepository struct {
 
 func (*concurrentlyDeletedLikeRepository) CountByPostID(context.Context, uint) (int64, error) {
 	return 0, nil
+}
+func (*concurrentlyDeletedLikeRepository) CountByPostIDs(context.Context, []uint) (map[uint]int64, error) {
+	return map[uint]int64{}, nil
 }
 func (*concurrentlyDeletedLikeRepository) ExistsByUserAndPost(context.Context, uint, uint) (bool, error) {
 	return false, nil

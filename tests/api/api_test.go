@@ -293,6 +293,16 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 		t.Fatalf("comment status=%d body=%s", w.Code, w.Body.String())
 	}
 
+	w = doJSON(t, r, http.MethodGet, "/api/posts", "", nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("list posts with counts status=%d body=%s", w.Code, w.Body.String())
+	}
+	countList := decodeResp(t, w)["data"].(map[string]any)["list"].([]any)
+	countedPost := countList[0].(map[string]any)
+	if countedPost["like_count"].(float64) != 1 || countedPost["comment_count"].(float64) != 1 {
+		t.Fatalf("unexpected list counts: %v", countedPost)
+	}
+
 	w = doJSON(t, r, http.MethodGet, fmt.Sprintf("/api/posts/%d", postID), token, nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("detail status=%d body=%s", w.Code, w.Body.String())

@@ -61,14 +61,21 @@ func TestPostResponses_PreserveHTTPContract(t *testing.T) {
 		t.Fatalf("unexpected interaction fields: %+v", detail)
 	}
 
-	page := httpresp.NewPostPageResponse(pagination.Result[model.Post]{
-		List:     []model.Post{post},
+	page := httpresp.NewPostPageResponse(pagination.Result[service.PostSummary]{
+		List: []service.PostSummary{{
+			Post:         post,
+			LikeCount:    5,
+			CommentCount: 6,
+		}},
 		PageNo:   2,
 		PageSize: 10,
 		HasMore:  true,
 	})
 	if len(page.List) != 1 || page.List[0].ID != post.ID {
 		t.Fatalf("unexpected page list: %+v", page)
+	}
+	if page.List[0].LikeCount != 5 || page.List[0].CommentCount != 6 {
+		t.Fatalf("unexpected page interaction fields: %+v", page.List[0])
 	}
 	if page.PageNo != 2 || page.PageSize != 10 || !page.HasMore {
 		t.Fatalf("unexpected page metadata: %+v", page)
