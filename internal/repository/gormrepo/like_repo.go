@@ -45,6 +45,31 @@ func (r *LikeRepository) CountByPostID(ctx context.Context, postID uint) (int64,
 	return count, translateError(err)
 }
 
+func (r *LikeRepository) CountByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	counts := make(map[uint]int64, len(postIDs))
+	if len(postIDs) == 0 {
+		return counts, nil
+	}
+
+	var rows []struct {
+		PostID uint  `gorm:"column:post_id"`
+		Total  int64 `gorm:"column:total"`
+	}
+	err := r.db.WithContext(ctx).
+		Model(&model.PostLike{}).
+		Select("post_id, COUNT(*) AS total").
+		Where("post_id IN ?", postIDs).
+		Group("post_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, translateError(err)
+	}
+	for _, row := range rows {
+		counts[row.PostID] = row.Total
+	}
+	return counts, nil
+}
+
 func (r *LikeRepository) ExistsByUserAndPost(ctx context.Context, userID, postID uint) (bool, error) {
 	var count int64
 	err := r.db.WithContext(ctx).Model(&model.PostLike{}).

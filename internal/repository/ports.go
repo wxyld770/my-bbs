@@ -40,6 +40,7 @@ type PostRepository interface {
 // CommentCounter 是帖子详情所需的评论统计端口。
 type CommentCounter interface {
 	CountByPostID(ctx context.Context, postID uint) (int64, error)
+	CountByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
 }
 
 // CommentRepository 是评论用例所需的持久化端口。
@@ -54,6 +55,7 @@ type CommentRepository interface {
 // LikeReader 是帖子详情所需的点赞查询端口。
 type LikeReader interface {
 	CountByPostID(ctx context.Context, postID uint) (int64, error)
+	CountByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error)
 	ExistsByUserAndPost(ctx context.Context, userID, postID uint) (bool, error)
 }
 

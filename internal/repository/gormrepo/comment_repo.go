@@ -53,3 +53,28 @@ func (r *CommentRepository) CountByPostID(ctx context.Context, postID uint) (int
 	err := r.db.WithContext(ctx).Model(&model.Comment{}).Where("post_id = ?", postID).Count(&count).Error
 	return count, translateError(err)
 }
+
+func (r *CommentRepository) CountByPostIDs(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	counts := make(map[uint]int64, len(postIDs))
+	if len(postIDs) == 0 {
+		return counts, nil
+	}
+
+	var rows []struct {
+		PostID uint  `gorm:"column:post_id"`
+		Total  int64 `gorm:"column:total"`
+	}
+	err := r.db.WithContext(ctx).
+		Model(&model.Comment{}).
+		Select("post_id, COUNT(*) AS total").
+		Where("post_id IN ?", postIDs).
+		Group("post_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, translateError(err)
+	}
+	for _, row := range rows {
+		counts[row.PostID] = row.Total
+	}
+	return counts, nil
+}

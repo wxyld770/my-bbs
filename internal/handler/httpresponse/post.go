@@ -26,6 +26,12 @@ type PostDetailResponse struct {
 	IsLiked      bool         `json:"is_liked"`
 }
 
+type PostListItemResponse struct {
+	PostResponse
+	LikeCount    int64 `json:"like_count"`
+	CommentCount int64 `json:"comment_count"`
+}
+
 func NewPostDetailResponse(detail *service.PostDetail) PostDetailResponse {
 	if detail == nil {
 		return PostDetailResponse{}
@@ -38,8 +44,16 @@ func NewPostDetailResponse(detail *service.PostDetail) PostDetailResponse {
 	}
 }
 
-func NewPostPageResponse(result pagination.Result[model.Post]) PageResponse[PostResponse] {
-	return newPageResponse(result, newPostResponse)
+func NewPostPageResponse(result pagination.Result[service.PostSummary]) PageResponse[PostListItemResponse] {
+	return newPageResponse(result, newPostListItemResponse)
+}
+
+func newPostListItemResponse(summary service.PostSummary) PostListItemResponse {
+	return PostListItemResponse{
+		PostResponse: newPostResponse(summary.Post),
+		LikeCount:    summary.LikeCount,
+		CommentCount: summary.CommentCount,
+	}
 }
 
 func newPostResponse(post model.Post) PostResponse {

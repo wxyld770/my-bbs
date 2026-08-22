@@ -40,6 +40,13 @@ type PostDetail struct {
 	IsLiked      bool
 }
 
+// PostSummary 帖子列表项（含批量聚合的互动计数）。
+type PostSummary struct {
+	Post         model.Post
+	LikeCount    int64
+	CommentCount int64
+}
+
 // CreatePost 创建帖子（默认公开）
 func (s *PostService) CreatePost(ctx context.Context, userID uint, title, content string) error {
 	var err error
@@ -110,50 +117,53 @@ func (s *PostService) GetPostByID(ctx context.Context, id uint, viewerID uint) (
 }
 
 // GetPostsByUser 分页获取某用户的帖子（个人主页，含私密，无限下拉）
-func (s *PostService) GetPostsByUser(ctx context.Context, userID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+func (s *PostService) GetPostsByUser(ctx context.Context, userID uint, q pagination.Query) (pagination.Result[PostSummary], error) {
 	q.Normalize()
 	posts, err := s.postRepo.FindPostsByUserID(ctx, userID, q.Offset(), q.PageSize)
 	if err != nil {
-		return pagination.Result[model.Post]{}, err
+		return pagination.Result[PostSummary]{}, err
 	}
-	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
-		return pagination.Result[model.Post]{}, err
+	summaries, err := s.summarizePosts(ctx, posts)
+	if err != nil {
+		return pagination.Result[PostSummary]{}, err
 	}
-	return pagination.NewResult(posts, q), nil
+	return pagination.NewResult(summaries, q), nil
 }
 
 // GetPublicPostsByUser 分页获取某用户的公开帖（他人主页）
-func (s *PostService) GetPublicPostsByUser(ctx context.Context, targetUserID uint, q pagination.Query) (pagination.Result[model.Post], error) {
+func (s *PostService) GetPublicPostsByUser(ctx context.Context, targetUserID uint, q pagination.Query) (pagination.Result[PostSummary], error) {
 	user, err := s.userRepo.FindUserByID(ctx, targetUserID)
 	if err != nil {
-		return pagination.Result[model.Post]{}, err
+		return pagination.Result[PostSummary]{}, err
 	}
 	if user == nil {
-		return pagination.Result[model.Post]{}, bizerr.ErrUserNotFound
+		return pagination.Result[PostSummary]{}, bizerr.ErrUserNotFound
 	}
 
 	q.Normalize()
 	posts, err := s.postRepo.FindPublicPostsByUserID(ctx, targetUserID, q.Offset(), q.PageSize)
 	if err != nil {
-		return pagination.Result[model.Post]{}, err
+		return pagination.Result[PostSummary]{}, err
 	}
-	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
-		return pagination.Result[model.Post]{}, err
+	summaries, err := s.summarizePosts(ctx, posts)
+	if err != nil {
+		return pagination.Result[PostSummary]{}, err
 	}
-	return pagination.NewResult(posts, q), nil
+	return pagination.NewResult(summaries, q), nil
 }
 
 // GetAllPosts 分页获取公开帖子（广场，无限下拉）
-func (s *PostService) GetAllPosts(ctx context.Context, q pagination.Query) (pagination.Result[model.Post], error) {
+func (s *PostService) GetAllPosts(ctx context.Context, q pagination.Query) (pagination.Result[PostSummary], error) {
 	q.Normalize()
 	posts, err := s.postRepo.FindPublicPosts(ctx, q.Offset(), q.PageSize)
 	if err != nil {
-		return pagination.Result[model.Post]{}, err
+		return pagination.Result[PostSummary]{}, err
 	}
-	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
-		return pagination.Result[model.Post]{}, err
+	summaries, err := s.summarizePosts(ctx, posts)
+	if err != nil {
+		return pagination.Result[PostSummary]{}, err
 	}
-	return pagination.NewResult(posts, q), nil
+	return pagination.NewResult(summaries, q), nil
 }
 
 // UpdatePost 部分更新帖子：title 和 content 至少提供一个，未提供的字段保持原值。
@@ -259,6 +269,40 @@ func (s *PostService) fillUsers(ctx context.Context, posts []*model.Post) error 
 		}
 	}
 	return nil
+}
+
+// summarizePosts 批量填充作者和互动计数，查询次数不随帖子数量增长。
+func (s *PostService) summarizePosts(ctx context.Context, posts []model.Post) ([]PostSummary, error) {
+	if err := s.fillUsers(ctx, toPostPtrs(posts)); err != nil {
+		return nil, err
+	}
+	if len(posts) == 0 {
+		return []PostSummary{}, nil
+	}
+
+	postIDs := make([]uint, len(posts))
+	for i := range posts {
+		postIDs[i] = posts[i].ID
+	}
+
+	likeCounts, err := s.likeRepo.CountByPostIDs(ctx, postIDs)
+	if err != nil {
+		return nil, err
+	}
+	commentCounts, err := s.commentRepo.CountByPostIDs(ctx, postIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	summaries := make([]PostSummary, len(posts))
+	for i := range posts {
+		summaries[i] = PostSummary{
+			Post:         posts[i],
+			LikeCount:    likeCounts[posts[i].ID],
+			CommentCount: commentCounts[posts[i].ID],
+		}
+	}
+	return summaries, nil
 }
 
 func toPostPtrs(posts []model.Post) []*model.Post {
