@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 import { formatDateTime, getDisplayName } from '../lib/format'
-import type { Post, User } from '../types'
+import type { PostListItem, User } from '../types'
 
 const PAGE_SIZE = 10
 
@@ -16,7 +16,7 @@ export function UserPage() {
   const userId = Number(id)
   const { user: currentUser } = useAuth()
   const [profile, setProfile] = useState<User | null>(null)
-  const [posts, setPosts] = useState<Post[]>([])
+  const [posts, setPosts] = useState<PostListItem[]>([])
   const [pageNo, setPageNo] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)

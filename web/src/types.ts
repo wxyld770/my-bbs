@@ -41,6 +41,11 @@ export interface Post {
   user: User | null
 }
 
+export interface PostListItem extends Post {
+  like_count: number
+  comment_count: number
+}
+
 export interface PostDetail {
   post: Post
   like_count: number

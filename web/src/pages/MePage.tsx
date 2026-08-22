@@ -7,14 +7,14 @@ import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 import { formatDateTime, getDisplayName } from '../lib/format'
-import type { Post } from '../types'
+import type { PostListItem } from '../types'
 
 const PAGE_SIZE = 10
 
 export function MePage() {
   const { token, user, isAuthenticated, isBootstrapping, refreshUser, logout, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, contentVersion } = useUI()
-  const [posts, setPosts] = useState<Post[]>([])
+  const [posts, setPosts] = useState<PostListItem[]>([])
   const [pageNo, setPageNo] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [loadingPosts, setLoadingPosts] = useState(true)

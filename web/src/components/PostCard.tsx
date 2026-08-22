@@ -1,18 +1,17 @@
-import { ArrowUpRight, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Heart, MessageCircle, Pencil, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
-import { formatRelativeTime, getDisplayName } from '../lib/format'
-import { getFirstPostImage, getPostTextSummary } from '../lib/postContent'
-import { POST_VISIBILITY, type Post } from '../types'
+import { formatCount, formatRelativeTime, getDisplayName } from '../lib/format'
+import { POST_VISIBILITY, type PostListItem } from '../types'
 import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
 
 interface PostCardProps {
-  post: Post
+  post: PostListItem
   manageable?: boolean
   onChanged?: () => void
 }
@@ -22,12 +21,10 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
   const { openAuth, openComposer, notify, refreshContent } = useUI()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busyAction, setBusyAction] = useState<'delete' | 'visibility' | null>(null)
-  const [previewFailed, setPreviewFailed] = useState(false)
-  const previewImage = getFirstPostImage(post.content)
-
-  useEffect(() => {
-    setPreviewFailed(false)
-  }, [previewImage])
+  const hasLikeCount = Number.isFinite(post.like_count)
+  const hasCommentCount = Number.isFinite(post.comment_count)
+  const likeCount = hasLikeCount ? formatCount(post.like_count) : '—'
+  const commentCount = hasCommentCount ? formatCount(post.comment_count) : '—'
 
   const handleFailure = (error: unknown) => {
     if (handleSessionError(error)) {
@@ -78,53 +75,43 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
   }
 
   return (
-    <article className="post-card">
-      <Link className="post-card__link" to={`/post/${post.id}`}>
-        <div className="post-card__meta">
-          <Avatar user={post.user} size="sm" />
-          <div className="post-card__author">
-            <strong>{getDisplayName(post.user)}</strong>
-            <span>{formatRelativeTime(post.create_time)}</span>
+    <>
+      <article className={`post-card${manageable ? ' post-card--manageable' : ''}`}>
+        <Link className={`post-card__link${manageable ? ' post-card__link--manageable' : ''}`} to={`/post/${post.id}`}>
+          <div className="post-card__meta">
+            <Avatar user={post.user} size="sm" />
+            <div className="post-card__author">
+              <strong>{getDisplayName(post.user)}</strong>
+              <span>{formatRelativeTime(post.create_time)}</span>
+            </div>
           </div>
-          <span className={`post-card__tag${post.visible === POST_VISIBILITY.PRIVATE ? ' private' : ''}`}>
-            {post.visible === POST_VISIBILITY.PRIVATE ? '仅自己' : '公开'}
+          <h3 title={post.title}>{post.title}</h3>
+          <span className="post-card__stats">
+            <span aria-label={hasLikeCount ? `${likeCount} 次点赞` : '点赞数将在接口更新后显示'}><Heart size={15} aria-hidden="true" />{likeCount}</span>
+            <span aria-label={hasCommentCount ? `${commentCount} 条评论` : '评论数将在接口更新后显示'}><MessageCircle size={15} aria-hidden="true" />{commentCount}</span>
           </span>
-        </div>
-        <h3>{post.title}</h3>
-        <p className="post-card__excerpt">{getPostTextSummary(post.content, 150)}</p>
-        {previewImage && !previewFailed && (
-          <span className="post-card__image" aria-hidden="true">
-            <img
-              src={previewImage}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              fetchPriority="low"
-              referrerPolicy="no-referrer"
-              onError={() => setPreviewFailed(true)}
-            />
-          </span>
-        )}
-        <div className="post-card__footer">
-          <span>{post.update_time === post.create_time ? '初次发布' : `更新于 ${formatRelativeTime(post.update_time)}`}</span>
-          <span className="post-card__read">读一读 <ArrowUpRight size={15} aria-hidden="true" /></span>
-        </div>
-      </Link>
+          {manageable && (
+            <span className={`post-card__tag${post.visible === POST_VISIBILITY.PRIVATE ? ' private' : ''}`}>
+              {post.visible === POST_VISIBILITY.PRIVATE ? '仅自己' : '公开'}
+            </span>
+          )}
+        </Link>
 
-      {manageable && (
-        <div className="post-card__actions" aria-label="帖子管理操作">
-          <button className="button button--soft button--small" type="button" onClick={() => openComposer(post)}>
-            <Pencil size={14} aria-hidden="true" />编辑
-          </button>
-          <button className="button button--soft button--small" type="button" onClick={toggleVisibility} disabled={Boolean(busyAction)}>
-            {post.visible === POST_VISIBILITY.PUBLIC ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
-            {busyAction === 'visibility' ? '处理中…' : post.visible === POST_VISIBILITY.PUBLIC ? '转为私密' : '公开'}
-          </button>
-          <button className="button button--danger button--small" type="button" onClick={() => setConfirmDelete(true)} disabled={Boolean(busyAction)}>
-            <Trash2 size={14} aria-hidden="true" />删除
-          </button>
-        </div>
-      )}
+        {manageable && (
+          <div className="post-card__actions" aria-label="帖子管理操作">
+            <button className="button button--soft button--small" type="button" onClick={() => openComposer(post)} aria-label={`编辑《${post.title}》`}>
+              <Pencil size={14} aria-hidden="true" />编辑
+            </button>
+            <button className="button button--soft button--small" type="button" onClick={toggleVisibility} disabled={Boolean(busyAction)} aria-label={`${post.visible === POST_VISIBILITY.PUBLIC ? '转为私密' : '公开'}《${post.title}》`}>
+              {post.visible === POST_VISIBILITY.PUBLIC ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}
+              {busyAction === 'visibility' ? '处理中…' : post.visible === POST_VISIBILITY.PUBLIC ? '转为私密' : '公开'}
+            </button>
+            <button className="button button--danger button--small" type="button" onClick={() => setConfirmDelete(true)} disabled={Boolean(busyAction)} aria-label={`删除《${post.title}》`}>
+              <Trash2 size={14} aria-hidden="true" />删除
+            </button>
+          </div>
+        )}
+      </article>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -136,6 +123,6 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
         onConfirm={deletePost}
         onCancel={() => setConfirmDelete(false)}
       />
-    </article>
+    </>
   )
 }

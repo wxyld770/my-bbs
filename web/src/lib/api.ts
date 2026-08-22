@@ -10,8 +10,8 @@ import type {
   LoginRequest,
   PageData,
   PageQuery,
-  Post,
   PostDetail,
+  PostListItem,
   PostVisibility,
   RegisterRequest,
   UpdatePostRequest,
@@ -258,14 +258,14 @@ export const api = {
     })
   },
 
-  listPosts(query: PageQuery = {}): Promise<PageData<Post>> {
+  listPosts(query: PageQuery = {}): Promise<PageData<PostListItem>> {
     return requestData('/posts', { query: pageQuery(query) })
   },
 
   listMyPosts(
     token: string,
     query: PageQuery = {},
-  ): Promise<PageData<Post>> {
+  ): Promise<PageData<PostListItem>> {
     return requestData('/user/posts', {
       method: 'POST',
       token,
@@ -276,7 +276,7 @@ export const api = {
   listUserPosts(
     userId: number,
     query: PageQuery = {},
-  ): Promise<PageData<Post>> {
+  ): Promise<PageData<PostListItem>> {
     return requestData(`/users/${encodeId(userId)}/posts`, {
       query: pageQuery(query),
     })
