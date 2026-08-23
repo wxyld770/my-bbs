@@ -78,6 +78,14 @@ func doRaw(t *testing.T, r http.Handler, method, path, contentType, body string)
 	return w
 }
 
+func doLocalHealth(r http.Handler, path string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	return w
+}
+
 func decodeResp(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 	t.Helper()
 	var resp map[string]any
@@ -104,13 +112,30 @@ func TestAPI_HealthChecks(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("livez status=%d body=%s", w.Code, w.Body.String())
 	}
-	w = doJSON(t, readyRouter, http.MethodGet, "/readyz", "", nil)
+	w = doLocalHealth(readyRouter, "/readyz")
 	if w.Code != http.StatusOK {
 		t.Fatalf("readyz status=%d body=%s", w.Code, w.Body.String())
 	}
 
+	publicReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	publicReq.RemoteAddr = "203.0.113.10:1234"
+	publicResp := httptest.NewRecorder()
+	readyRouter.ServeHTTP(publicResp, publicReq)
+	if publicResp.Code != http.StatusNotFound {
+		t.Fatalf("public readyz status=%d, want 404 body=%s", publicResp.Code, publicResp.Body.String())
+	}
+
+	proxiedReq := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	proxiedReq.RemoteAddr = "127.0.0.1:1234"
+	proxiedReq.Header.Set("X-Real-IP", "203.0.113.11")
+	proxiedResp := httptest.NewRecorder()
+	readyRouter.ServeHTTP(proxiedResp, proxiedReq)
+	if proxiedResp.Code != http.StatusNotFound {
+		t.Fatalf("proxied public readyz status=%d, want 404 body=%s", proxiedResp.Code, proxiedResp.Body.String())
+	}
+
 	unavailableRouter := router.SetupRouter(router.RouterDeps{})
-	w = doJSON(t, unavailableRouter, http.MethodGet, "/readyz", "", nil)
+	w = doLocalHealth(unavailableRouter, "/readyz")
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("readyz without checker status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -227,6 +252,15 @@ func TestAPI_RejectsMalformedPaginationQuery(t *testing.T) {
 	if got, _ := body["message"].(string); got != "字段 pageNo 必须是正整数" {
 		t.Fatalf("message=%q", got)
 	}
+
+	w = doRaw(t, r, http.MethodGet, "/api/posts?pageNo=502&pageSize=10", "", "")
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("deep pagination status=%d, want=400 body=%s", w.Code, w.Body.String())
+	}
+	body = decodeResp(t, w)
+	if got, _ := body["message"].(string); got != "分页位置不能超过 5000 条" {
+		t.Fatalf("deep pagination message=%q", got)
+	}
 }
 
 func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
@@ -274,6 +308,9 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 		t.Fatalf("want 1 post, got %v", list)
 	}
 	postObj, _ := list[0].(map[string]any)
+	if _, exists := postObj["content"]; exists {
+		t.Fatalf("post list must not include content: %v", postObj)
+	}
 	postID := uint(postObj["id"].(float64))
 
 	w = doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/%d/like", postID), token, nil)
@@ -314,6 +351,10 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 	}
 	if !detailData["is_liked"].(bool) {
 		t.Fatal("expected is_liked=true")
+	}
+	detailPost := detailData["post"].(map[string]any)
+	if detailPost["content"] != "world" {
+		t.Fatalf("post detail must include content: %v", detailPost)
 	}
 }
 

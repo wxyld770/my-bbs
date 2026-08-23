@@ -21,9 +21,12 @@ func TestBindPageQuery(t *testing.T) {
 	}{
 		{name: "defaults", want: pagination.Query{PageNo: 1, PageSize: 10}},
 		{name: "values", rawQuery: "pageNo=2&pageSize=20", want: pagination.Query{PageNo: 2, PageSize: 20}},
+		{name: "maximum offset", rawQuery: "pageNo=501&pageSize=10", want: pagination.Query{PageNo: 501, PageSize: 10}},
 		{name: "invalid number", rawQuery: "pageNo=abc", message: "字段 pageNo 必须是正整数"},
 		{name: "non-positive", rawQuery: "pageSize=0", message: "字段 pageSize 必须是正整数"},
 		{name: "above maximum", rawQuery: "pageSize=51", message: "字段 pageSize 不能超过 50"},
+		{name: "offset too deep", rawQuery: "pageNo=502&pageSize=10", message: "分页位置不能超过 5000 条"},
+		{name: "large page number safely rejected", rawQuery: "pageNo=2147483647&pageSize=50", message: "分页位置不能超过 5000 条"},
 	}
 
 	for _, tt := range tests {
@@ -41,5 +44,19 @@ func TestBindPageQuery(t *testing.T) {
 			}
 			assertBizError(t, err, http.StatusBadRequest, bizerr.ErrBadRequest.Code, tt.message)
 		})
+	}
+}
+
+func TestPaginationResultStopsAtMaximumOffset(t *testing.T) {
+	fullPage := make([]int, 10)
+
+	beforeBoundary := pagination.NewResult(fullPage, pagination.Query{PageNo: 500, PageSize: 10})
+	if !beforeBoundary.HasMore {
+		t.Fatal("page before maximum offset should still advertise the final allowed page")
+	}
+
+	atBoundary := pagination.NewResult(fullPage, pagination.Query{PageNo: 501, PageSize: 10})
+	if atBoundary.HasMore {
+		t.Fatal("page at maximum offset must not advertise a rejected next page")
 	}
 }

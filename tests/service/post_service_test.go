@@ -48,8 +48,8 @@ func TestPostService_GetPostByID_AuthorCanReadPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("author should read private post: %v", err)
 	}
-	if detail.Post.Title != "secret" {
-		t.Fatalf("unexpected title: %s", detail.Post.Title)
+	if detail.Post.Title != "secret" || detail.Post.Content != "private content" {
+		t.Fatalf("detail must preserve title and content: %+v", detail.Post)
 	}
 
 	_, err = svc.GetPostByID(ctx, post.ID, other.ID)
@@ -97,6 +97,21 @@ func TestPostService_GetPublicPostsByUser_FiltersPrivate(t *testing.T) {
 	}
 	if len(result.List) != 1 || result.List[0].Post.Title != "public" {
 		t.Fatalf("expected only public post, got %+v", result.List)
+	}
+	if result.List[0].Post.Content != "" {
+		t.Fatalf("public list query must not load content: %+v", result.List[0].Post)
+	}
+	myPosts, err := svc.GetPostsByUser(ctx, user.ID, pagination.Query{PageNo: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("GetPostsByUser: %v", err)
+	}
+	if len(myPosts.List) != 2 {
+		t.Fatalf("expected public and private posts, got %+v", myPosts.List)
+	}
+	for _, item := range myPosts.List {
+		if item.Post.Content != "" {
+			t.Fatalf("my-posts list query must not load content: %+v", item.Post)
+		}
 	}
 
 	_, err = svc.GetPublicPostsByUser(ctx, 99999, pagination.Query{PageNo: 1, PageSize: 10})
@@ -167,6 +182,11 @@ func TestPostService_GetAllPosts_IncludesInteractionCounts(t *testing.T) {
 	}
 	if len(result.List) != 2 {
 		t.Fatalf("expected 2 posts, got %d", len(result.List))
+	}
+	for _, item := range result.List {
+		if item.Post.Content != "" {
+			t.Fatalf("list query must not load content: %+v", item.Post)
+		}
 	}
 
 	counts := make(map[uint]service.PostSummary, len(result.List))

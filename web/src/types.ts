@@ -41,7 +41,7 @@ export interface Post {
   user: User | null
 }
 
-export interface PostListItem extends Post {
+export type PostListItem = Omit<Post, 'content'> & {
   like_count: number
   comment_count: number
 }

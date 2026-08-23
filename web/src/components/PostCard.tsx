@@ -20,7 +20,7 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
   const { token, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, refreshContent } = useUI()
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [busyAction, setBusyAction] = useState<'delete' | 'visibility' | null>(null)
+  const [busyAction, setBusyAction] = useState<'delete' | 'edit' | 'visibility' | null>(null)
   const hasLikeCount = Number.isFinite(post.like_count)
   const hasCommentCount = Number.isFinite(post.comment_count)
   const likeCount = hasLikeCount ? formatCount(post.like_count) : '—'
@@ -47,6 +47,22 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
       notify('success', next === POST_VISIBILITY.PUBLIC ? '已公开' : '已设为仅自己可见')
       refreshContent()
       onChanged?.()
+    } catch (error) {
+      handleFailure(error)
+    } finally {
+      setBusyAction(null)
+    }
+  }
+
+  const editPost = async () => {
+    if (!token) {
+      openAuth('login')
+      return
+    }
+    setBusyAction('edit')
+    try {
+      const detail = await api.getPost(post.id, token)
+      openComposer(detail.post)
     } catch (error) {
       handleFailure(error)
     } finally {
@@ -99,8 +115,8 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
 
         {manageable && (
           <div className="post-card__actions" aria-label="帖子管理操作">
-            <button className="button button--soft button--small" type="button" onClick={() => openComposer(post)} aria-label={`编辑《${post.title}》`}>
-              <Pencil size={14} aria-hidden="true" />编辑
+            <button className="button button--soft button--small" type="button" onClick={() => void editPost()} disabled={Boolean(busyAction)} aria-label={`编辑《${post.title}》`}>
+              <Pencil size={14} aria-hidden="true" />{busyAction === 'edit' ? '读取中…' : '编辑'}
             </button>
             <button className="button button--soft button--small" type="button" onClick={toggleVisibility} disabled={Boolean(busyAction)} aria-label={`${post.visible === POST_VISIBILITY.PUBLIC ? '转为私密' : '公开'}《${post.title}》`}>
               {post.visible === POST_VISIBILITY.PUBLIC ? <EyeOff size={14} aria-hidden="true" /> : <Eye size={14} aria-hidden="true" />}

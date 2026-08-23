@@ -57,6 +57,9 @@ func TestPostResponses_PreserveHTTPContract(t *testing.T) {
 	if detail.Post.ID != post.ID || detail.Post.User == nil || detail.Post.User.Username != "author" {
 		t.Fatalf("unexpected post detail response: %+v", detail)
 	}
+	if detail.Post.Content != "world" {
+		t.Fatalf("post detail must preserve content: %+v", detail.Post)
+	}
 	if detail.LikeCount != 3 || detail.CommentCount != 4 || !detail.IsLiked {
 		t.Fatalf("unexpected interaction fields: %+v", detail)
 	}
@@ -79,6 +82,13 @@ func TestPostResponses_PreserveHTTPContract(t *testing.T) {
 	}
 	if page.PageNo != 2 || page.PageSize != 10 || !page.HasMore {
 		t.Fatalf("unexpected page metadata: %+v", page)
+	}
+	pageBody, err := json.Marshal(page)
+	if err != nil {
+		t.Fatalf("marshal page response: %v", err)
+	}
+	if strings.Contains(string(pageBody), `"content"`) || strings.Contains(string(pageBody), "world") {
+		t.Fatalf("post list response leaked content: %s", pageBody)
 	}
 }
 
