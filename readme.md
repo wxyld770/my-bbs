@@ -49,6 +49,7 @@ my-bbs/
 │   ├── response/               # 统一响应
 │   ├── jwt/                    # jwt加解密
 │   └── bcrypt/                 # 密码加解密
+├── deploy/nginx/               # 生产入口限流、HTTPS 反代与就绪检查隔离模板
 ├── logs/                       # 日志目录（gitignore）
 └── readme.md
 ```
@@ -85,7 +86,8 @@ my-bbs/
 - ✅ 优雅启停（SIGINT/SIGTERM）
 - ✅ 请求 `context.Context` 全链路传递与数据库取消
 - ✅ HTTP 超时、数据库连接池与启动连通性检查
-- ✅ 存活检查 `/livez`、MySQL + Redis 就绪检查 `/readyz`
+- ✅ 存活检查 `/livez`、仅本机可访问的 MySQL + Redis 就绪检查 `/readyz`
+- ✅ 登录、注册、读接口和写接口的分级限流（429 + `Retry-After`）
 - ✅ JWT 当前 Token 撤销（Redis 记录保留到 Token 原始过期时间）
 - ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
 
@@ -167,11 +169,46 @@ HTTP_WRITE_TIMEOUT="15s"
 HTTP_IDLE_TIMEOUT="60s"
 HTTP_SHUTDOWN_TIMEOUT="10s"
 HEALTH_CHECK_TIMEOUT="2s"
+SEARCH_TIMEOUT="1s"
+RATE_LIMIT_MAX_ENTRIES="20000"
+RATE_LIMIT_IDLE_TTL="15m"
+RATE_LIMIT_LOGIN_REQUESTS="10"
+RATE_LIMIT_LOGIN_WINDOW="1m"
+RATE_LIMIT_LOGIN_BURST="5"
+RATE_LIMIT_REGISTER_REQUESTS="3"
+RATE_LIMIT_REGISTER_WINDOW="1m"
+RATE_LIMIT_REGISTER_BURST="2"
+RATE_LIMIT_SEARCH_REQUESTS="60"
+RATE_LIMIT_SEARCH_WINDOW="1m"
+RATE_LIMIT_SEARCH_BURST="15"
+RATE_LIMIT_WRITE_REQUESTS="30"
+RATE_LIMIT_WRITE_WINDOW="1m"
+RATE_LIMIT_WRITE_BURST="10"
+RATE_LIMIT_READ_REQUESTS="600"
+RATE_LIMIT_READ_WINDOW="1m"
+RATE_LIMIT_READ_BURST="120"
 REDIS_ADDR="127.0.0.1:6379"
 REDIS_PASS=""
 ```
 
 时长配置使用 Go `time.ParseDuration` 格式，例如 `500ms`、`10s`、`5m`。
+
+限流使用进程内有界令牌桶：登录为每 IP 每分钟持续 10 次、突发 5 次；注册为
+每 IP 每分钟持续 3 次、突发 2 次；搜索为每 IP 每分钟持续 60 次、突发 15 次；
+写接口优先按已签名用户计数，每分钟持续 30 次、突发 10 次；普通读接口按 IP
+每分钟持续 600 次、突发 120 次。超过额度
+统一返回 HTTP 429、业务码 `42900`，并附带 `Retry-After`。`REQUESTS/WINDOW`
+表示令牌补充速率，`BURST` 表示可立即使用的令牌上限。
+
+应用只信任来自 `127.0.0.0/8` 或 `::1` 本机反向代理写入的 `X-Real-IP`；公网
+直连请求携带的同名 Header 会被忽略。若反向代理不在本机，需要先调整代码中的
+可信代理边界，不能直接信任任意代理地址。进程内限流不跨应用实例共享，多实例
+部署仍需在 Nginx、网关或共享存储层增加全局限流。
+
+生产 Nginx 模板位于 `deploy/nginx/`：入口对通用 API、写操作、登录、注册和
+`/livez` 分级限流，每 IP 并发 API 请求上限为 20；Nginx 产生的 429 也返回统一
+JSON 业务码 `42900`。共享限流区文件只能安装一次，修改配置后必须先执行
+`nginx -t`，通过后再 reload。
 
 > 若表仍是旧字段（`created_at` 等），开发环境可删表后重启，让 AutoMigrate 重建；或手动改列名。
 
@@ -266,12 +303,13 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/livez` | 否 | 进程存活检查，不访问外部依赖 |
-| GET | `/readyz` | 否 | 服务就绪检查，限定时间内检查 MySQL 和 Redis |
+| GET | `/readyz` | 仅本机 | 服务就绪检查，限定时间内检查 MySQL 和 Redis；公网统一隐藏为 404 |
 | POST | `/api/register` | 否 | 注册 |
 | POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
 | POST | `/api/logout` | 是 | 立即撤销当前 Token |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
+| GET | `/api/search` | 否 | 搜索用户和公开帖子，支持 `q`/`scope`/`pageNo`/`pageSize` |
 | GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/:id` | 可选 | 详情（仅公开帖；带 Token 时返回 `is_liked`） |
 | POST | `/api/posts/create` | 是 | 发帖 |
@@ -287,7 +325,9 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 认证 Header：`Authorization: Bearer <token>`
 
 健康检查成功返回 `200 {"status":"ok"}`；MySQL、Redis 任一不可用或检查超时，
-`/readyz` 返回 `503 {"status":"unavailable"}`。
+`/readyz` 返回 `503 {"status":"unavailable"}`。`/readyz` 只接受 loopback 客户端；
+通过本机 Nginx 转发的公网请求仍按真实客户端 IP 判断并返回 404。生产监控应直接请求
+`http://127.0.0.1:{APP_PORT}/readyz`。
 
 退出当前会话：
 
@@ -314,8 +354,21 @@ POST /api/user/posts?pageNo=1&pageSize=10
 }
 ```
 
-默认 `pageNo=1`，`pageSize=10`，`pageSize` 上限 50；非正整数、非数字或超过上限返回 400。
-客户端根据 `hasMore` 决定是否继续下拉加载，无需 total。
+默认 `pageNo=1`，`pageSize=10`，`pageSize` 上限 50；分页起始位置（`(pageNo-1)*pageSize`）上限为 5000。非正整数、非数字或超过上限返回 400。
+客户端根据 `hasMore` 决定是否继续下拉加载，无需 total；到达允许的最深分页时，
+即使本页刚好填满也会返回 `hasMore=false`，不会引导客户端请求必然被拒绝的下一页。
+帖子列表项只返回标题、作者、可见性和互动计数等摘要字段，不返回 `content`；需要正文时调用 `GET /api/posts/:id`。
+
+全局搜索：
+
+```text
+GET /api/search?q=Go&scope=all&pageNo=1&pageSize=10
+```
+
+`q` 去除并合并空白后为 2～50 个字符；`scope` 支持 `all`（默认）、`users`、
+`posts`。搜索分页大小上限为 20、起始位置上限为 1000。响应将用户和公开帖子
+放在两个独立分页对象中；私密帖、软删除记录和帖子完整正文不会返回。搜索查询
+超过 `SEARCH_TIMEOUT` 时返回 503，超过独立搜索额度时返回 429。
 
 设置可见性 body：
 

@@ -23,7 +23,11 @@ func BindPageQuery(c *gin.Context) (pagination.Query, error) {
 	if pageSize > pagination.MaxPageSize {
 		return pagination.Query{}, badRequest("字段 pageSize 不能超过 " + strconv.Itoa(pagination.MaxPageSize))
 	}
-	return pagination.Query{PageNo: pageNo, PageSize: pageSize}, nil
+	query := pagination.Query{PageNo: pageNo, PageSize: pageSize}
+	if !query.IsOffsetAllowed() {
+		return pagination.Query{}, badRequest("分页位置不能超过 " + strconv.Itoa(pagination.MaxOffset) + " 条")
+	}
+	return query, nil
 }
 
 func positiveQueryInt(c *gin.Context, name string, defaultValue int) (int, error) {

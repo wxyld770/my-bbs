@@ -20,6 +20,14 @@ type UserReader interface {
 	FindUsersByIDs(ctx context.Context, ids []uint) ([]model.User, error)
 }
 
+// SearchReader 是全局搜索用例所需的跨资源只读端口。
+// keyword 由应用层完成规范化；实现负责按字面量匹配而不是把 LIKE
+// 通配符暴露给调用方。
+type SearchReader interface {
+	SearchUsers(ctx context.Context, keyword string, offset, limit int) ([]model.User, error)
+	SearchPublicPosts(ctx context.Context, keyword string, offset, limit int) ([]model.Post, error)
+}
+
 // PostReader 是互动用例所需的帖子只读端口。
 type PostReader interface {
 	FindPostByID(ctx context.Context, id uint) (*model.Post, error)

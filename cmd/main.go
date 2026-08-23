@@ -13,9 +13,11 @@ import (
 	"my-bbs/internal/database"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/logger"
+	"my-bbs/internal/middleware"
 	"my-bbs/internal/modules/comment"
 	"my-bbs/internal/modules/like"
 	"my-bbs/internal/modules/post"
+	"my-bbs/internal/modules/search"
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/redisstore"
 	"my-bbs/internal/router"
@@ -78,6 +80,39 @@ func main() {
 	postMod := post.Initialize(db, redisClient)
 	commentMod := comment.Initialize(db, redisClient)
 	likeMod := like.Initialize(db, redisClient)
+	searchMod := search.Initialize(db, cfg.SearchTimeout)
+	rateLimiter, err := middleware.NewTieredRateLimiter(middleware.TieredRateLimitConfig{
+		Login: middleware.RateLimitPolicy{
+			Requests: cfg.RateLimitLoginRequests,
+			Window:   cfg.RateLimitLoginWindow,
+			Burst:    cfg.RateLimitLoginBurst,
+		},
+		Register: middleware.RateLimitPolicy{
+			Requests: cfg.RateLimitRegisterRequests,
+			Window:   cfg.RateLimitRegisterWindow,
+			Burst:    cfg.RateLimitRegisterBurst,
+		},
+		Search: middleware.RateLimitPolicy{
+			Requests: cfg.RateLimitSearchRequests,
+			Window:   cfg.RateLimitSearchWindow,
+			Burst:    cfg.RateLimitSearchBurst,
+		},
+		Write: middleware.RateLimitPolicy{
+			Requests: cfg.RateLimitWriteRequests,
+			Window:   cfg.RateLimitWriteWindow,
+			Burst:    cfg.RateLimitWriteBurst,
+		},
+		Read: middleware.RateLimitPolicy{
+			Requests: cfg.RateLimitReadRequests,
+			Window:   cfg.RateLimitReadWindow,
+			Burst:    cfg.RateLimitReadBurst,
+		},
+		MaxEntries: cfg.RateLimitMaxEntries,
+		IdleTTL:    cfg.RateLimitIdleTTL,
+	})
+	if err != nil {
+		logger.Fatal("限流器初始化失败: %v", err)
+	}
 
 	// 6. 配置路由
 	deps := router.RouterDeps{
@@ -86,9 +121,11 @@ func main() {
 			postMod,
 			commentMod,
 			likeMod,
+			searchMod,
 		},
 		ReadinessChecker: handler.ReadinessCheckers{sqlDB, redisClient},
 		HealthTimeout:    cfg.HealthCheckTimeout,
+		RateLimiter:      rateLimiter,
 	}
 	r := router.SetupRouter(deps)
 

@@ -13,6 +13,10 @@ type PostRepository struct {
 	db *gorm.DB
 }
 
+// postListColumns deliberately excludes content. List views only need the
+// metadata below; the full body is loaded exclusively by FindPostByID.
+var postListColumns = []string{"id", "create_time", "update_time", "user_id", "title", "visible"}
+
 func NewPostRepository(db *gorm.DB) *PostRepository {
 	return &PostRepository{db: db}
 }
@@ -36,6 +40,7 @@ func (r *PostRepository) FindPostByID(ctx context.Context, id uint) (*model.Post
 func (r *PostRepository) FindPublicPosts(ctx context.Context, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
 	err := r.db.WithContext(ctx).
+		Select(postListColumns).
 		Where("visible = ?", model.VisiblePublic).
 		Order("create_time DESC").
 		Offset(offset).
@@ -47,6 +52,7 @@ func (r *PostRepository) FindPublicPosts(ctx context.Context, offset, limit int)
 func (r *PostRepository) FindPostsByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
 	err := r.db.WithContext(ctx).
+		Select(postListColumns).
 		Where("user_id = ?", userID).
 		Order("create_time DESC").
 		Offset(offset).
@@ -58,6 +64,7 @@ func (r *PostRepository) FindPostsByUserID(ctx context.Context, userID uint, off
 func (r *PostRepository) FindPublicPostsByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Post, error) {
 	var posts []model.Post
 	err := r.db.WithContext(ctx).
+		Select(postListColumns).
 		Where("user_id = ? AND visible = ?", userID, model.VisiblePublic).
 		Order("create_time DESC").
 		Offset(offset).

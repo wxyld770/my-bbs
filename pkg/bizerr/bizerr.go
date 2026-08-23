@@ -59,6 +59,7 @@ var (
 	ErrConflict             = New(http.StatusConflict, 40900, "资源冲突")
 	ErrPayloadTooLarge      = New(http.StatusRequestEntityTooLarge, 41300, "请求体过大")
 	ErrUnsupportedMediaType = New(http.StatusUnsupportedMediaType, 41500, "仅支持 application/json 请求")
+	ErrTooManyRequests      = New(http.StatusTooManyRequests, 42900, "请求过于频繁，请稍后重试")
 	ErrInternal             = New(http.StatusInternalServerError, 50000, "服务器内部错误")
 	ErrServiceUnavailable   = New(http.StatusServiceUnavailable, 50300, "服务暂时不可用，请稍后重试")
 

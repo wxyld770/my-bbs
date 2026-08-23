@@ -13,23 +13,41 @@ import (
 )
 
 type Config struct {
-	DBDSN                 string
-	DBMaxOpenConns        int
-	DBMaxIdleConns        int
-	DBConnMaxLifetime     time.Duration
-	DBConnMaxIdleTime     time.Duration
-	RedisAddr             string
-	RedisPass             string
-	JWTSecret             string
-	AppPort               string
-	AppMode               string
-	LogDir                string
-	HTTPReadHeaderTimeout time.Duration
-	HTTPReadTimeout       time.Duration
-	HTTPWriteTimeout      time.Duration
-	HTTPIdleTimeout       time.Duration
-	HTTPShutdownTimeout   time.Duration
-	HealthCheckTimeout    time.Duration
+	DBDSN                     string
+	DBMaxOpenConns            int
+	DBMaxIdleConns            int
+	DBConnMaxLifetime         time.Duration
+	DBConnMaxIdleTime         time.Duration
+	RedisAddr                 string
+	RedisPass                 string
+	JWTSecret                 string
+	AppPort                   string
+	AppMode                   string
+	LogDir                    string
+	HTTPReadHeaderTimeout     time.Duration
+	HTTPReadTimeout           time.Duration
+	HTTPWriteTimeout          time.Duration
+	HTTPIdleTimeout           time.Duration
+	HTTPShutdownTimeout       time.Duration
+	HealthCheckTimeout        time.Duration
+	SearchTimeout             time.Duration
+	RateLimitMaxEntries       int
+	RateLimitIdleTTL          time.Duration
+	RateLimitLoginRequests    int
+	RateLimitLoginWindow      time.Duration
+	RateLimitLoginBurst       int
+	RateLimitRegisterRequests int
+	RateLimitRegisterWindow   time.Duration
+	RateLimitRegisterBurst    int
+	RateLimitSearchRequests   int
+	RateLimitSearchWindow     time.Duration
+	RateLimitSearchBurst      int
+	RateLimitWriteRequests    int
+	RateLimitWriteWindow      time.Duration
+	RateLimitWriteBurst       int
+	RateLimitReadRequests     int
+	RateLimitReadWindow       time.Duration
+	RateLimitReadBurst        int
 }
 
 func Load() *Config {
@@ -39,23 +57,41 @@ func Load() *Config {
 	}
 
 	return &Config{
-		DBDSN:                 getEnv("DB_DSN", ""),
-		DBMaxOpenConns:        getEnvInt("DB_MAX_OPEN_CONNS", 25),
-		DBMaxIdleConns:        getEnvInt("DB_MAX_IDLE_CONNS", 10),
-		DBConnMaxLifetime:     getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
-		DBConnMaxIdleTime:     getEnvDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
-		RedisAddr:             getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPass:             getEnv("REDIS_PASS", ""),
-		JWTSecret:             getEnv("JWT_SECRET", ""),
-		AppPort:               getEnv("APP_PORT", "8080"),
-		AppMode:               getEnv("APP_MODE", "debug"),
-		LogDir:                getEnv("LOG_DIR", "logs"),
-		HTTPReadHeaderTimeout: getEnvDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
-		HTTPReadTimeout:       getEnvDuration("HTTP_READ_TIMEOUT", 10*time.Second),
-		HTTPWriteTimeout:      getEnvDuration("HTTP_WRITE_TIMEOUT", 15*time.Second),
-		HTTPIdleTimeout:       getEnvDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
-		HTTPShutdownTimeout:   getEnvDuration("HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
-		HealthCheckTimeout:    getEnvDuration("HEALTH_CHECK_TIMEOUT", 2*time.Second),
+		DBDSN:                     getEnv("DB_DSN", ""),
+		DBMaxOpenConns:            getEnvInt("DB_MAX_OPEN_CONNS", 25),
+		DBMaxIdleConns:            getEnvInt("DB_MAX_IDLE_CONNS", 10),
+		DBConnMaxLifetime:         getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
+		DBConnMaxIdleTime:         getEnvDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
+		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPass:                 getEnv("REDIS_PASS", ""),
+		JWTSecret:                 getEnv("JWT_SECRET", ""),
+		AppPort:                   getEnv("APP_PORT", "8080"),
+		AppMode:                   getEnv("APP_MODE", "debug"),
+		LogDir:                    getEnv("LOG_DIR", "logs"),
+		HTTPReadHeaderTimeout:     getEnvDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
+		HTTPReadTimeout:           getEnvDuration("HTTP_READ_TIMEOUT", 10*time.Second),
+		HTTPWriteTimeout:          getEnvDuration("HTTP_WRITE_TIMEOUT", 15*time.Second),
+		HTTPIdleTimeout:           getEnvDuration("HTTP_IDLE_TIMEOUT", 60*time.Second),
+		HTTPShutdownTimeout:       getEnvDuration("HTTP_SHUTDOWN_TIMEOUT", 10*time.Second),
+		HealthCheckTimeout:        getEnvDuration("HEALTH_CHECK_TIMEOUT", 2*time.Second),
+		SearchTimeout:             getEnvDuration("SEARCH_TIMEOUT", time.Second),
+		RateLimitMaxEntries:       getEnvInt("RATE_LIMIT_MAX_ENTRIES", 20000),
+		RateLimitIdleTTL:          getEnvDuration("RATE_LIMIT_IDLE_TTL", 15*time.Minute),
+		RateLimitLoginRequests:    getEnvInt("RATE_LIMIT_LOGIN_REQUESTS", 10),
+		RateLimitLoginWindow:      getEnvDuration("RATE_LIMIT_LOGIN_WINDOW", time.Minute),
+		RateLimitLoginBurst:       getEnvInt("RATE_LIMIT_LOGIN_BURST", 5),
+		RateLimitRegisterRequests: getEnvInt("RATE_LIMIT_REGISTER_REQUESTS", 3),
+		RateLimitRegisterWindow:   getEnvDuration("RATE_LIMIT_REGISTER_WINDOW", time.Minute),
+		RateLimitRegisterBurst:    getEnvInt("RATE_LIMIT_REGISTER_BURST", 2),
+		RateLimitSearchRequests:   getEnvInt("RATE_LIMIT_SEARCH_REQUESTS", 60),
+		RateLimitSearchWindow:     getEnvDuration("RATE_LIMIT_SEARCH_WINDOW", time.Minute),
+		RateLimitSearchBurst:      getEnvInt("RATE_LIMIT_SEARCH_BURST", 15),
+		RateLimitWriteRequests:    getEnvInt("RATE_LIMIT_WRITE_REQUESTS", 30),
+		RateLimitWriteWindow:      getEnvDuration("RATE_LIMIT_WRITE_WINDOW", time.Minute),
+		RateLimitWriteBurst:       getEnvInt("RATE_LIMIT_WRITE_BURST", 10),
+		RateLimitReadRequests:     getEnvInt("RATE_LIMIT_READ_REQUESTS", 600),
+		RateLimitReadWindow:       getEnvDuration("RATE_LIMIT_READ_WINDOW", time.Minute),
+		RateLimitReadBurst:        getEnvInt("RATE_LIMIT_READ_BURST", 120),
 	}
 }
 
@@ -86,6 +122,27 @@ func (c *Config) Validate() error {
 	if c.DBMaxIdleConns > c.DBMaxOpenConns {
 		return fmt.Errorf("DB_MAX_IDLE_CONNS 不能大于 DB_MAX_OPEN_CONNS")
 	}
+	positiveInts := []struct {
+		name  string
+		value int
+	}{
+		{"RATE_LIMIT_MAX_ENTRIES", c.RateLimitMaxEntries},
+		{"RATE_LIMIT_LOGIN_REQUESTS", c.RateLimitLoginRequests},
+		{"RATE_LIMIT_LOGIN_BURST", c.RateLimitLoginBurst},
+		{"RATE_LIMIT_REGISTER_REQUESTS", c.RateLimitRegisterRequests},
+		{"RATE_LIMIT_REGISTER_BURST", c.RateLimitRegisterBurst},
+		{"RATE_LIMIT_SEARCH_REQUESTS", c.RateLimitSearchRequests},
+		{"RATE_LIMIT_SEARCH_BURST", c.RateLimitSearchBurst},
+		{"RATE_LIMIT_WRITE_REQUESTS", c.RateLimitWriteRequests},
+		{"RATE_LIMIT_WRITE_BURST", c.RateLimitWriteBurst},
+		{"RATE_LIMIT_READ_REQUESTS", c.RateLimitReadRequests},
+		{"RATE_LIMIT_READ_BURST", c.RateLimitReadBurst},
+	}
+	for _, item := range positiveInts {
+		if item.value <= 0 {
+			return fmt.Errorf("%s 必须大于 0", item.name)
+		}
+	}
 	positiveDurations := []struct {
 		name  string
 		value time.Duration
@@ -98,6 +155,13 @@ func (c *Config) Validate() error {
 		{"HTTP_IDLE_TIMEOUT", c.HTTPIdleTimeout},
 		{"HTTP_SHUTDOWN_TIMEOUT", c.HTTPShutdownTimeout},
 		{"HEALTH_CHECK_TIMEOUT", c.HealthCheckTimeout},
+		{"SEARCH_TIMEOUT", c.SearchTimeout},
+		{"RATE_LIMIT_IDLE_TTL", c.RateLimitIdleTTL},
+		{"RATE_LIMIT_LOGIN_WINDOW", c.RateLimitLoginWindow},
+		{"RATE_LIMIT_REGISTER_WINDOW", c.RateLimitRegisterWindow},
+		{"RATE_LIMIT_SEARCH_WINDOW", c.RateLimitSearchWindow},
+		{"RATE_LIMIT_WRITE_WINDOW", c.RateLimitWriteWindow},
+		{"RATE_LIMIT_READ_WINDOW", c.RateLimitReadWindow},
 	}
 	for _, item := range positiveDurations {
 		if item.value <= 0 {

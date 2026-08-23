@@ -27,9 +27,15 @@ type PostDetailResponse struct {
 }
 
 type PostListItemResponse struct {
-	PostResponse
-	LikeCount    int64 `json:"like_count"`
-	CommentCount int64 `json:"comment_count"`
+	ID           uint          `json:"id"`
+	CreateTime   time.Time     `json:"create_time"`
+	UpdateTime   time.Time     `json:"update_time"`
+	UserID       uint          `json:"user_id"`
+	Title        string        `json:"title"`
+	Visible      uint8         `json:"visible"`
+	User         *UserResponse `json:"user"`
+	LikeCount    int64         `json:"like_count"`
+	CommentCount int64         `json:"comment_count"`
 }
 
 func NewPostDetailResponse(detail *service.PostDetail) PostDetailResponse {
@@ -50,7 +56,13 @@ func NewPostPageResponse(result pagination.Result[service.PostSummary]) PageResp
 
 func newPostListItemResponse(summary service.PostSummary) PostListItemResponse {
 	return PostListItemResponse{
-		PostResponse: newPostResponse(summary.Post),
+		ID:           summary.Post.ID,
+		CreateTime:   summary.Post.CreateTime,
+		UpdateTime:   summary.Post.UpdateTime,
+		UserID:       summary.Post.UserID,
+		Title:        summary.Post.Title,
+		Visible:      summary.Post.Visible,
+		User:         newUserResponse(summary.Post.User),
 		LikeCount:    summary.LikeCount,
 		CommentCount: summary.CommentCount,
 	}

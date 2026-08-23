@@ -12,4 +12,5 @@ var (
 	_ repository.CommentCounter    = (*CommentRepository)(nil)
 	_ repository.LikeRepository    = (*LikeRepository)(nil)
 	_ repository.LikeReader        = (*LikeRepository)(nil)
+	_ repository.SearchReader      = (*SearchReader)(nil)
 )
