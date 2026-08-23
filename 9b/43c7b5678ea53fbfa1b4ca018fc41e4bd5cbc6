@@ -1,0 +1,100 @@
+internal/repository/ports.go
+  s_5cfcaa40ecf649::t_44c28de92e13a3 23-30
+internal/repository/gormrepo/search_reader.go
+  s_5cfcaa40ecf649::t_44c28de92e13a3 1-40,42-96
+  s_5cfcaa40ecf649::t_b2f734a5ca8268 41
+internal/modules/search/module.go
+  s_5cfcaa40ecf649::t_550b01e6c257fb 1-19,21-32
+  s_5cfcaa40ecf649::t_7501efa4e36278 20
+pkg/bizerr/bizerr.go
+  s_8464988174a9d2::t_53bdceaedc3fb1 62
+internal/config/config.go
+  s_8464988174a9d2::t_f885607036d6d9 84,89,91
+  s_5cfcaa40ecf649::t_474c0110b4d98d 33,42-44,77,86-88,134-135,158,162
+  s_8464988174a9d2::t_1292ff8945ffe9 34-41,45-50,78-83,85,90,92-94,125-133,136-145,159-161,163-164
+internal/handler/httprequest/search.go
+  s_5cfcaa40ecf649::t_d8684ba32db3b5 7,27,31,35,37,40,42,46
+  s_5cfcaa40ecf649::t_4e4cac414447a8 1-6,8-26,28-30,32-34,36,38-39,41,43-45,47-57
+internal/handler/search_handler.go
+  s_5cfcaa40ecf649::t_0eb196b7af59f5 1-41,43-55
+  s_5cfcaa40ecf649::t_77e305efab22f8 42
+internal/middleware/rate_limit.go
+  s_5cfcaa40ecf649::t_bc94850de02553 40
+  s_5cfcaa40ecf649::t_57cbf083529ddb 25,45,79,148-149
+  s_8464988174a9d2::t_53bdceaedc3fb1 1-24,26-39,41-42,51-63,72-78,80-147,150-169,177-256
+  s_8464988174a9d2::t_a20c8170a33d9f 43-44,46-50,64-71,170-176
+internal/handler/httpresponse/search.go
+  s_5cfcaa40ecf649::t_c1297636f9cf2f 45,94,96,98
+  s_5cfcaa40ecf649::t_e8cb5255a1b596 40-44,46-47
+  s_5cfcaa40ecf649::t_421e4f619abd15 1-39,48-93,95,97,99-103
+config/.env.example
+  s_5cfcaa40ecf649::t_eef17fe24d1e1a 18,27-29
+  s_8464988174a9d2::t_a20c8170a33d9f 19-26,30-35
+readme.md
+  s_8464988174a9d2::t_d232ac1c945048 89-90,306,328-330
+  s_8464988174a9d2::t_20d60b703f1f8a 52,207-211
+  s_8464988174a9d2::t_03e3a0aa29cf9e 357,360
+  s_8464988174a9d2::t_b0d1606a0f7328 358-359
+  s_8464988174a9d2::t_a20c8170a33d9f 173-180,184-189,196,200-206
+  s_5cfcaa40ecf649::t_9ff942cfced828 362-371
+  s_5cfcaa40ecf649::t_2465fde3c85ccd 172,181-183,197-199,312
+internal/repository/gormrepo/contracts.go
+  s_5cfcaa40ecf649::t_44c28de92e13a3 15
+开发流程.md
+  s_8464988174a9d2::t_36940e245f8704 97,99-100
+pkg/pagination/pagination.go
+  s_8464988174a9d2::t_08508b991651dc 60,64-66,71
+  s_8464988174a9d2::t_5aeda7c23631a4 7-11,31-41,44,46
+internal/handler/httprequest/page.go
+  s_8464988174a9d2::t_5aeda7c23631a4 26-30
+internal/repository/gormrepo/post_repo.go
+  s_8464988174a9d2::t_415895bd82a523 16-19,43,55,67
+cmd/main.go
+  s_8464988174a9d2::t_1292ff8945ffe9 16,84-94,100-115,128
+  s_5cfcaa40ecf649::t_369a86b532160c 20,83,95-99,124
+internal/handler/httpresponse/post.go
+  s_8464988174a9d2::t_a6e73ae684009c 30-38,59-65
+internal/router/router.go
+  s_8464988174a9d2::t_61821acd9c91d4 45
+  s_8464988174a9d2::t_53bdceaedc3fb1 19,25-29,48-50
+internal/service/search_service.go
+  s_5cfcaa40ecf649::t_e61d92f0a59d27 293-296
+  s_5cfcaa40ecf649::t_eafc8b9802cab5 116,249,284,292,299,303-310,312
+  s_5cfcaa40ecf649::t_2800d3a8455e1f 193,195
+  s_5cfcaa40ecf649::t_44c28de92e13a3 1-19,27-115,117-157,159-160,162,165-166,169-191,196-248,250-283,285-291,297-298,311,313
+  s_5cfcaa40ecf649::t_d8684ba32db3b5 22-26,158,161,163-164,167-168,194
+  s_5cfcaa40ecf649::t_ee72822807bc16 300-302
+  s_5cfcaa40ecf649::t_7da604f8f4f11a 192
+  s_5cfcaa40ecf649::t_0548d0d5ba30f2 20-21
+internal/middleware/network.go
+  s_8464988174a9d2::t_61821acd9c91d4 1-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "9b43c7b5678ea53fbfa1b4ca018fc41e4bd5cbc6",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    },
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
