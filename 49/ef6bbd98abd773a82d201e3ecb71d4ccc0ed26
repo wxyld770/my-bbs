@@ -1,0 +1,68 @@
+tests/service/search_pagination_test.go
+  s_5cfcaa40ecf649::t_ef22ca7fdd1a5b 1-52
+tests/config/search_config_test.go
+  s_5cfcaa40ecf649::t_3a9b563589d9a8 6-7,15,17-19,21-22,26-28
+  s_5cfcaa40ecf649::t_50709b9f122ae0 1-5,8-14,16,23-25,29-34
+  s_5cfcaa40ecf649::t_0cfbd0661686c9 20
+tests/middleware/rate_limit_test.go
+  s_5cfcaa40ecf649::t_ac312fa2e92809 210
+  s_8464988174a9d2::t_e98cb069ce0894 1-79,100-209,211-278
+  s_5cfcaa40ecf649::t_2d7ac87776d83a 80-99
+tests/api/api_test.go
+  s_8464988174a9d2::t_b107e1da9f74a1 311-313,355-357
+  s_8464988174a9d2::t_61821acd9c91d4 81-88,115,120-136,138
+  s_8464988174a9d2::t_02c1f8d388d819 255-263
+web/src/components/PostCard.tsx
+  s_8464988174a9d2::t_3556e40c754d89 23,57-72,118-119
+tests/handler/httpresponse/httpresponse_test.go
+  s_8464988174a9d2::t_b107e1da9f74a1 60-62,86-91
+web/src/types.ts
+  s_8464988174a9d2::t_8b508016a904a8 44
+tests/handler/httprequest/page_test.go
+  s_8464988174a9d2::t_08508b991651dc 49-62
+  s_8464988174a9d2::t_b107e1da9f74a1 24,28-29
+tests/service/post_service_test.go
+  s_8464988174a9d2::t_42f37a8b881b84 104-115
+  s_8464988174a9d2::t_b107e1da9f74a1 51-52,101-103,186-189
+tests/api/search_context_test.go
+  s_5cfcaa40ecf649::t_b1c69cb4a24070 1-65
+tests/repository/search_context_test.go
+  s_5cfcaa40ecf649::t_760e701ab08b72 1-24
+tests/api/search_summary_test.go
+  s_5cfcaa40ecf649::t_ed3067754f25d0 5,35-56
+  s_5cfcaa40ecf649::t_0c90167595e588 59-76
+  s_5cfcaa40ecf649::t_ff9c6cd0d0303d 1-4,6-34,57-58
+tests/api/search_test.go
+  s_5cfcaa40ecf649::t_1d81666435e599 10,71
+  s_5cfcaa40ecf649::t_39e9928bba1e27 11,409-411
+  s_5cfcaa40ecf649::t_80aff2f8d06bf2 54-57
+  s_5cfcaa40ecf649::t_e5cbddcdcd53b9 1-9,12-53,58-70,72-408,412-419
+tests/config/config_test.go
+  s_5cfcaa40ecf649::t_52b3c9abc927b8 96,105-107
+  s_8464988174a9d2::t_7726d0b3b7d2b0 68-81,102
+  s_8464988174a9d2::t_a20c8170a33d9f 63,82-95,97-101,103-104,108-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "49ef6bbd98abd773a82d201e3ecb71d4ccc0ed26",
+  "prompts": {},
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    },
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
