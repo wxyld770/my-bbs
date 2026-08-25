@@ -26,6 +26,7 @@
 
 ```text
 my-bbs/
+├── .github/workflows/ci.yml    # PR / main 的后端、前端检查与发布包构建
 ├── cmd/main.go                 # 入口：配置、日志、DB、优雅启停
 ├── config/.env                 # 本地配置（不入库）
 ├── internal/
@@ -49,7 +50,7 @@ my-bbs/
 │   ├── response/               # 统一响应
 │   ├── jwt/                    # jwt加解密
 │   └── bcrypt/                 # 密码加解密
-├── deploy/nginx/               # 生产入口限流、HTTPS 反代与就绪检查隔离模板
+├── web/                        # React + TypeScript 前端
 ├── logs/                       # 日志目录（gitignore）
 └── readme.md
 ```
@@ -236,6 +237,17 @@ make down      # 停止 Docker 服务
 - 不以覆盖每个私有函数为目标；私有实现重构不应迫使契约测试跟着修改。
 - 数据库 Adapter 的行为通过 Repository 公开接口验证；MySQL 专属错误码应由真实 MySQL 集成测试覆盖，而不是直接调用私有错误转换函数。
 - 本项目统一将测试放在 `tests/`，按被测层或包分目录，并使用 `xxx_test` 外部测试包验证公开契约。
+
+### 持续集成与发布包
+
+`.github/workflows/ci.yml` 在 Pull Request 和 `main` 更新时分别执行后端测试、
+`go vet`、Linux/amd64 编译，以及前端类型检查和生产构建。`Backend` 与
+`Frontend` 是分支保护使用的稳定检查名称。
+
+只有可信的 `main` 运行会继续执行 `Package`：它不会重新构建，而是把同一次
+运行中已经通过检查的后端二进制和前端构建产物组合成与完整 Git commit SHA
+绑定的不可变发布包。发布包不含 `.env`、数据库、Redis、Nginx、systemd 或 TLS
+密钥，也不包含服务器上的部署脚本或配置文件。
 
 ### Redis 生命周期封装
 

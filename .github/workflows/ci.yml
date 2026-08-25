@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CI: "true"
@@ -22,6 +22,8 @@ jobs:
     name: Backend
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      artifact-id: ${{ steps.upload-backend.outputs.artifact-id }}
 
     steps:
       - name: Check out repository
@@ -49,12 +51,26 @@ jobs:
           CGO_ENABLED: "0"
           GOOS: linux
           GOARCH: amd64
-        run: go build -trimpath -o /tmp/my-bbs-linux-amd64 ./cmd
+        run: >-
+          go build -trimpath -buildvcs=true -ldflags="-s -w"
+          -o "${RUNNER_TEMP}/my-bbs-linux-amd64" ./cmd
+
+      - name: Upload backend component
+        id: upload-backend
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/my-bbs-linux-amd64
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
 
   frontend:
     name: Frontend
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      artifact-id: ${{ steps.upload-frontend.outputs.artifact-id }}
     defaults:
       run:
         working-directory: web
@@ -68,7 +84,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "24"
+          node-version: "24.19.0"
           package-manager-cache: false
 
       - name: Install frontend dependencies
@@ -79,3 +95,143 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Package frontend component
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_epoch="$(git show -s --format=%ct "${GITHUB_SHA}")"
+          tar \
+            --sort=name \
+            --mtime="@${source_epoch}" \
+            --owner=0 --group=0 --numeric-owner \
+            --mode='u+rwX,go+rX,go-w' \
+            -C dist -cf - . \
+            | gzip -n -9 > "${RUNNER_TEMP}/my-bbs-frontend.tar.gz"
+
+      - name: Upload frontend component
+        id: upload-frontend
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/my-bbs-frontend.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+
+  package:
+    name: Package
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: {}
+    outputs:
+      artifact-id: ${{ steps.upload-release.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload-release.outputs.artifact-digest }}
+
+    steps:
+      - name: Download backend component
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.backend.outputs.artifact-id }}
+          path: ${{ runner.temp }}/components
+          digest-mismatch: error
+
+      - name: Download frontend component
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.frontend.outputs.artifact-id }}
+          path: ${{ runner.temp }}/components
+          digest-mismatch: error
+
+      - name: Assemble immutable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 022
+
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          release_dir="${RUNNER_TEMP}/my-bbs-release"
+          bundle="${RUNNER_TEMP}/my-bbs-release-${GITHUB_SHA}.tar.gz"
+
+          install -d -m 0755 "${release_dir}"
+          install -m 0755 \
+            "${RUNNER_TEMP}/components/my-bbs-linux-amd64" \
+            "${release_dir}/my-bbs-linux-amd64"
+          install -m 0644 \
+            "${RUNNER_TEMP}/components/my-bbs-frontend.tar.gz" \
+            "${release_dir}/my-bbs-frontend.tar.gz"
+
+          jq -n \
+            --arg commit_sha "${GITHUB_SHA}" \
+            --arg source_ref "${GITHUB_REF}" \
+            '{
+              schema_version: 1,
+              application: "my-bbs",
+              commit_sha: $commit_sha,
+              source_ref: $source_ref,
+              target_os: "linux",
+              target_arch: "amd64",
+              go_version: "go1.26.7",
+              node_version: "v24.19.0"
+            }' > "${release_dir}/release.json"
+
+          (
+            cd "${release_dir}"
+            sha256sum \
+              my-bbs-linux-amd64 \
+              my-bbs-frontend.tar.gz \
+              release.json \
+              > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
+          tar \
+            --sort=name \
+            --mtime='@0' \
+            --owner=0 --group=0 --numeric-owner \
+            --mode='u+rwX,go+rX,go-w' \
+            -C "${release_dir}" \
+            -cf - \
+            my-bbs-linux-amd64 \
+            my-bbs-frontend.tar.gz \
+            release.json \
+            SHA256SUMS \
+            | gzip -n -9 > "${bundle}"
+
+          mapfile -t members < <(tar -tzf "${bundle}")
+          expected=(
+            my-bbs-linux-amd64
+            my-bbs-frontend.tar.gz
+            release.json
+            SHA256SUMS
+          )
+          [[ "${members[*]}" == "${expected[*]}" ]]
+
+      - name: Upload immutable release artifact
+        id: upload-release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: ${{ runner.temp }}/my-bbs-release-${{ github.sha }}.tar.gz
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write release summary
+        env:
+          ARTIFACT_ID: ${{ steps.upload-release.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload-release.outputs.artifact-digest }}
+          ARTIFACT_URL: ${{ steps.upload-release.outputs.artifact-url }}
+        run: |
+          {
+            echo "## Release artifact"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Artifact ID: \`${ARTIFACT_ID}\`"
+            echo "- Digest: \`${ARTIFACT_DIGEST}\`"
+            echo "- Download: ${ARTIFACT_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
