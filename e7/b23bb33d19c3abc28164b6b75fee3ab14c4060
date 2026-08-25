@@ -1,0 +1,39 @@
+web/README.md
+  s_5cfcaa40ecf649::t_17e57673812013 26
+web/src/pages/SearchPage.tsx
+  s_5cfcaa40ecf649::t_53b2fbbc87069b 42,81,83,112,179,225,254,257,300,308,332,340,348
+  s_5cfcaa40ecf649::t_83751bd5344ca4 133-134,210
+  s_5cfcaa40ecf649::t_971e9d4792b772 230,239,260-263
+  s_5cfcaa40ecf649::t_a18e0f8bee7a4a 74,124-127
+  s_5cfcaa40ecf649::t_17e57673812013 355-360
+  s_5cfcaa40ecf649::t_fa594445a6353d 1-41,43-73,75-80,82,84-111,113-123,128-132,135-178,180-209,211-224,226-229,231-238,240-253,255-256,258-259,264-299,301-307,309-331,333-339,341-347,349-354,361-399
+web/src/App.tsx
+  s_5cfcaa40ecf649::t_fa594445a6353d 11,29
+  s_5cfcaa40ecf649::t_a18e0f8bee7a4a 15,18
+web/src/components/Shell.tsx
+  s_5cfcaa40ecf649::t_fa594445a6353d 1,37-40,78-80
+web/src/types.ts
+  s_5cfcaa40ecf649::t_fa594445a6353d 113-157
+web/src/styles.css
+  s_5cfcaa40ecf649::t_53b2fbbc87069b 1903-1911
+  s_5cfcaa40ecf649::t_971e9d4792b772 1529,1585,1588-1593
+  s_5cfcaa40ecf649::t_a18e0f8bee7a4a 1470-1528,1530-1584,1586-1587,1594-1847,1933,2021-2053
+web/src/lib/api.ts
+  s_5cfcaa40ecf649::t_fa594445a6353d 17-18,263-271
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e7b23bb33d19c3abc28164b6b75fee3ab14c4060",
+  "prompts": {},
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
