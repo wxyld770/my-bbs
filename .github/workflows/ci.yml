@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
@@ -234,4 +234,303 @@ jobs:
             echo "- Artifact ID: \`${ARTIFACT_ID}\`"
             echo "- Digest: \`${ARTIFACT_DIGEST}\`"
             echo "- Download: ${ARTIFACT_URL}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  deploy:
+    name: Deploy production
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs:
+      - package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions: {}
+    environment:
+      name: production
+      url: ${{ vars.PROD_SITE_URL }}
+    concurrency:
+      group: my-bbs-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Download immutable release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.package.outputs.artifact-id }}
+          path: ${{ runner.temp }}/production-release
+          digest-mismatch: error
+
+      - name: Validate release artifact and main head
+        id: deployment-context
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ needs.package.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${GITHUB_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+
+          bundle="${RUNNER_TEMP}/production-release/my-bbs-release-${GITHUB_SHA}.tar.gz"
+          [[ -f "${bundle}" && ! -L "${bundle}" ]]
+
+          expected_digest="${ARTIFACT_DIGEST}"
+          [[ "${expected_digest}" =~ ^[0-9a-f]{64}$ ]]
+
+          shopt -s nullglob dotglob
+          downloaded_files=("${RUNNER_TEMP}/production-release"/*)
+          [[ "${#downloaded_files[@]}" -eq 1 ]]
+          [[ "${downloaded_files[0]}" == "${bundle}" ]]
+
+          bundle_size="$(stat -c '%s' "${bundle}")"
+          [[ "${bundle_size}" =~ ^[0-9]+$ ]]
+          (( bundle_size > 0 && bundle_size <= 100663296 ))
+
+          actual_digest="$(sha256sum "${bundle}" | awk '{print $1}')"
+          [[ "${actual_digest}" == "${expected_digest}" ]]
+
+          main_head="$(
+            git ls-remote --exit-code \
+              "https://github.com/${GITHUB_REPOSITORY}.git" \
+              refs/heads/main \
+              | awk 'NR == 1 {print $1}'
+          )"
+          [[ "${main_head}" =~ ^[0-9a-f]{40}$ ]]
+          if [[ "${main_head}" != "${GITHUB_SHA}" ]]; then
+            echo "Refusing to deploy stale commit ${GITHUB_SHA}; main is ${main_head}." >&2
+            exit 78
+          fi
+
+          printf 'bundle-sha256=%s\n' "${expected_digest}" >> "${GITHUB_OUTPUT}"
+
+      - name: Prepare pinned SSH identity
+        shell: bash
+        env:
+          PROD_SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+          PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
+          PROD_SSH_KNOWN_HOSTS: ${{ vars.PROD_SSH_KNOWN_HOSTS }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "${PROD_SSH_HOST}" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "${PROD_SSH_HOST}" != -* ]]
+          [[ "${PROD_SSH_PORT}" == "22" ]]
+          [[ "${PROD_SSH_USER}" == "deploy" ]]
+          [[ -n "${PROD_SSH_PRIVATE_KEY}" ]]
+          [[ -n "${PROD_SSH_KNOWN_HOSTS}" ]]
+
+          ssh_dir="${RUNNER_TEMP}/my-bbs-ssh"
+          private_key="${ssh_dir}/id_ed25519"
+          public_key="${ssh_dir}/id_ed25519.pub"
+          known_hosts="${ssh_dir}/known_hosts"
+
+          install -d -m 0700 "${ssh_dir}"
+          printf '%s\n' "${PROD_SSH_PRIVATE_KEY}" > "${private_key}"
+          chmod 0600 "${private_key}"
+          ssh-keygen -y -P '' -f "${private_key}" > "${public_key}"
+
+          deploy_key_fingerprint="$(ssh-keygen -lf "${public_key}" -E sha256 | awk '{print $2}')"
+          [[ "${deploy_key_fingerprint}" == "SHA256:1MbAINQJQEQUqCwDajnEFhRCPpI7QSj18NT8VkQS5qI" ]]
+
+          printf '%s\n' "${PROD_SSH_KNOWN_HOSTS}" > "${known_hosts}"
+          chmod 0600 "${known_hosts}"
+
+          read -r known_host known_type known_key known_extra < "${known_hosts}"
+          [[ "${known_host}" == "${PROD_SSH_HOST}" ]]
+          [[ "${known_type}" == "ssh-ed25519" ]]
+          [[ -n "${known_key}" && -z "${known_extra:-}" ]]
+          [[ "$(wc -l < "${known_hosts}")" -eq 1 ]]
+          ssh-keygen -F "${PROD_SSH_HOST}" -f "${known_hosts}" >/dev/null
+
+          host_key_fingerprint="$(ssh-keygen -lf "${known_hosts}" -E sha256 | awk 'NR == 1 {print $2}')"
+          [[ "${host_key_fingerprint}" == "SHA256:QNC5ZaYfXItgvd93c+7sio/D5gmkiTjDfml04OekH3E" ]]
+
+      - name: Upload and activate release
+        shell: bash
+        env:
+          BUNDLE_SHA256: ${{ steps.deployment-context.outputs.bundle-sha256 }}
+          PROD_SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+          PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+          PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          bundle="${RUNNER_TEMP}/production-release/my-bbs-release-${GITHUB_SHA}.tar.gz"
+          private_key="${RUNNER_TEMP}/my-bbs-ssh/id_ed25519"
+          known_hosts="${RUNNER_TEMP}/my-bbs-ssh/known_hosts"
+          remote="${PROD_SSH_USER}@${PROD_SSH_HOST}"
+          remote_dir="/var/lib/my-bbs-deploy/incoming/${GITHUB_SHA}"
+          remote_temp="${remote_dir}/.my-bbs-release.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}.tmp"
+
+          [[ "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${BUNDLE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${GITHUB_RUN_ID}" =~ ^[0-9]+$ ]]
+          [[ "${GITHUB_RUN_ATTEMPT}" =~ ^[0-9]+$ ]]
+          [[ "${PROD_SSH_HOST}" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "${PROD_SSH_HOST}" != -* ]]
+          [[ "${PROD_SSH_PORT}" == "22" ]]
+          [[ "${PROD_SSH_USER}" == "deploy" ]]
+          [[ -f "${bundle}" && ! -L "${bundle}" ]]
+          [[ -f "${private_key}" && ! -L "${private_key}" ]]
+          [[ -f "${known_hosts}" && ! -L "${known_hosts}" ]]
+
+          ssh_options=(
+            -i "${private_key}"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="${known_hosts}"
+            -o GlobalKnownHostsFile=/dev/null
+            -o HostKeyAlgorithms=ssh-ed25519
+            -o PasswordAuthentication=no
+            -o KbdInteractiveAuthentication=no
+            -o PreferredAuthentications=publickey
+            -o ClearAllForwardings=yes
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=10
+            -o ServerAliveCountMax=3
+            -o LogLevel=ERROR
+          )
+
+          ssh "${ssh_options[@]}" -p "${PROD_SSH_PORT}" "${remote}" \
+            bash -s -- "${GITHUB_SHA}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" <<'PREPARE_REMOTE'
+          set -euo pipefail
+          umask 077
+
+          commit_sha="$1"
+          run_id="$2"
+          run_attempt="$3"
+
+          [[ "${commit_sha}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${run_id}" =~ ^[0-9]+$ ]]
+          [[ "${run_attempt}" =~ ^[0-9]+$ ]]
+          [[ "$(id -un)" == "deploy" ]]
+
+          incoming_root=/var/lib/my-bbs-deploy/incoming
+          remote_dir="${incoming_root}/${commit_sha}"
+          remote_temp="${remote_dir}/.my-bbs-release.${run_id}.${run_attempt}.tmp"
+
+          [[ -d "${incoming_root}" && ! -L "${incoming_root}" ]]
+          if [[ -e "${remote_dir}" ]]; then
+            [[ -d "${remote_dir}" && ! -L "${remote_dir}" ]]
+          else
+            install -d -m 0700 "${remote_dir}"
+          fi
+          [[ ! -e "${remote_temp}" ]]
+          PREPARE_REMOTE
+
+          scp "${ssh_options[@]}" -P "${PROD_SSH_PORT}" -- \
+            "${bundle}" "${remote}:${remote_temp}"
+
+          ssh "${ssh_options[@]}" -p "${PROD_SSH_PORT}" "${remote}" \
+            bash -s -- \
+              "${GITHUB_SHA}" \
+              "${BUNDLE_SHA256}" \
+              "${GITHUB_RUN_ID}" \
+              "${GITHUB_RUN_ATTEMPT}" <<'ACTIVATE_REMOTE'
+          set -euo pipefail
+          umask 077
+
+          commit_sha="$1"
+          expected_digest="$2"
+          run_id="$3"
+          run_attempt="$4"
+
+          [[ "${commit_sha}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${expected_digest}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${run_id}" =~ ^[0-9]+$ ]]
+          [[ "${run_attempt}" =~ ^[0-9]+$ ]]
+          [[ "$(id -un)" == "deploy" ]]
+
+          incoming_root=/var/lib/my-bbs-deploy/incoming
+          remote_dir="${incoming_root}/${commit_sha}"
+          remote_temp="${remote_dir}/.my-bbs-release.${run_id}.${run_attempt}.tmp"
+          remote_bundle="${remote_dir}/my-bbs-release.tar.gz"
+
+          cleanup_temp() {
+            if [[ -f "${remote_temp}" && ! -L "${remote_temp}" ]]; then
+              rm -f -- "${remote_temp}"
+            fi
+          }
+          trap cleanup_temp EXIT HUP INT TERM
+
+          [[ -d "${incoming_root}" && ! -L "${incoming_root}" ]]
+          [[ -d "${remote_dir}" && ! -L "${remote_dir}" ]]
+          [[ -f "${remote_temp}" && ! -L "${remote_temp}" ]]
+
+          actual_digest="$(sha256sum "${remote_temp}" | awk '{print $1}')"
+          [[ "${actual_digest}" == "${expected_digest}" ]]
+          chmod 0600 "${remote_temp}"
+
+          if [[ -e "${remote_bundle}" ]]; then
+            [[ -f "${remote_bundle}" && ! -L "${remote_bundle}" ]]
+            existing_digest="$(sha256sum "${remote_bundle}" | awk '{print $1}')"
+            [[ "${existing_digest}" == "${expected_digest}" ]]
+            cleanup_temp
+          else
+            mv -T -- "${remote_temp}" "${remote_bundle}"
+          fi
+
+          published_digest="$(sha256sum "${remote_bundle}" | awk '{print $1}')"
+          [[ "${published_digest}" == "${expected_digest}" ]]
+
+          trap - EXIT HUP INT TERM
+          /usr/bin/sudo -n -- /usr/local/sbin/deploy-my-bbs \
+            "${commit_sha}" "${expected_digest}"
+          ACTIVATE_REMOTE
+
+      - name: Remove SSH key material
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f -- \
+            "${RUNNER_TEMP}/my-bbs-ssh/id_ed25519" \
+            "${RUNNER_TEMP}/my-bbs-ssh/id_ed25519.pub" \
+            "${RUNNER_TEMP}/my-bbs-ssh/known_hosts"
+          rmdir "${RUNNER_TEMP}/my-bbs-ssh" 2>/dev/null || true
+
+      - name: Verify public production endpoints
+        shell: bash
+        env:
+          PROD_SITE_URL: ${{ vars.PROD_SITE_URL }}
+        run: |
+          set -euo pipefail
+
+          site_url="${PROD_SITE_URL%/}"
+          [[ "${site_url}" == "https://5iyeji.xyz" ]]
+
+          request_status() {
+            curl \
+              --proto '=https' \
+              --tlsv1.2 \
+              --connect-timeout 10 \
+              --max-time 20 \
+              --silent \
+              --show-error \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              "$1"
+          }
+
+          [[ "$(request_status "${site_url}/")" == "200" ]]
+          [[ "$(request_status "${site_url}/livez")" == "200" ]]
+          [[ "$(request_status "${site_url}/readyz")" == "404" ]]
+          [[ "$(request_status "${site_url}/api/posts?pageNo=1&pageSize=1")" == "200" ]]
+
+      - name: Write deployment summary
+        if: ${{ success() }}
+        env:
+          BUNDLE_SHA256: ${{ steps.deployment-context.outputs.bundle-sha256 }}
+          PROD_SITE_URL: ${{ vars.PROD_SITE_URL }}
+        run: |
+          {
+            echo "## Production deployment"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Bundle SHA-256: \`${BUNDLE_SHA256}\`"
+            echo "- Site: ${PROD_SITE_URL}"
           } >> "${GITHUB_STEP_SUMMARY}"
