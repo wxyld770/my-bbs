@@ -14,6 +14,8 @@ import type {
   PostListItem,
   PostVisibility,
   RegisterRequest,
+  SearchData,
+  SearchQuery,
   UpdatePostRequest,
   UpdateProfileRequest,
   UserProfileData,
@@ -255,6 +257,18 @@ export const api = {
       method: 'POST',
       token,
       body: input,
+    })
+  },
+
+  search(query: SearchQuery, signal?: AbortSignal): Promise<SearchData> {
+    return requestData('/search', {
+      signal,
+      query: {
+        q: query.q,
+        scope: query.scope,
+        pageNo: query.pageNo,
+        pageSize: query.pageSize,
+      },
     })
   },
 

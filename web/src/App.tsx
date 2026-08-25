@@ -8,13 +8,14 @@ import { HomePage } from './pages/HomePage'
 import { MePage } from './pages/MePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PostPage } from './pages/PostPage'
+import { SearchPage } from './pages/SearchPage'
 import { UserPage } from './pages/UserPage'
 
 function ScrollToTop() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [pathname])
+  }, [pathname, search])
   return null
 }
 
@@ -25,6 +26,7 @@ export default function App() {
       <Routes>
         <Route element={<Shell />}>
           <Route index element={<HomePage />} />
+          <Route path="search" element={<SearchPage />} />
           <Route path="post/:id" element={<PostPage />} />
           <Route path="me" element={<MePage />} />
           <Route path="u/:id" element={<UserPage />} />

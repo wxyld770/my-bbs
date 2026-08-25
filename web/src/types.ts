@@ -110,6 +110,51 @@ export interface PageQuery {
   pageSize?: number
 }
 
+export const SEARCH_SCOPE = {
+  ALL: 'all',
+  USERS: 'users',
+  POSTS: 'posts',
+} as const
+
+export type SearchScope =
+  (typeof SEARCH_SCOPE)[keyof typeof SEARCH_SCOPE]
+
+export interface SearchQuery extends PageQuery {
+  q: string
+  scope?: SearchScope
+}
+
+export interface SearchUser {
+  id: number
+  username: string
+  nickname: string
+  introduction: string
+}
+
+export interface SearchPostAuthor {
+  id: number
+  username: string
+  nickname: string
+}
+
+export interface SearchPost {
+  id: number
+  create_time: ISODateTime
+  user_id: number
+  title: string
+  excerpt: string
+  user: SearchPostAuthor | null
+  like_count: number
+  comment_count: number
+}
+
+export interface SearchData {
+  query: string
+  scope: SearchScope
+  users: PageData<SearchUser>
+  posts: PageData<SearchPost>
+}
+
 export interface RegisterRequest {
   username: string
   password: string

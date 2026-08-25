@@ -1,4 +1,4 @@
-import { Home, LogIn, PenLine, UserRound } from 'lucide-react'
+import { Home, LogIn, PenLine, Search, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
@@ -33,6 +33,10 @@ export function Shell() {
             <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/" end>
               <Home size={16} aria-hidden="true" />
               广场
+            </NavLink>
+            <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/search">
+              <Search size={16} aria-hidden="true" />
+              搜索
             </NavLink>
             {isAuthenticated && (
               <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/me">
@@ -70,6 +74,10 @@ export function Shell() {
         <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/" end>
           <Home size={17} aria-hidden="true" />
           广场
+        </NavLink>
+        <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/search">
+          <Search size={17} aria-hidden="true" />
+          搜索
         </NavLink>
         <button className="nav-link" type="button" onClick={compose}>
           <PenLine size={17} aria-hidden="true" />
