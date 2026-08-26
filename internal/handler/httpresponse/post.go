@@ -1,6 +1,8 @@
 package httpresponse
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"my-bbs/internal/model"
@@ -47,8 +49,38 @@ type PinPostResponse struct {
 	IsPinned    bool      `json:"is_pinned"`
 }
 
+type HotPostListItemResponse struct {
+	PostListItemResponse
+	Score json.Number `json:"score"`
+}
+
+type HotPostListResponse struct {
+	List []HotPostListItemResponse `json:"list"`
+}
+
 func NewPinPostResponse(pinnedUntil time.Time) PinPostResponse {
 	return PinPostResponse{PinnedUntil: pinnedUntil, IsPinned: true}
+}
+
+func NewHotPostListResponse(summaries []service.HotPostSummary) HotPostListResponse {
+	list := make([]HotPostListItemResponse, len(summaries))
+	now := time.Now()
+	for i := range summaries {
+		list[i] = HotPostListItemResponse{
+			PostListItemResponse: newPostListItemResponse(service.PostSummary{
+				Post:         summaries[i].Post,
+				LikeCount:    summaries[i].LikeCount,
+				CommentCount: summaries[i].CommentCount,
+			}, now),
+			Score: scoreNumber(summaries[i].ScoreMillis),
+		}
+	}
+	return HotPostListResponse{List: list}
+}
+
+// scoreNumber 用 JSON 数值（而不是字符串）输出，并固定为三位小数。
+func scoreNumber(scoreMillis int64) json.Number {
+	return json.Number(fmt.Sprintf("%d.%03d", scoreMillis/1000, scoreMillis%1000))
 }
 
 func NewPostDetailResponse(detail *service.PostDetail) PostDetailResponse {

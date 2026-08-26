@@ -48,6 +48,24 @@ type PostRepository interface {
 	DeletePost(ctx context.Context, id uint) error
 }
 
+// PostEngagement 是热榜查询返回的帖子互动只读模型。
+// Repository 只负责在给定发布时间范围内聚合计数；热度计算、排序和截断
+// 属于应用层规则，由 Service 完成。
+type PostEngagement struct {
+	Post         model.Post
+	LikeCount    int64
+	CommentCount int64
+}
+
+// HotPostReader 是热榜用例所需的只读端口。
+type HotPostReader interface {
+	FindPublicPostEngagements(
+		ctx context.Context,
+		publishedFrom time.Time,
+		publishedBefore time.Time,
+	) ([]PostEngagement, error)
+}
+
 // CommentCounter 是帖子详情所需的评论统计端口。
 type CommentCounter interface {
 	CountByPostID(ctx context.Context, postID uint) (int64, error)

@@ -5,6 +5,7 @@ import type {
   Comment,
   CreateCommentRequest,
   CreatePostRequest,
+  HotPostData,
   LikeToggleData,
   LoginData,
   LoginRequest,
@@ -289,6 +290,10 @@ export const api = {
 
   listPosts(query: PageQuery = {}): Promise<PageData<PostListItem>> {
     return requestData('/posts', { query: pageQuery(query) })
+  },
+
+  listHotPosts(): Promise<HotPostData> {
+    return requestData('/posts/hot')
   },
 
   listMyPosts(

@@ -8,6 +8,7 @@ var (
 	_ repository.UserReader        = (*UserRepository)(nil)
 	_ repository.PostRepository    = (*PostRepository)(nil)
 	_ repository.PostReader        = (*PostRepository)(nil)
+	_ repository.HotPostReader     = (*HotPostReader)(nil)
 	_ repository.CommentRepository = (*CommentRepository)(nil)
 	_ repository.CommentCounter    = (*CommentRepository)(nil)
 	_ repository.LikeRepository    = (*LikeRepository)(nil)

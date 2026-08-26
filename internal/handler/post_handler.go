@@ -14,11 +14,12 @@ import (
 )
 
 type PostHandler struct {
-	postService *service.PostService
+	postService    *service.PostService
+	hotPostService *service.HotPostService
 }
 
-func NewPostHandler(postService *service.PostService) *PostHandler {
-	return &PostHandler{postService: postService}
+func NewPostHandler(postService *service.PostService, hotPostService *service.HotPostService) *PostHandler {
+	return &PostHandler{postService: postService, hotPostService: hotPostService}
 }
 
 func (h *PostHandler) CreatePost(c *gin.Context) {
@@ -61,6 +62,15 @@ func (h *PostHandler) GetPost(c *gin.Context) {
 	}
 
 	response.OK(c, httpresp.NewPostDetailResponse(detail))
+}
+
+func (h *PostHandler) GetHotPosts(c *gin.Context) {
+	posts, err := h.hotPostService.GetTodayHotPosts(c.Request.Context())
+	if err != nil {
+		response.ReportError(c, err)
+		return
+	}
+	response.OK(c, httpresp.NewHotPostListResponse(posts))
 }
 
 func (h *PostHandler) GetAllPosts(c *gin.Context) {

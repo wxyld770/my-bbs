@@ -26,13 +26,15 @@ func Initialize(db *gorm.DB, redisClient redis.Cmdable, admins authorization.Adm
 	commentRepo := gormrepo.NewCommentRepository(db)
 	likeRepo := gormrepo.NewLikeRepository(db)
 	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo, admins)
-	hdl := handler.NewPostHandler(svc)
+	hotSvc := service.NewHotPostService(gormrepo.NewHotPostReader(db), userRepo)
+	hdl := handler.NewPostHandler(svc, hotSvc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }
 
 // Register 实现 router.RouteRegister 接口
 func (m *Module) Register(r *gin.RouterGroup) {
 	// 公开路由（详情：公开帖所有人可读，私密帖仅作者可读；可选 Token 用于 is_liked）
+	r.GET("/posts/hot", m.Handler.GetHotPosts)
 	r.GET("/posts", m.Handler.GetAllPosts)
 	r.GET("/posts/:id", middleware.OptionalAuth(m.redis), m.Handler.GetPost)
 	r.GET("/users/:id/posts", m.Handler.GetUserPublicPosts)

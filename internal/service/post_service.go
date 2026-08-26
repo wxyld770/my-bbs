@@ -331,6 +331,10 @@ func mapPostMutationError(err error) error {
 
 // fillUsers 批量填充帖子作者信息
 func (s *PostService) fillUsers(ctx context.Context, posts []*model.Post) error {
+	return fillPostUsers(ctx, s.userRepo, posts)
+}
+
+func fillPostUsers(ctx context.Context, userRepo repository.UserReader, posts []*model.Post) error {
 	if len(posts) == 0 {
 		return nil
 	}
@@ -342,7 +346,7 @@ func (s *PostService) fillUsers(ctx context.Context, posts []*model.Post) error 
 		}
 	}
 
-	users, err := s.userRepo.FindUsersByIDs(ctx, set.FromSlice(ids).ToSlice())
+	users, err := userRepo.FindUsersByIDs(ctx, set.FromSlice(ids).ToSlice())
 	if err != nil {
 		return err
 	}

@@ -49,6 +49,14 @@ export type PostListItem = Omit<Post, 'content'> & {
   comment_count: number
 }
 
+export type HotPostItem = PostListItem & {
+  score: number
+}
+
+export interface HotPostData {
+  list: HotPostItem[]
+}
+
 export interface PostDetail {
   post: Post
   like_count: number

@@ -794,6 +794,16 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.hot-list__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.55rem;
+  color: var(--ink-soft);
+  font-family: "DM Mono", monospace;
+  font-size: 0.61rem;
+  line-height: 1.35;
+}
+
 .hot-list-card__loading {
   padding: 0.55rem 1.05rem;
   display: grid;
@@ -813,6 +823,9 @@ textarea:focus-visible {
 
 .hot-list-card__empty {
   padding: 1.2rem;
+  display: grid;
+  justify-items: start;
+  gap: 0.8rem;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.65;

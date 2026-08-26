@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
-import { formatRelativeTime, getDisplayName } from '../lib/format'
-import type { PostListItem } from '../types'
+import { formatCount, getDisplayName } from '../lib/format'
+import type { HotPostItem, PostListItem } from '../types'
 import { PostCard } from '../components/PostCard'
 
 const PAGE_SIZE = 10
@@ -20,6 +20,9 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [hotPosts, setHotPosts] = useState<HotPostItem[]>([])
+  const [hotLoading, setHotLoading] = useState(true)
+  const [hotError, setHotError] = useState('')
 
   const loadFirstPage = useCallback(async () => {
     setLoading(true)
@@ -36,9 +39,23 @@ export function HomePage() {
     }
   }, [])
 
+  const loadHotPosts = useCallback(async () => {
+    setHotLoading(true)
+    setHotError('')
+    try {
+      const ranking = await api.listHotPosts()
+      setHotPosts(ranking.list)
+    } catch (loadError) {
+      setHotError(getErrorMessage(loadError))
+    } finally {
+      setHotLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadFirstPage()
-  }, [contentVersion, loadFirstPage])
+    void loadHotPosts()
+  }, [contentVersion, loadFirstPage, loadHotPosts])
 
   const loadMore = async () => {
     setLoadingMore(true)
@@ -134,51 +151,56 @@ export function HomePage() {
         </section>
 
         <aside className="side-rail" aria-label="发现与社区信息">
-          <section className="hot-list-card" aria-labelledby="hot-list-heading" aria-busy={loading}>
+          <section className="hot-list-card" aria-labelledby="hot-list-heading" aria-busy={hotLoading}>
             <div className="hot-list-card__head">
               <div className="hot-list-card__kicker">
                 <span>TODAY / TOP 10</span>
-                <span className="hot-list-card__badge">版式预览</span>
+                <span className="hot-list-card__badge">昨日 + 今日</span>
               </div>
               <h3 id="hot-list-heading">今日最热</h3>
-              <p>正式上线后，将综合阅读、回应与喜欢，整理今天最受关注的十篇表达。</p>
+              <p>按评论 60% 与点赞 40% 计算热度，看看这两天正在发生的讨论。</p>
             </div>
 
-            {loading ? (
+            {hotLoading ? (
               <>
                 <div className="hot-list-card__loading" aria-hidden="true">
                   {Array.from({ length: 5 }, (_, index) => (
                     <span key={index} />
                   ))}
                 </div>
-                <span className="sr-only" role="status">正在准备榜单预览</span>
+                <span className="sr-only" role="status">正在加载今日最热榜单</span>
               </>
-            ) : error && posts.length === 0 ? (
-              <div className="hot-list-card__empty">
-                榜单暂时没有更新，先去看看广场上的最新发布吧。
+            ) : hotError ? (
+              <div className="hot-list-card__empty" role="alert">
+                <span>榜单暂时没有加载成功：{hotError}</span>
+                <button className="button button--soft button--small" type="button" onClick={() => void loadHotPosts()}>
+                  重新加载榜单
+                </button>
               </div>
-            ) : posts.length > 0 ? (
-              <>
-                <p className="hot-list-card__notice">热度数据尚未接入，以下暂按发布时间展示，仅作版式预览。</p>
-                <ol className="hot-list" role="list" aria-label="今日最热榜单版式预览">
-                  {posts.slice(0, 10).map((post, index) => (
-                    <li key={post.id}>
-                      <Link className="hot-list__link" to={`/post/${post.id}`}>
-                        <span className="hot-list__rank">{String(index + 1).padStart(2, '0')}</span>
-                        <span className="hot-list__body">
-                          <strong>{post.title}</strong>
-                          <small>
-                            {post.user ? getDisplayName(post.user) : '一位朋友'} · {formatRelativeTime(post.create_time)}
-                          </small>
+            ) : hotPosts.length > 0 ? (
+              <ol className="hot-list" role="list" aria-label="今日最热榜单">
+                {hotPosts.map((post, index) => (
+                  <li key={post.id}>
+                    <Link className="hot-list__link" to={`/post/${post.id}`}>
+                      <span className="hot-list__rank">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="hot-list__body">
+                        <strong>{post.title}</strong>
+                        <small>{post.user ? getDisplayName(post.user) : '一位朋友'}</small>
+                        <span className="hot-list__metrics">
+                          <span>{formatCount(post.comment_count)} 条评论</span>
+                          <span>{formatCount(post.like_count)} 次点赞</span>
                         </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ol>
-              </>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
             ) : (
               <div className="hot-list-card__empty">
-                榜单会从第一篇被认真回应的帖子开始生长。
+                <span>空榜单，快去发布吧。</span>
+                <button className="button button--primary button--small" type="button" onClick={startWriting}>
+                  写一篇
+                </button>
               </div>
             )}
           </section>
