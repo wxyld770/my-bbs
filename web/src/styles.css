@@ -696,15 +696,6 @@ textarea:focus-visible {
   letter-spacing: 0.1em;
 }
 
-.hot-list-card__badge {
-  padding: 0.22rem 0.45rem;
-  border: 1px solid rgba(32, 36, 31, 0.35);
-  border-radius: 999px;
-  background: rgba(255, 253, 247, 0.64);
-  font-size: 0.58rem;
-  letter-spacing: 0.04em;
-}
-
 .hot-list-card h3 {
   margin: 0;
   font-family: "Noto Serif SC", serif;

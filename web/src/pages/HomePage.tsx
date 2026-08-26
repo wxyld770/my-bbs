@@ -155,10 +155,8 @@ export function HomePage() {
             <div className="hot-list-card__head">
               <div className="hot-list-card__kicker">
                 <span>TODAY / TOP 10</span>
-                <span className="hot-list-card__badge">昨日 + 今日</span>
               </div>
               <h3 id="hot-list-heading">今日最热</h3>
-              <p>按评论 60% 与点赞 40% 计算热度，看看这两天正在发生的讨论。</p>
             </div>
 
             {hotLoading ? (
