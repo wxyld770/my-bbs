@@ -66,6 +66,17 @@ func TestValidate_OK(t *testing.T) {
 	}
 }
 
+func TestValidate_RequiresAdminUsernames(t *testing.T) {
+	t.Parallel()
+	cfg := validConfig()
+	cfg.AdminUsernames = "  "
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "ADMIN_USERNAMES") {
+		t.Fatalf("error = %v, want ADMIN_USERNAMES validation", err)
+	}
+}
+
 func TestValidate_RejectsInvalidRateLimitSettings(t *testing.T) {
 	t.Parallel()
 	cfg := validConfig()
@@ -74,6 +85,15 @@ func TestValidate_RejectsInvalidRateLimitSettings(t *testing.T) {
 	err := cfg.Validate()
 	if err == nil || !strings.Contains(err.Error(), "RATE_LIMIT_LOGIN_REQUESTS") {
 		t.Fatalf("error = %v, want RATE_LIMIT_LOGIN_REQUESTS validation", err)
+	}
+}
+
+func TestLoad_ReadsAdminUsernamesFromEnvironment(t *testing.T) {
+	t.Setenv("ADMIN_USERNAMES", "admin,moderator")
+
+	cfg := config.Load()
+	if cfg.AdminUsernames != "admin,moderator" {
+		t.Fatalf("AdminUsernames=%q, want env value", cfg.AdminUsernames)
 	}
 }
 
@@ -86,6 +106,7 @@ func validConfig() *config.Config {
 		DBConnMaxIdleTime:         5 * time.Minute,
 		RedisAddr:                 "127.0.0.1:6379",
 		JWTSecret:                 "a-long-enough-secret",
+		AdminUsernames:            "admin",
 		AppPort:                   "8080",
 		HTTPReadHeaderTimeout:     5 * time.Second,
 		HTTPReadTimeout:           10 * time.Second,

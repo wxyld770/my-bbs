@@ -165,6 +165,49 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 	response.OKMsg(c, "删除成功")
 }
 
+func (h *PostHandler) PinPost(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		response.ReportError(c, bizerr.ErrInvalidPostID)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+
+	pinnedUntil, err := h.postService.PinPost(c.Request.Context(), uint(id), userID)
+	if err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OK(c, httpresp.NewPinPostResponse(pinnedUntil))
+}
+
+func (h *PostHandler) UnpinPost(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		response.ReportError(c, bizerr.ErrInvalidPostID)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+
+	if err := h.postService.UnpinPost(c.Request.Context(), uint(id), userID); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OKMsg(c, "取消置顶成功")
+}
+
 func (h *PostHandler) SetVisible(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {

@@ -58,6 +58,14 @@ func (r *memoryUserRepository) FindUserByID(_ context.Context, id uint) (*model.
 	return r.byID[id], nil
 }
 
+func (r *memoryUserRepository) UpdateUserStatus(_ context.Context, id uint, status uint) error {
+	user := r.byID[id]
+	if user != nil {
+		user.Status = status
+	}
+	return nil
+}
+
 func (r *memoryUserRepository) UpdateProfile(_ context.Context, id uint, nickname, introduction string) error {
 	user := r.byID[id]
 	if user != nil {

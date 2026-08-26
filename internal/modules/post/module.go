@@ -1,6 +1,7 @@
 package post
 
 import (
+	"my-bbs/internal/authorization"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/repository/gormrepo"
@@ -19,12 +20,12 @@ type Module struct {
 }
 
 // Initialize 初始化帖子模块
-func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable, admins authorization.AdminChecker) *Module {
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
 	commentRepo := gormrepo.NewCommentRepository(db)
 	likeRepo := gormrepo.NewLikeRepository(db)
-	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo)
+	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo, admins)
 	hdl := handler.NewPostHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }
@@ -43,6 +44,8 @@ func (m *Module) Register(r *gin.RouterGroup) {
 		auth.POST("/posts/create", m.Handler.CreatePost)
 		auth.POST("/posts/update/:id", m.Handler.UpdatePost)
 		auth.POST("/posts/del/:id", m.Handler.DeletePost)
+		auth.POST("/posts/pin/:id", m.Handler.PinPost)
+		auth.POST("/posts/unpin/:id", m.Handler.UnpinPost)
 		auth.POST("/posts/visible/:id", m.Handler.SetVisible)
 		auth.POST("/user/posts", m.Handler.GetMyPosts)
 	}

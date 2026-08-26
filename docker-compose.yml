@@ -41,6 +41,7 @@ services:
       REDIS_ADDR: "redis:6379"
       REDIS_PASS: "change-me"
       JWT_SECRET: "replace-this-before-any-public-deployment"
+      ADMIN_USERNAMES: "${ADMIN_USERNAMES:?ADMIN_USERNAMES is required}"
       HTTP_READ_HEADER_TIMEOUT: "5s"
       HTTP_READ_TIMEOUT: "10s"
       HTTP_WRITE_TIMEOUT: "15s"

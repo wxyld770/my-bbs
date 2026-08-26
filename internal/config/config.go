@@ -21,6 +21,7 @@ type Config struct {
 	RedisAddr                 string
 	RedisPass                 string
 	JWTSecret                 string
+	AdminUsernames            string
 	AppPort                   string
 	AppMode                   string
 	LogDir                    string
@@ -65,6 +66,7 @@ func Load() *Config {
 		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
 		RedisPass:                 getEnv("REDIS_PASS", ""),
 		JWTSecret:                 getEnv("JWT_SECRET", ""),
+		AdminUsernames:            getEnv("ADMIN_USERNAMES", "admin"),
 		AppPort:                   getEnv("APP_PORT", "8080"),
 		AppMode:                   getEnv("APP_MODE", "debug"),
 		LogDir:                    getEnv("LOG_DIR", "logs"),
@@ -108,6 +110,9 @@ func (c *Config) Validate() error {
 	}
 	if strings.TrimSpace(c.RedisAddr) == "" {
 		return fmt.Errorf("缺少必要配置 REDIS_ADDR")
+	}
+	if strings.TrimSpace(c.AdminUsernames) == "" {
+		return fmt.Errorf("缺少必要配置 ADMIN_USERNAMES")
 	}
 	port, err := strconv.Atoi(c.AppPort)
 	if err != nil || port < 1 || port > 65535 {

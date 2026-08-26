@@ -1,6 +1,7 @@
 package user
 
 import (
+	"my-bbs/internal/authorization"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/repository/gormrepo"
@@ -19,9 +20,9 @@ type Module struct {
 }
 
 // Initialize 初始化用户模块
-func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable, admins authorization.AdminChecker) *Module {
 	repo := gormrepo.NewUserRepository(db)
-	svc := service.NewUserServiceWithRedis(repo, redisClient)
+	svc := service.NewUserServiceWithRedis(repo, redisClient, admins)
 	hdl := handler.NewUserHandler(svc)
 	return &Module{Handler: hdl, userRepo: repo, redis: redisClient}
 }
@@ -38,5 +39,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 		auth.POST("/logout", m.Handler.Logout)
 		auth.GET("/user/me", m.Handler.GetMe)
 		auth.POST("/user/profile", m.Handler.UpdateProfile)
+		auth.POST("/users/:id/mute", m.Handler.MuteUser)
+		auth.POST("/users/:id/unmute", m.Handler.UnmuteUser)
 	}
 }

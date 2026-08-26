@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
+	"my-bbs/internal/authorization"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
@@ -11,11 +13,15 @@ import (
 	"my-bbs/pkg/set"
 )
 
+// DefaultPostPinDuration 是管理员置顶帖子的默认有效期。
+const DefaultPostPinDuration = 24 * time.Hour
+
 type PostService struct {
 	postRepo    repository.PostRepository
 	userRepo    repository.UserReader
 	commentRepo repository.CommentCounter
 	likeRepo    repository.LikeReader
+	admins      authorization.AdminChecker
 }
 
 func NewPostService(
@@ -23,12 +29,14 @@ func NewPostService(
 	userRepo repository.UserReader,
 	commentRepo repository.CommentCounter,
 	likeRepo repository.LikeReader,
+	adminCheckers ...authorization.AdminChecker,
 ) *PostService {
 	return &PostService{
 		postRepo:    postRepo,
 		userRepo:    userRepo,
 		commentRepo: commentRepo,
 		likeRepo:    likeRepo,
+		admins:      firstAdminChecker(adminCheckers),
 	}
 }
 
@@ -200,12 +208,52 @@ func (s *PostService) UpdatePost(ctx context.Context, postID uint, userID uint, 
 	return mapPostMutationError(s.postRepo.UpdatePost(ctx, post))
 }
 
-// DeletePost 删除帖子，需验证当前用户是否为作者
+// DeletePost 删除帖子，作者和管理员均可操作。
 func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) error {
-	if _, err := s.requireAuthor(ctx, postID, userID); err != nil {
+	if _, err := s.requireAuthorOrAdmin(ctx, postID, userID); err != nil {
 		return err
 	}
 	return mapPostMutationError(s.postRepo.DeletePost(ctx, postID))
+}
+
+// PinPost 将公开帖子置顶默认时长，仅管理员可操作。
+func (s *PostService) PinPost(ctx context.Context, postID uint, userID uint) (time.Time, error) {
+	if err := s.requireAdmin(ctx, userID); err != nil {
+		return time.Time{}, err
+	}
+
+	post, err := s.postRepo.FindPostByID(ctx, postID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if post == nil {
+		return time.Time{}, bizerr.ErrPostNotFound
+	}
+	if post.Visible != model.VisiblePublic {
+		return time.Time{}, bizerr.ErrPrivatePostCannotPin
+	}
+
+	// 统一到数据库常用的毫秒精度，避免幂等更新因纳秒被截断而误判。
+	pinnedUntil := time.Now().Add(DefaultPostPinDuration).Truncate(time.Millisecond)
+	if err := mapPostMutationError(s.postRepo.SetPostPinnedUntil(ctx, postID, &pinnedUntil)); err != nil {
+		return time.Time{}, err
+	}
+	return pinnedUntil, nil
+}
+
+// UnpinPost 取消帖子置顶，仅管理员可操作。
+func (s *PostService) UnpinPost(ctx context.Context, postID uint, userID uint) error {
+	if err := s.requireAdmin(ctx, userID); err != nil {
+		return err
+	}
+	post, err := s.postRepo.FindPostByID(ctx, postID)
+	if err != nil {
+		return err
+	}
+	if post == nil {
+		return bizerr.ErrPostNotFound
+	}
+	return mapPostMutationError(s.postRepo.SetPostPinnedUntil(ctx, postID, nil))
 }
 
 // SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
@@ -232,6 +280,46 @@ func (s *PostService) requireAuthor(ctx context.Context, postID, userID uint) (*
 		return nil, bizerr.ErrPostNoPermission
 	}
 	return post, nil
+}
+
+// requireAuthorOrAdmin 优先按作者授权，非作者再校验管理员身份。
+func (s *PostService) requireAuthorOrAdmin(ctx context.Context, postID, userID uint) (*model.Post, error) {
+	post, err := s.postRepo.FindPostByID(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if post == nil {
+		return nil, bizerr.ErrPostNotFound
+	}
+	if post.UserID == userID {
+		return post, nil
+	}
+
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, bizerr.ErrUserNotFound
+	}
+	if !authorization.IsAdmin(s.admins, user.Username) {
+		return nil, bizerr.ErrPostNoPermission
+	}
+	return post, nil
+}
+
+func (s *PostService) requireAdmin(ctx context.Context, userID uint) error {
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return bizerr.ErrUserNotFound
+	}
+	if !authorization.IsAdmin(s.admins, user.Username) {
+		return bizerr.ErrForbidden
+	}
+	return nil
 }
 
 func mapPostMutationError(err error) error {

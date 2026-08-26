@@ -24,6 +24,7 @@ export interface User {
   nickname: string
   status: UserStatus
   introduction: string
+  is_admin: boolean
 }
 
 export interface UserProfileData {
@@ -38,6 +39,8 @@ export interface Post {
   title: string
   content: string
   visible: PostVisibility
+  pinned_until: ISODateTime | null
+  is_pinned: boolean
   user: User | null
 }
 
@@ -81,6 +84,11 @@ export interface LoginData {
 export interface LikeToggleData {
   liked: boolean
   like_count: number
+}
+
+export interface PinPostData {
+  pinned_until: ISODateTime
+  is_pinned: boolean
 }
 
 /** The JSON envelope used by every endpoint except /livez and /readyz. */
@@ -143,6 +151,8 @@ export interface SearchPost {
   user_id: number
   title: string
   excerpt: string
+  pinned_until: ISODateTime | null
+  is_pinned: boolean
   user: SearchPostAuthor | null
   like_count: number
   comment_count: number

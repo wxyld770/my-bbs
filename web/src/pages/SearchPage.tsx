@@ -3,6 +3,7 @@ import {
   FileText,
   Heart,
   MessageCircle,
+  Pin,
   RefreshCw,
   Search as SearchIcon,
   Users,
@@ -14,6 +15,7 @@ import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 import {
   formatCount,
+  formatDateTime,
   formatRelativeTime,
   getDisplayName,
 } from '../lib/format'
@@ -348,6 +350,11 @@ function SearchPostsSection({ posts }: { posts: SearchPost[] }) {
                 <span>{post.user ? getDisplayName(post.user) : '一位朋友'}</span>
                 <span aria-hidden="true">·</span>
                 <time dateTime={post.create_time}>{formatRelativeTime(post.create_time)}</time>
+                {post.is_pinned && (
+                  <span className="search-post-card__pin" title={post.pinned_until ? `置顶至 ${formatDateTime(post.pinned_until)}` : '已置顶'}>
+                    <Pin size={12} aria-hidden="true" />置顶
+                  </span>
+                )}
               </span>
               <strong>{post.title}</strong>
               {post.excerpt && <p>{post.excerpt}</p>}

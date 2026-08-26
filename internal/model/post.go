@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // 帖子可见性
 const (
 	VisiblePrivate uint8 = 0 // 仅自己可见
@@ -21,6 +23,11 @@ func (p *Post) IsPrivate() bool {
 	return p.Visible == VisiblePrivate
 }
 
+// IsPinnedAt 判断帖子在指定时刻是否处于有效置顶期。
+func (p *Post) IsPinnedAt(now time.Time) bool {
+	return p != nil && p.PinnedUntil != nil && p.PinnedUntil.After(now)
+}
+
 // Post 帖子模型
 type Post struct {
 	BaseModel
@@ -28,7 +35,9 @@ type Post struct {
 	Title   string `gorm:"type:varchar(255);not null" json:"title"`
 	Content string `gorm:"type:text;not null" json:"content"`
 	Visible uint8  `gorm:"type:tinyint(4);not null;comment:可见性状态，1所有人可见，0仅自己可见" json:"visible"`
-	User    *User  `json:"user" gorm:"-"` // 非 ORM 关联，由 Service 手动填充
+	// PinnedUntil 为 nil 或不晚于当前时间时，帖子不处于有效置顶状态。
+	PinnedUntil *time.Time `gorm:"column:pinned_until;index;comment:置顶到期时间" json:"pinned_until"`
+	User        *User      `json:"user" gorm:"-"` // 非 ORM 关联，由 Service 手动填充
 }
 
 func (Post) TableComment() string {

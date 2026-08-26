@@ -23,20 +23,22 @@ type UserResponse struct {
 	Nickname     string    `json:"nickname"`
 	Status       uint      `json:"status"`
 	Introduction string    `json:"introduction"`
+	IsAdmin      bool      `json:"is_admin"`
 }
 
 type UserProfileResponse struct {
 	User *UserResponse `json:"user"`
 }
 
-func NewUserProfileResponse(user *model.User) UserProfileResponse {
-	return UserProfileResponse{User: newUserResponse(user)}
+func NewUserProfileResponse(user *model.User, isAdmin ...bool) UserProfileResponse {
+	return UserProfileResponse{User: newUserResponse(user, isAdmin...)}
 }
 
-func newUserResponse(user *model.User) *UserResponse {
+func newUserResponse(user *model.User, isAdmin ...bool) *UserResponse {
 	if user == nil {
 		return nil
 	}
+	admin := len(isAdmin) > 0 && isAdmin[0]
 	return &UserResponse{
 		ID:           user.ID,
 		CreateTime:   user.CreateTime,
@@ -45,5 +47,6 @@ func newUserResponse(user *model.User) *UserResponse {
 		Nickname:     user.Nickname,
 		Status:       user.Status,
 		Introduction: user.Introduction,
+		IsAdmin:      admin,
 	}
 }

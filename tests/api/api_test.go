@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"my-bbs/internal/authorization"
 	"my-bbs/internal/model"
 	"my-bbs/internal/modules/comment"
 	"my-bbs/internal/modules/like"
@@ -18,6 +19,7 @@ import (
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/router"
+	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/tests/testutil"
 
@@ -32,16 +34,31 @@ func (f readinessCheckerFunc) PingContext(ctx context.Context) error {
 }
 
 func setupTestRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
+	return setupTestRouterWithAdminUsers(t, "admin")
+}
+
+func setupTestRouterWithAdminUsers(t *testing.T, usernames ...string) (*gin.Engine, *gorm.DB) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
 	redisClient := testutil.NewTestRedis(t)
+	adminUsers := authorization.NewAdminUsers(usernames...)
+	userRepo := gormrepo.NewUserRepository(db)
+	userService := service.NewUserService(userRepo)
+	for _, username := range adminUsers.Usernames() {
+		if err := userService.Register(context.Background(), username, "password1", username); err != nil {
+			t.Fatalf("seed configured admin %q before router startup: %v", username, err)
+		}
+	}
+	if err := authorization.ValidateExistingAdminUsers(context.Background(), userRepo, adminUsers); err != nil {
+		t.Fatalf("validate configured admins before router startup: %v", err)
+	}
 
 	deps := router.RouterDeps{
 		Modules: []router.RouteRegister{
-			user.Initialize(db, redisClient),
-			post.Initialize(db, redisClient),
+			user.Initialize(db, redisClient, adminUsers),
+			post.Initialize(db, redisClient, adminUsers),
 			comment.Initialize(db, redisClient),
 			like.Initialize(db, redisClient),
 		},

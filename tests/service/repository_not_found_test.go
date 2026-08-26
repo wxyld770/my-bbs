@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -97,6 +98,9 @@ func (*mutationNotFoundUserRepository) FindUserByUsername(context.Context, strin
 func (*mutationNotFoundUserRepository) FindUserByID(_ context.Context, id uint) (*model.User, error) {
 	return &model.User{BaseModel: model.BaseModel{ID: id}}, nil
 }
+func (*mutationNotFoundUserRepository) UpdateUserStatus(context.Context, uint, uint) error {
+	return repository.ErrNotFound
+}
 func (*mutationNotFoundUserRepository) UpdateProfile(context.Context, uint, string, string) error {
 	return repository.ErrNotFound
 }
@@ -122,6 +126,9 @@ func (*mutationNotFoundPostRepository) UpdatePost(context.Context, *model.Post) 
 	return repository.ErrNotFound
 }
 func (*mutationNotFoundPostRepository) UpdatePostVisible(context.Context, uint, uint8) error {
+	return repository.ErrNotFound
+}
+func (*mutationNotFoundPostRepository) SetPostPinnedUntil(context.Context, uint, *time.Time) error {
 	return repository.ErrNotFound
 }
 func (*mutationNotFoundPostRepository) DeletePost(context.Context, uint) error {

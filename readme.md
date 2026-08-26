@@ -60,16 +60,19 @@ my-bbs/
 ### 用户
 - ✅ 注册（用户名唯一索引，密码 bcrypt）
 - ✅ 登录（返回带独立 JTI 的 JWT）
+- ✅ 管理员账号由 `ADMIN_USERNAMES` 配置（逗号分隔，仅授权已有账号）
+- ✅ 管理员可禁言和解除禁言普通用户
 - ✅ 当前用户资料 `GET /user/me`
 - ✅ 修改昵称 / 个人介绍
 - ✅ 退出（服务端撤销当前 Token，不影响同一用户的其他会话）
 
 ### 帖子
-- ✅ 发布、修改、删除（作者校验）
+- ✅ 发布、修改、删除（作者可删除自己的帖子，管理员可删除任意帖子）
 - ✅ 广场列表（仅 `visible=1`，分页）
 - ✅ 详情（仅公开帖；私密帖请走个人主页；含点赞/评论数与 `is_liked`）
 - ✅ 个人主页帖子列表（分页）
 - ✅ 设置可见性（0 仅自己 / 1 所有人）
+- ✅ 管理员置顶公开帖子（默认 24 小时，可提前取消）
 
 ### 互动
 - ✅ 评论（发表 / 分页列表 / 作者删除）
@@ -164,6 +167,7 @@ APP_MODE="debug"
 APP_PORT="8080"
 LOG_DIR="logs"
 JWT_SECRET="换成一段足够长的随机密钥"
+ADMIN_USERNAMES="admin"
 HTTP_READ_HEADER_TIMEOUT="5s"
 HTTP_READ_TIMEOUT="10s"
 HTTP_WRITE_TIMEOUT="15s"
@@ -191,6 +195,15 @@ RATE_LIMIT_READ_BURST="120"
 REDIS_ADDR="127.0.0.1:6379"
 REDIS_PASS=""
 ```
+
+`ADMIN_USERNAMES` 从环境变量读取管理员账号名，多个账号使用英文逗号分隔，例如
+`ADMIN_USERNAMES="admin,moderator"`。应用只给数据库中已经存在且用户名精确匹配的账号
+授权，不会创建账号、修改密码或增加数据库角色字段。用户名仍使用原有唯一性校验，重复
+注册返回 409。请先确认账号已经存在，再把用户名加入配置；配置为空或账号不存在时应用
+拒绝启动，修改名单后需重启服务才能生效。
+
+直接运行应用时会读取 `config/.env`；使用 Docker Compose 时，请在仓库根目录的 `.env`
+或部署平台环境变量中设置同名配置。
 
 时长配置使用 Go `time.ParseDuration` 格式，例如 `500ms`、`10s`、`5m`。
 
@@ -326,8 +339,12 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 | GET | `/api/posts/:id` | 可选 | 详情（仅公开帖；带 Token 时返回 `is_liked`） |
 | POST | `/api/posts/create` | 是 | 发帖 |
 | POST | `/api/posts/update/:id` | 是 | 修改（作者） |
-| POST | `/api/posts/del/:id` | 是 | 删除（作者） |
+| POST | `/api/posts/del/:id` | 是 | 删除（作者或管理员） |
+| POST | `/api/posts/pin/:id` | 管理员 | 置顶公开帖子 24 小时 |
+| POST | `/api/posts/unpin/:id` | 管理员 | 提前取消置顶 |
 | POST | `/api/posts/visible/:id` | 是 | 设置可见性 |
+| POST | `/api/users/:id/mute` | 管理员 | 禁言普通用户 |
+| POST | `/api/users/:id/unmute` | 管理员 | 解除普通用户禁言 |
 | POST | `/api/user/posts` | 是 | 我的帖子（支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/:id/comments` | 否 | 评论列表（公开帖，分页） |
 | POST | `/api/posts/:id/comments/create` | 是 | 发表评论 |
@@ -370,6 +387,8 @@ POST /api/user/posts?pageNo=1&pageSize=10
 客户端根据 `hasMore` 决定是否继续下拉加载，无需 total；到达允许的最深分页时，
 即使本页刚好填满也会返回 `hasMore=false`，不会引导客户端请求必然被拒绝的下一页。
 帖子列表项只返回标题、作者、可见性和互动计数等摘要字段，不返回 `content`；需要正文时调用 `GET /api/posts/:id`。
+广场会把尚未到期的置顶帖排在普通帖子之前；列表和详情通过 `is_pinned`、
+`pinned_until` 表示当前置顶状态，置顶到期后统一返回 `false` 和 `null`。
 
 全局搜索：
 

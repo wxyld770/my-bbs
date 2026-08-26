@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"my-bbs/internal/model"
 )
@@ -11,6 +12,7 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	FindUserByUsername(ctx context.Context, username string) (*model.User, error)
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
+	UpdateUserStatus(ctx context.Context, id uint, status uint) error
 	UpdateProfile(ctx context.Context, id uint, nickname, introduction string) error
 }
 
@@ -42,6 +44,7 @@ type PostRepository interface {
 	FindPublicPostsByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Post, error)
 	UpdatePost(ctx context.Context, post *model.Post) error
 	UpdatePostVisible(ctx context.Context, id uint, visible uint8) error
+	SetPostPinnedUntil(ctx context.Context, id uint, pinnedUntil *time.Time) error
 	DeletePost(ctx context.Context, id uint) error
 }
 

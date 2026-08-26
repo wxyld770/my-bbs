@@ -1,4 +1,4 @@
-import { ArrowLeft, Heart, LockKeyhole, MessageCircle, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Heart, LockKeyhole, MessageCircle, Pin, PinOff, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
@@ -31,6 +31,8 @@ export function PostPage() {
   const [liking, setLiking] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null)
   const [deletingComment, setDeletingComment] = useState(false)
+  const [confirmDeletePost, setConfirmDeletePost] = useState(false)
+  const [postAction, setPostAction] = useState<'delete' | 'pin' | null>(null)
 
   const validId = Number.isSafeInteger(postId) && postId > 0
 
@@ -69,7 +71,9 @@ export function PostPage() {
   }, [contentVersion, loadPost])
 
   const isOwner = Boolean(user && detail && user.id === detail.post.user_id)
+  const isAdmin = user?.is_admin === true
   const commentsEnabled = detail?.post.visible === POST_VISIBILITY.PUBLIC
+  const canPin = detail?.post.visible === POST_VISIBILITY.PUBLIC
 
   const authorLink = useMemo(() => {
     if (!detail?.post.user) return '/'
@@ -94,6 +98,57 @@ export function PostPage() {
       }
     } finally {
       setLiking(false)
+    }
+  }
+
+  const handlePostActionFailure = (action: string, actionError: unknown) => {
+    if (handleSessionError(actionError)) {
+      openAuth('login')
+      notify('info', '登录状态已失效', '请重新登录后继续。')
+      return
+    }
+    notify('error', `${action}没有完成`, getErrorMessage(actionError))
+  }
+
+  const togglePin = async () => {
+    if (!token || !detail || !isAdmin) return
+    if (!detail.post.is_pinned && !canPin) return
+    setPostAction('pin')
+    try {
+      if (detail.post.is_pinned) {
+        await api.unpinPost(token, postId)
+        setDetail((current) => current ? {
+          ...current,
+          post: { ...current.post, is_pinned: false, pinned_until: null },
+        } : current)
+        notify('success', '已取消置顶')
+      } else {
+        const result = await api.pinPost(token, postId)
+        setDetail((current) => current ? {
+          ...current,
+          post: { ...current.post, is_pinned: true, pinned_until: result.pinned_until },
+        } : current)
+        notify('success', '帖子已置顶', `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
+      }
+    } catch (actionError) {
+      handlePostActionFailure(detail.post.is_pinned ? '取消置顶' : '置顶', actionError)
+    } finally {
+      setPostAction(null)
+    }
+  }
+
+  const deletePost = async () => {
+    if (!token || !detail || !isAdmin) return
+    setPostAction('delete')
+    try {
+      await api.deletePost(token, postId)
+      setConfirmDeletePost(false)
+      notify('success', '帖子已删除')
+      navigate('/', { replace: true })
+    } catch (actionError) {
+      handlePostActionFailure('删除', actionError)
+    } finally {
+      setPostAction(null)
     }
   }
 
@@ -200,7 +255,22 @@ export function PostPage() {
     <div className="page-wrap">
       <div className="page-header">
         <Link className="back-link" to="/"><ArrowLeft size={17} aria-hidden="true" />回到广场</Link>
-        {isOwner && <button className="button button--soft button--small" type="button" onClick={() => openComposer(detail.post)}>编辑这篇</button>}
+        {(isOwner || isAdmin) && (
+          <div className="page-header__actions" aria-label="帖子操作">
+            {isOwner && <button className="button button--soft button--small" type="button" onClick={() => openComposer(detail.post)}>编辑这篇</button>}
+            {isAdmin && (
+              <>
+                <button className="button button--soft button--small" type="button" onClick={() => void togglePin()} disabled={Boolean(postAction) || (!detail.post.is_pinned && !canPin)} title={!detail.post.is_pinned && !canPin ? '请先将帖子设为公开' : undefined}>
+                  {detail.post.is_pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
+                  {postAction === 'pin' ? '处理中…' : detail.post.is_pinned ? '取消置顶' : canPin ? '置顶 1 天' : '仅公开帖可置顶'}
+                </button>
+                <button className="button button--danger button--small" type="button" onClick={() => setConfirmDeletePost(true)} disabled={Boolean(postAction)}>
+                  <Trash2 size={14} aria-hidden="true" />删除帖子
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="article-layout">
@@ -215,7 +285,14 @@ export function PostPage() {
                 </span>
               </Link>
               <h1>{detail.post.title}</h1>
-              {detail.post.visible === POST_VISIBILITY.PRIVATE && <span className="post-card__tag private"><LockKeyhole size={12} aria-hidden="true" /> 仅自己可见</span>}
+              <div className="article-card__badges">
+                {detail.post.is_pinned && (
+                  <span className="post-card__tag pinned" title={detail.post.pinned_until ? `置顶至 ${formatDateTime(detail.post.pinned_until)}` : '已置顶'}>
+                    <Pin size={12} aria-hidden="true" /> 置顶
+                  </span>
+                )}
+                {detail.post.visible === POST_VISIBILITY.PRIVATE && <span className="post-card__tag private"><LockKeyhole size={12} aria-hidden="true" /> 仅自己可见</span>}
+              </div>
             </header>
             <div className="article-card__body">
               <PostContent content={detail.post.content} />
@@ -309,6 +386,17 @@ export function PostPage() {
           </section>
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={confirmDeletePost}
+        title="删除这篇帖子？"
+        description="这是管理员操作。删除后无法恢复，与它相关的内容也不会再出现在广场中。"
+        confirmLabel="确认删除"
+        danger
+        busy={postAction === 'delete'}
+        onConfirm={() => void deletePost()}
+        onCancel={() => setConfirmDeletePost(false)}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

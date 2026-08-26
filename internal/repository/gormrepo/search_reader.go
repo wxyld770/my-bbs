@@ -70,7 +70,7 @@ func (r *SearchReader) SearchPublicPosts(ctx context.Context, keyword string, of
 
 	var posts []model.Post
 	err := r.db.WithContext(ctx).
-		Select("id", "create_time", "update_time", "user_id", "title", "content", "visible").
+		Select("id", "create_time", "update_time", "user_id", "title", "content", "visible", "pinned_until").
 		Where("visible = ?", model.VisiblePublic).
 		Where("title LIKE ? ESCAPE '!' OR content LIKE ? ESCAPE '!'", containsPattern, containsPattern).
 		Clauses(clause.OrderBy{Expression: clause.Expr{

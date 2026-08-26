@@ -10,6 +10,7 @@ import type {
   LoginRequest,
   PageData,
   PageQuery,
+  PinPostData,
   PostDetail,
   PostListItem,
   PostVisibility,
@@ -260,6 +261,20 @@ export const api = {
     })
   },
 
+  muteUser(token: string, userId: number): Promise<ApiMessage> {
+    return requestMessage(`/users/${encodeId(userId)}/mute`, {
+      method: 'POST',
+      token,
+    })
+  },
+
+  unmuteUser(token: string, userId: number): Promise<ApiMessage> {
+    return requestMessage(`/users/${encodeId(userId)}/unmute`, {
+      method: 'POST',
+      token,
+    })
+  },
+
   search(query: SearchQuery, signal?: AbortSignal): Promise<SearchData> {
     return requestData('/search', {
       signal,
@@ -322,6 +337,20 @@ export const api = {
 
   deletePost(token: string, postId: number): Promise<ApiMessage> {
     return requestMessage(`/posts/del/${encodeId(postId)}`, {
+      method: 'POST',
+      token,
+    })
+  },
+
+  pinPost(token: string, postId: number): Promise<PinPostData> {
+    return requestData(`/posts/pin/${encodeId(postId)}`, {
+      method: 'POST',
+      token,
+    })
+  },
+
+  unpinPost(token: string, postId: number): Promise<ApiMessage> {
+    return requestMessage(`/posts/unpin/${encodeId(postId)}`, {
       method: 'POST',
       token,
     })

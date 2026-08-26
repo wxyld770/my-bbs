@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"my-bbs/internal/authorization"
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
 	"my-bbs/internal/handler"
@@ -20,6 +21,7 @@ import (
 	"my-bbs/internal/modules/search"
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/redisstore"
+	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/router"
 	"my-bbs/pkg/jwt"
 
@@ -27,10 +29,15 @@ import (
 )
 
 func main() {
-	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET / REDIS_ADDR 直接退出）
+	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET / REDIS_ADDR / ADMIN_USERNAMES 直接退出）
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "配置错误: %v\n", err)
+		os.Exit(1)
+	}
+	adminUsers, err := authorization.ParseAdminUsers(cfg.AdminUsernames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "管理员配置错误: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -74,10 +81,20 @@ func main() {
 	if err := database.AutoMigrate(db); err != nil {
 		logger.Fatal("迁移失败: %v", err)
 	}
+	adminCheckCtx, adminCheckCancel := context.WithTimeout(context.Background(), cfg.HealthCheckTimeout)
+	if err := authorization.ValidateExistingAdminUsers(
+		adminCheckCtx,
+		gormrepo.NewUserRepository(db),
+		adminUsers,
+	); err != nil {
+		adminCheckCancel()
+		logger.Fatal("管理员账号配置校验失败: %v", err)
+	}
+	adminCheckCancel()
 
 	// 5. 初始化各模块（每个模块封装了自己的依赖）
-	userMod := user.Initialize(db, redisClient)
-	postMod := post.Initialize(db, redisClient)
+	userMod := user.Initialize(db, redisClient, adminUsers)
+	postMod := post.Initialize(db, redisClient, adminUsers)
 	commentMod := comment.Initialize(db, redisClient)
 	likeMod := like.Initialize(db, redisClient)
 	searchMod := search.Initialize(db, cfg.SearchTimeout)

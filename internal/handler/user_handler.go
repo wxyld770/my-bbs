@@ -6,6 +6,7 @@ import (
 	httpreq "my-bbs/internal/handler/httprequest"
 	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
+	"my-bbs/internal/model"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/response"
@@ -82,7 +83,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, httpresp.NewUserProfileResponse(user))
+	response.OK(c, httpresp.NewUserProfileResponse(user, h.userService.IsAdminUsername(user.Username)))
 }
 
 func (h *UserHandler) GetPublicProfile(c *gin.Context) {
@@ -98,7 +99,7 @@ func (h *UserHandler) GetPublicProfile(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, httpresp.NewUserProfileResponse(user))
+	response.OK(c, httpresp.NewUserProfileResponse(user, h.userService.IsAdminUsername(user.Username)))
 }
 
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
@@ -120,4 +121,30 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	response.OKMsg(c, "资料更新成功")
+}
+
+func (h *UserHandler) MuteUser(c *gin.Context) {
+	h.setUserStatus(c, model.UserStatusMuted, "用户已禁言")
+}
+
+func (h *UserHandler) UnmuteUser(c *gin.Context) {
+	h.setUserStatus(c, model.UserStatusNormal, "用户已解除禁言")
+}
+
+func (h *UserHandler) setUserStatus(c *gin.Context, status uint, successMessage string) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || targetID <= 0 {
+		response.ReportError(c, bizerr.ErrInvalidUserID)
+		return
+	}
+	actorID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+	if err := h.userService.SetUserStatus(c.Request.Context(), actorID, uint(targetID), status); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+	response.OKMsg(c, successMessage)
 }
