@@ -1,0 +1,155 @@
+internal/modules/post/module.go
+  s_5cfcaa40ecf649::t_408e8631525072 4,23,28
+  s_5cfcaa40ecf649::t_6f57927a7dee13 47-48
+pkg/bizerr/bizerr.go
+  s_5cfcaa40ecf649::t_67b93648604a67 66-74,76-83
+  s_5cfcaa40ecf649::t_54a37b518e98d5 75
+web/src/styles.css
+  s_5cfcaa40ecf649::t_7cb839e8dd93d4 1190-1197,2180,2182-2183
+  s_5cfcaa40ecf649::t_bc02ec02e2d9ae 1848
+  s_5cfcaa40ecf649::t_5eff55d8c516bf 1854-1863
+  s_5cfcaa40ecf649::t_bcbea83be691e8 527-533,595-609,891-898,947-956,2136,2140-2144,2166-2172
+internal/handler/httpresponse/user.go
+  s_5cfcaa40ecf649::t_b9931f2a8f467e 26
+  s_5cfcaa40ecf649::t_bbf31e9b268a80 33-34,37,41,50
+internal/model/post.go
+  s_5cfcaa40ecf649::t_6f6bd1d9890d08 40
+  s_5cfcaa40ecf649::t_d89fe3e4ee6615 3-4,26-30,38
+  s_5cfcaa40ecf649::t_01daa119c8ff89 39
+internal/repository/ports.go
+  s_5cfcaa40ecf649::t_ccd90c120a3014 15
+  s_5cfcaa40ecf649::t_d89fe3e4ee6615 5,47
+cmd/main.go
+  s_5cfcaa40ecf649::t_c0179f87967868 24,84-93
+  s_5cfcaa40ecf649::t_22ec9b08b44ed7 32
+  s_5cfcaa40ecf649::t_f25e86ae97cc51 12,38-42,96-97
+tests/service/user_service_port_test.go
+  s_5cfcaa40ecf649::t_e2e3751970bfb7 61,64
+  s_5cfcaa40ecf649::t_4ae3ac2d408288 62-63,65-68
+internal/repository/gormrepo/search_reader.go
+  s_5cfcaa40ecf649::t_d89fe3e4ee6615 73
+tests/api/api_test.go
+  s_5cfcaa40ecf649::t_6984cbf0e8cc55 37-40,46
+  s_5cfcaa40ecf649::t_471067fefc70ba 22,47-56
+  s_5cfcaa40ecf649::t_0e2c7333256171 14,60-61
+internal/handler/httpresponse/search.go
+  s_5cfcaa40ecf649::t_b9931f2a8f467e 45-46,84,91-92
+config/.env.example
+  s_5cfcaa40ecf649::t_ece36cfaba5e6f 12
+internal/service/user_service.go
+  s_5cfcaa40ecf649::t_cc4856d3966a88 9,23,26-27,31-36,160-202,213-218
+readme.md
+  s_5cfcaa40ecf649::t_65d15ce1094b9a 205-207
+  s_5cfcaa40ecf649::t_573d5a5036568a 390-391
+  s_5cfcaa40ecf649::t_ece36cfaba5e6f 63,170,199-201,346-347
+  s_5cfcaa40ecf649::t_8984e539f2f0b7 202-203
+  s_5cfcaa40ecf649::t_82e324aa27e1b7 64
+  s_5cfcaa40ecf649::t_89edd354f213b5 70,75,342-344
+internal/authorization/admin_users.go
+  s_5cfcaa40ecf649::t_7d850f63d0e873 4,6-7,9-10,13-16,26-29,58-87
+  s_5cfcaa40ecf649::t_ea704fe22206a4 1-3,5,8,11-12,17-25,30-57,88-93
+tests/config/config_test.go
+  s_5cfcaa40ecf649::t_c6914f43fa674c 69-79,109
+  s_5cfcaa40ecf649::t_74521d4ea7e551 91-99
+internal/handler/httpresponse/post.go
+  s_5cfcaa40ecf649::t_b9931f2a8f467e 19-21,38-39,45-53,67-70,73-74,82-83,91,93-109,111
+web/src/pages/SearchPage.tsx
+  s_5cfcaa40ecf649::t_5eff55d8c516bf 6,353-357
+  s_5cfcaa40ecf649::t_ad27085700de92 18
+tests/authorization/admin_users_test.go
+  s_5cfcaa40ecf649::t_f47c3f5614c205 1-3,5-8,10-11,20-38,76-77
+  s_5cfcaa40ecf649::t_471067fefc70ba 4,9,12-19,39-75
+internal/repository/gormrepo/post_repo.go
+  s_5cfcaa40ecf649::t_a30d48ad7c53ea 12,48-52
+  s_5cfcaa40ecf649::t_9b2f547dd38a44 118-120
+  s_5cfcaa40ecf649::t_e11049a0796769 86-87,89-90
+  s_5cfcaa40ecf649::t_14294a7e8f4e9c 110,138
+  s_5cfcaa40ecf649::t_a984cae00af7cd 9
+  s_5cfcaa40ecf649::t_8dcd129491010b 106,113-117,121-134,136-137,139
+  s_5cfcaa40ecf649::t_7e7a77fcbb3016 88,91-92,100-102,107-109,140-153
+  s_5cfcaa40ecf649::t_6f6bd1d9890d08 111-112,135
+  s_5cfcaa40ecf649::t_d89fe3e4ee6615 6,21,65,78,96-99,103-105
+internal/handler/user_handler.go
+  s_5cfcaa40ecf649::t_eda642373cd5bb 9,86,102,125-149
+开发流程.md
+  s_5cfcaa40ecf649::t_ece36cfaba5e6f 122
+  s_5cfcaa40ecf649::t_db5f43c0f446b7 113
+tests/api/admin_post_test.go
+  s_5cfcaa40ecf649::t_7fa13497959ba1 16-19,27,140-141
+  s_5cfcaa40ecf649::t_bfded5b0bee891 151-156
+  s_5cfcaa40ecf649::t_762f532db54340 299
+  s_5cfcaa40ecf649::t_2a671b10d01ac8 332
+  s_5cfcaa40ecf649::t_471067fefc70ba 23,38,55,90,124
+  s_5cfcaa40ecf649::t_494b66eef00963 21,24,29,31,52
+  s_5cfcaa40ecf649::t_1cfd012e640adc 1-6,8-15,20,22,25-26,28,30,32-33,51,53-54,56,60-85,121-123,125-139,142-150,157-248,276-298,300-331,333-377,379,386-387
+  s_5cfcaa40ecf649::t_54ad15e8d3113b 57-59,249-260,274
+  s_5cfcaa40ecf649::t_e755f8a35606ec 7,378,380-385
+  s_5cfcaa40ecf649::t_6984cbf0e8cc55 34-37,39-50
+  s_5cfcaa40ecf649::t_4e01348183b8c6 86-89,91-120,261-273,275
+internal/config/config.go
+  s_5cfcaa40ecf649::t_f25e86ae97cc51 24
+  h_994034d8bcd203 69
+  s_5cfcaa40ecf649::t_2d6cb16b80c772 114-116
+tests/service/repository_not_found_test.go
+  s_5cfcaa40ecf649::t_e2e3751970bfb7 101
+  s_5cfcaa40ecf649::t_e755f8a35606ec 7,131
+  s_5cfcaa40ecf649::t_4ae3ac2d408288 102-103
+internal/modules/user/module.go
+  s_5cfcaa40ecf649::t_408e8631525072 4,23,25,42-43
+web/src/lib/api.ts
+  s_5cfcaa40ecf649::t_5a98160e8f9462 13,345-353
+  s_5cfcaa40ecf649::t_3683bb463956fa 264-277
+web/src/components/PostCard.tsx
+  s_5cfcaa40ecf649::t_92215c9be22be5 185-187
+  s_5cfcaa40ecf649::t_64174f0e0872fb 8,141
+  s_5cfcaa40ecf649::t_5a98160e8f9462 1,20,23-26,97,99-101,104-110,112-121,124-125,138-140,142-149,154,156-167,169,171-177
+  s_5cfcaa40ecf649::t_b66ef9e41f0259 27,103,168,170
+  s_5cfcaa40ecf649::t_099b7b1e136f1f 98,102,111
+internal/service/post_service.go
+  s_5cfcaa40ecf649::t_01daa119c8ff89 236
+  s_5cfcaa40ecf649::t_eebbb3e43c808b 6,16-18,211,213,219-235,238-258,285-304,309-318,320-322
+  s_5cfcaa40ecf649::t_6f6bd1d9890d08 237
+  s_5cfcaa40ecf649::t_d44d8af3e4b3e9 8,24,32,39,305,319
+internal/handler/post_handler.go
+  s_5cfcaa40ecf649::t_6f57927a7dee13 168-210
+tests/repository/not_found_test.go
+  s_5cfcaa40ecf649::t_470a75b5a4d754 73-75,81-83,87-183
+internal/repository/gormrepo/user_repo.go
+  s_5cfcaa40ecf649::t_e11049a0796769 66-72,76,78-79
+  s_5cfcaa40ecf649::t_7e7a77fcbb3016 73-75,77,80
+  s_5cfcaa40ecf649::t_ccd90c120a3014 64-65
+web/src/pages/UserPage.tsx
+  s_5cfcaa40ecf649::t_5a98160e8f9462 141
+  s_5cfcaa40ecf649::t_045a9e3817e399 1,7,11,18-19,26,66-88,117-125
+web/src/pages/PostPage.tsx
+  s_5cfcaa40ecf649::t_099b7b1e136f1f 131
+  s_5cfcaa40ecf649::t_14601f6335dfe6 1,34-35,74,104-114,116-130,132-154,258-262,264,266-273,288-295,390-399
+  s_5cfcaa40ecf649::t_b66ef9e41f0259 76,115,263,265
+docker-compose.yml
+  s_5cfcaa40ecf649::t_c0179f87967868 44
+web/src/types.ts
+  s_5cfcaa40ecf649::t_b95c6ac6f6cc5d 91
+  s_5cfcaa40ecf649::t_5eff55d8c516bf 154-155
+  s_5cfcaa40ecf649::t_5a98160e8f9462 27,42-43,89-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "f32f0a97dc2b7df0748160bab694741daeaad62a",
+  "prompts": {},
+  "humans": {
+    "h_994034d8bcd203": {
+      "author": "wxyld <wxyld770@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
