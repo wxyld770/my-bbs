@@ -181,15 +181,11 @@ export function MePage() {
               type="button"
               onClick={() => void generateInvitation()}
               disabled={generatingInvitation || Boolean(invitationCode)}
-              aria-describedby="invitation-eligibility-help"
               aria-busy={generatingInvitation}
             >
               <KeyRound size={16} aria-hidden="true" />
               {generatingInvitation ? '生成中…' : '生成邀请码'}
             </button>
-            <p className="profile-card__invitation-help" id="invitation-eligibility-help">
-              注册满 7 天后可生成；成功发布一篇帖子后可立即生成。
-            </p>
             <button className="button button--soft" type="button" onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />退出登录</button>
           </div>
         </section>

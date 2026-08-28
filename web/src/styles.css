@@ -1261,15 +1261,6 @@ button.stat-pill {
   gap: 0.65rem;
 }
 
-.profile-card__invitation-help {
-  max-width: 16rem;
-  margin: -0.1rem 0 0;
-  color: var(--ink-soft);
-  font-size: 0.72rem;
-  line-height: 1.55;
-  text-align: right;
-}
-
 .profile-meta {
   margin-top: 0.75rem;
   display: flex;
@@ -2317,11 +2308,6 @@ button.stat-pill {
     grid-column: 1 / -1;
     width: 100%;
     align-items: stretch;
-  }
-
-  .profile-card__invitation-help {
-    max-width: none;
-    text-align: left;
   }
 
   .invitation-code {

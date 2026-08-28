@@ -13,6 +13,129 @@ import { POST_VISIBILITY, type Comment, type PostDetail } from '../types'
 
 const COMMENT_PAGE_SIZE = 20
 
+const READING_PROMPTS = [
+  {
+    title: '慢一点，也没关系。',
+    body: '你不必在每一天都成为更好的人，能照顾好此刻的自己就很了不起。',
+  },
+  {
+    title: '今天也值得期待。',
+    body: '生活偶尔会把答案藏起来，但它从没有忘记为认真前行的人留一盏灯。',
+  },
+  {
+    title: '允许自己休息。',
+    body: '停下来不是后退，而是把丢在路上的勇气一点点捡回来。',
+  },
+  {
+    title: '别急着否定自己。',
+    body: '那些暂时没有回声的努力，也在悄悄地把你带往更远的地方。',
+  },
+  {
+    title: '向前走一点点。',
+    body: '你不需要一次走完所有的路，今天比昨天多走一步就很好。',
+  },
+  {
+    title: '你已经做得很好。',
+    body: '走到今天的你，曾经也穿过许多以为迈不过去的黑夜。',
+  },
+  {
+    title: '保持自己的节奏。',
+    body: '别人的花期不是你的时钟，你只需要在自己的季节里好好生长。',
+  },
+  {
+    title: '好事正在发生。',
+    body: '眼前的平静不代表没有变化，有些美好正在你看不见的地方生根。',
+  },
+  {
+    title: '把今天过好。',
+    body: '不必提前为明天的风雨担心，此刻的阳光也值得你认真收藏。',
+  },
+  {
+    title: '愿你忠于自己。',
+    body: '不用把每一次选择都做给别人看，内心安静就是最好的方向。',
+  },
+  {
+    title: '夜晚总会过去。',
+    body: '再漫长的黑夜也有尽头，你要做的只是再相信黎明一次。',
+  },
+  {
+    title: '生活会慢慢回答。',
+    body: '你此刻的迷茫并不是结局，它只是答案出现以前的一小段留白。',
+  },
+  {
+    title: '给自己一点时间。',
+    body: '不是所有问题都要在今天解决，有些答案会在你安静生活时慢慢浮现。',
+  },
+  {
+    title: '你不必事事完美。',
+    body: '真实的生活本就带着缺口，愿意继续往前走就已经值得肯定。',
+  },
+  {
+    title: '风会带来新的方向。',
+    body: '眼前的路暂时不清楚也没关系，当你继续出发，新的方向自会出现。',
+  },
+  {
+    title: '小小的进步也算数。',
+    body: '不用等到翻越高山才庆祝，每一次没有放弃都是你留下的里程碑。',
+  },
+  {
+    title: '答案还在路上。',
+    body: '一时的沉默不是拒绝，生活只是在用它的速度为你准备回音。',
+  },
+  {
+    title: '先把自己照顾好。',
+    body: '你可以关心很多人，也别忘了给自己留一份同样认真的温柔。',
+  },
+  {
+    title: '别怕走得慢。',
+    body: '只要你还在朝着想去的方向前进，慢一些也是属于自己的风景。',
+  },
+  {
+    title: '重新开始也是勇敢。',
+    body: '改变方向不代表之前的努力白费，那些经历已经成为你新的底气。',
+  },
+  {
+    title: '你值得被温柔对待。',
+    body: '不必用委屈换来理解，真正重要的关系会尊重你的感受和边界。',
+  },
+  {
+    title: '没有白走的路。',
+    body: '那些曾让你困惑的绕路，总会在未来的某一天变成理解世界的新角度。',
+  },
+  {
+    title: '把烦恼交给明天。',
+    body: '今天已经走了很远，先让自己好好休息，醒来时世界会有新的空气。',
+  },
+  {
+    title: '相信时间的力量。',
+    body: '一时放不下的事不用勉强，时间会帮你留下珍贵的，也带走沉重的。',
+  },
+  {
+    title: '心里有光，脚下就有路。',
+    body: '哪怕只剩一点小小的期待，它也能陪你走过眼前这段不太容易的路。',
+  },
+  {
+    title: '不必讨好所有人。',
+    body: '你的人生不是一张需要每个人都满意的答卷，坦然做自己就很好。',
+  },
+  {
+    title: '你的感受很重要。',
+    body: '难过不需要先得到别人的认可，你可以承认它，也可以慢慢安放它。',
+  },
+  {
+    title: '等一等花开。',
+    body: '暂时看不见成果的日子里，根也在努力生长，请再给自己一点耐心。',
+  },
+  {
+    title: '勇敢不是毫不害怕。',
+    body: '真正的勇敢是带着心里的忐忑，仍然愿意为想要的生活向前一步。',
+  },
+  {
+    title: '明天会有新的风景。',
+    body: '今天没能如愿的事并不代表结束，新的一天会带来重新选择的可能。',
+  },
+] as const
+
 export function PostPage() {
   const { id } = useParams()
   const postId = Number(id)
@@ -35,6 +158,10 @@ export function PostPage() {
   const [postAction, setPostAction] = useState<'delete' | 'pin' | null>(null)
 
   const validId = Number.isSafeInteger(postId) && postId > 0
+  const readingPrompt = useMemo(
+    () => READING_PROMPTS[Math.floor(Math.random() * READING_PROMPTS.length)],
+    [postId],
+  )
 
   const loadPost = useCallback(async () => {
     if (!validId) {
@@ -377,8 +504,8 @@ export function PostPage() {
         <aside className="side-rail" aria-label="帖子信息">
           <section className="rail-card rail-card--accent">
             <span className="rail-card__index">POST / {String(detail.post.id).padStart(4, '0')}</span>
-            <h3>慢一点，读完它。</h3>
-            <p>好的交流不是等着反驳，而是先听清对方真正想说什么。</p>
+            <h3>{readingPrompt.title}</h3>
+            <p>{readingPrompt.body}</p>
           </section>
           <section className="rail-card">
             <span className="rail-card__index">UPDATED</span>
