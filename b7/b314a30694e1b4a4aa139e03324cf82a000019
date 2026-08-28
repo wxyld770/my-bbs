@@ -1,0 +1,21 @@
+web/src/pages/PostPage.tsx
+  s_8464988174a9d2::t_14ec05ed6b25b4 65-136
+  s_8464988174a9d2::t_8828bbe748378d 18-19,22-23,26-27,30-31,34-35,38-39,42-43,46-63
+  s_8464988174a9d2::t_d5bbb097673b1d 16-17,20-21,24-25,28-29,32-33,36-37,40-41,44-45,64,137-138,161-164,507-508
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "b7b314a30694e1b4a4aa139e03324cf82a000019",
+  "prompts": {},
+  "sessions": {
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
