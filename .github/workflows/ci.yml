@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       artifact-id: ${{ steps.upload-backend.outputs.artifact-id }}
+      ddl-artifact-id: ${{ steps.upload-ddl.outputs.artifact-id }}
 
     steps:
       - name: Check out repository
@@ -46,6 +47,375 @@ jobs:
       - name: Run Go vet
         run: go vet ./...
 
+      - name: Validate repeatable MariaDB schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          ddl_file="scripts/full_ddl.sql"
+          [[ -f "${ddl_file}" && ! -L "${ddl_file}" ]]
+          ddl_size="$(stat -c '%s' "${ddl_file}")"
+          [[ "${ddl_size}" =~ ^[0-9]+$ ]]
+          (( ddl_size > 0 && ddl_size <= 1048576 ))
+
+          python3 - "${ddl_file}" <<'PY'
+          import pathlib
+          import sys
+          import unicodedata
+
+          data = pathlib.Path(sys.argv[1]).read_bytes()
+          if b"\x00" in data or b"\r" in data:
+              raise SystemExit("full_ddl.sql contains NUL or CR bytes")
+          text = data.decode("utf-8")
+          if not text.strip():
+              raise SystemExit("full_ddl.sql must contain non-whitespace SQL")
+          if not data.endswith(b"\n"):
+              raise SystemExit("full_ddl.sql must end with a newline")
+          if text.startswith("\ufeff"):
+              raise SystemExit("full_ddl.sql must not start with a UTF-8 BOM")
+          for character in text:
+              if character not in ("\n", "\t") and unicodedata.category(character) in ("Cc", "Cf", "Cs"):
+                  raise SystemExit("full_ddl.sql contains a forbidden control character")
+          PY
+
+          [[ "${GITHUB_RUN_ID}" =~ ^[0-9]+$ ]]
+          [[ "${GITHUB_RUN_ATTEMPT}" =~ ^[0-9]+$ ]]
+          container="my-bbs-ddl-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          db_password="ddl-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          cleanup() {
+            docker rm -f "${container}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT HUP INT TERM
+
+          docker run --detach --name "${container}" \
+            --env MYSQL_ROOT_PASSWORD="${db_password}" \
+            --env MYSQL_DATABASE=my_bbs \
+            mariadb:10.3.28 >/dev/null
+
+          ready=false
+          for _ in {1..60}; do
+            if docker exec "${container}" \
+              mysql \
+                --user=root \
+                --password="${db_password}" \
+                --database=my_bbs \
+                --batch \
+                --skip-column-names \
+                --execute='SELECT 1' >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          [[ "${ready}" == "true" ]]
+
+          apply_ddl_raw() {
+            docker exec --interactive "${container}" \
+              mysql \
+                --user=root \
+                --password="${db_password}" \
+                --database=my_bbs \
+                --skip-force \
+                --batch \
+                --raw \
+                --skip-column-names \
+                --skip-reconnect \
+                --binary-mode \
+                --local-infile=0 \
+              < "${ddl_file}"
+          }
+
+          apply_ddl() {
+            local output
+            output="$(apply_ddl_raw)"
+            if [[ "${output}" != "FULL_DDL_OK" ]]; then
+              printf 'full_ddl.sql returned an unexpected result: %q\n' "${output}" >&2
+              return 1
+            fi
+          }
+
+          assert_schema_contract() {
+            local state
+            state="$(docker exec "${container}" mysql \
+              --user=root \
+              --password="${db_password}" \
+              --database=my_bbs \
+              --batch \
+              --raw \
+              --skip-column-names \
+              --execute='SELECT CONCAT(
+                (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME IN ("comments", "post_likes", "posts", "users", "invitations") AND TABLE_TYPE = "BASE TABLE"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "invite_code" AND LOWER(COLUMN_TYPE) = "char(6)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_unicode_ci" AND COLUMN_COMMENT = "注册时使用的邀请码"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations" AND UPPER(ENGINE) = "INNODB" AND LOWER(TABLE_COLLATION) = "utf8mb4_unicode_ci"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations" AND (
+                  (COLUMN_NAME = "id" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND LOWER(EXTRA) = "auto_increment" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "主键ID") OR
+                  (COLUMN_NAME = "create_time" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "创建时间") OR
+                  (COLUMN_NAME = "update_time" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "更新时间") OR
+                  (COLUMN_NAME = "code" AND LOWER(COLUMN_TYPE) = "char(6)" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_unicode_ci" AND COLUMN_COMMENT = "邀请码") OR
+                  (COLUMN_NAME = "creator_id" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "创建用户ID") OR
+                  (COLUMN_NAME = "used_by" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "使用用户ID") OR
+                  (COLUMN_NAME = "used_at" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "使用时间")
+                )),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND SUB_PART IS NULL AND UPPER(INDEX_TYPE) = "BTREE" AND SEQ_IN_INDEX = 1 AND (
+                  (TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code" AND NON_UNIQUE = 0 AND COLUMN_NAME = "invite_code") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "PRIMARY" AND NON_UNIQUE = 0 AND COLUMN_NAME = "id") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_code" AND NON_UNIQUE = 0 AND COLUMN_NAME = "code") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_creator_id" AND NON_UNIQUE = 1 AND COLUMN_NAME = "creator_id") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_used_by" AND NON_UNIQUE = 0 AND COLUMN_NAME = "used_by")
+                )),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND (
+                  (TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME IN ("PRIMARY", "idx_invitations_code", "idx_invitations_creator_id", "idx_invitations_used_by"))
+                ))
+              );')"
+            if [[ "${state}" != "5:1:1:7:7:5:5" ]]; then
+              printf 'unexpected schema contract state: %q\n' "${state}" >&2
+              return 1
+            fi
+          }
+
+          schema_snapshot() {
+            docker exec "${container}" mysqldump \
+              --user=root \
+              --password="${db_password}" \
+              --default-character-set=utf8mb4 \
+              --no-data \
+              --skip-comments \
+              --skip-add-drop-table \
+              --skip-lock-tables \
+              my_bbs
+          }
+
+          production_data_snapshot() {
+            docker exec "${container}" mysql \
+              --user=root \
+              --password="${db_password}" \
+              --database=my_bbs \
+              --batch \
+              --raw \
+              --skip-column-names \
+              --execute='SELECT `table_name`, `id`, `payload`
+              FROM (
+                SELECT "users" AS `table_name`, `id`, CONCAT_WS("|",
+                  COALESCE(DATE_FORMAT(`create_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`deleted`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  HEX(`username`), HEX(`password`), COALESCE(HEX(`nickname`), "<NULL>"),
+                  COALESCE(CAST(`status` AS CHAR), "<NULL>"), COALESCE(HEX(`introduction`), "<NULL>")
+                ) AS `payload` FROM `users`
+                UNION ALL
+                SELECT "posts", `id`, CONCAT_WS("|",
+                  COALESCE(DATE_FORMAT(`create_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`deleted`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  CAST(`user_id` AS CHAR), HEX(`title`), HEX(`content`), CAST(`visible` AS CHAR),
+                  COALESCE(DATE_FORMAT(`pinned_until`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>")
+                ) FROM `posts`
+                UNION ALL
+                SELECT "comments", `id`, CONCAT_WS("|",
+                  COALESCE(DATE_FORMAT(`create_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`deleted`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  CAST(`post_id` AS CHAR), CAST(`user_id` AS CHAR), HEX(`content`)
+                ) FROM `comments`
+                UNION ALL
+                SELECT "post_likes", `id`, CONCAT_WS("|",
+                  COALESCE(DATE_FORMAT(`create_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  CAST(`post_id` AS CHAR), CAST(`user_id` AS CHAR)
+                ) FROM `post_likes`
+              ) AS `production_rows`
+              ORDER BY `table_name`, `id`;'
+          }
+
+          # A clean database and a fully provisioned database must both converge.
+          apply_ddl
+          assert_schema_contract
+          schema_after_first="$(schema_snapshot)"
+          apply_ddl
+          assert_schema_contract
+          schema_after_second="$(schema_snapshot)"
+          [[ "${schema_after_first}" == "${schema_after_second}" ]]
+
+          empty_rows="$(docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --raw \
+            --skip-column-names \
+            --execute='SELECT
+              (SELECT COUNT(*) FROM `users`) +
+              (SELECT COUNT(*) FROM `posts`) +
+              (SELECT COUNT(*) FROM `comments`) +
+              (SELECT COUNT(*) FROM `post_likes`) +
+              (SELECT COUNT(*) FROM `invitations`);')"
+          [[ "${empty_rows}" == "0" ]]
+
+          reset_database() {
+            docker exec "${container}" mysql \
+              --user=root \
+              --password="${db_password}" \
+              --batch \
+              --execute='DROP DATABASE IF EXISTS `my_bbs`; CREATE DATABASE `my_bbs` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+          }
+
+          load_production_baseline() {
+            docker exec "${container}" mysql \
+              --user=root \
+              --password="${db_password}" \
+              --database=my_bbs \
+              --batch \
+              --execute='
+                CREATE TABLE `comments` (
+                  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "主键ID",
+                  `create_time` DATETIME(3) DEFAULT NULL COMMENT "创建时间",
+                  `update_time` DATETIME(3) DEFAULT NULL COMMENT "更新时间",
+                  `deleted` DATETIME(3) DEFAULT NULL COMMENT "删除时间，空表示未删除",
+                  `post_id` BIGINT(20) UNSIGNED NOT NULL,
+                  `user_id` BIGINT(20) UNSIGNED NOT NULL,
+                  `content` TEXT COLLATE utf8mb4_unicode_ci NOT NULL,
+                  PRIMARY KEY (`id`),
+                  KEY `idx_comments_deleted` (`deleted`),
+                  KEY `idx_comments_post_id` (`post_id`),
+                  KEY `idx_comments_user_id` (`user_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                CREATE TABLE `post_likes` (
+                  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "主键ID",
+                  `create_time` DATETIME(3) DEFAULT NULL COMMENT "创建时间",
+                  `update_time` DATETIME(3) DEFAULT NULL COMMENT "更新时间",
+                  `post_id` BIGINT(20) UNSIGNED NOT NULL,
+                  `user_id` BIGINT(20) UNSIGNED NOT NULL,
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `uk_like_user_post` (`post_id`, `user_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                CREATE TABLE `posts` (
+                  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "主键ID",
+                  `create_time` DATETIME(3) DEFAULT NULL COMMENT "创建时间",
+                  `update_time` DATETIME(3) DEFAULT NULL COMMENT "更新时间",
+                  `deleted` DATETIME(3) DEFAULT NULL COMMENT "删除时间，空表示未删除",
+                  `user_id` BIGINT(20) UNSIGNED NOT NULL,
+                  `title` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `content` TEXT COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `visible` TINYINT(4) NOT NULL COMMENT "可见性状态，1所有人可见，0仅自己可见",
+                  `pinned_until` DATETIME(3) DEFAULT NULL COMMENT "置顶到期时间",
+                  PRIMARY KEY (`id`),
+                  KEY `idx_posts_deleted` (`deleted`),
+                  KEY `idx_posts_user_id` (`user_id`),
+                  KEY `idx_posts_pinned_until` (`pinned_until`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                CREATE TABLE `users` (
+                  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "主键ID",
+                  `create_time` DATETIME(3) DEFAULT NULL COMMENT "创建时间",
+                  `update_time` DATETIME(3) DEFAULT NULL COMMENT "更新时间",
+                  `deleted` DATETIME(3) DEFAULT NULL COMMENT "删除时间，空表示未删除",
+                  `username` VARCHAR(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT "用户名",
+                  `password` VARCHAR(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+                  `nickname` VARCHAR(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT "用户昵称",
+                  `status` TINYINT(4) DEFAULT 1 COMMENT "用户状态，1:正常，0禁言",
+                  `introduction` VARCHAR(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT "个人介绍",
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `idx_users_username` (`username`),
+                  KEY `idx_users_deleted` (`deleted`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                INSERT INTO `users` (`id`, `create_time`, `username`, `password`, `nickname`, `status`, `introduction`)
+                VALUES (101, "2026-01-02 03:04:05.123", "legacy-user", "legacy-password", "Legacy", 1, "existing row");
+                INSERT INTO `posts` (`id`, `create_time`, `user_id`, `title`, `content`, `visible`, `pinned_until`)
+                VALUES (201, "2026-01-03 03:04:05.123", 101, "legacy title", "legacy content", 1, "2026-09-01 00:00:00.000");
+                INSERT INTO `comments` (`id`, `create_time`, `post_id`, `user_id`, `content`)
+                VALUES (301, "2026-01-04 03:04:05.123", 201, 101, "legacy comment");
+                INSERT INTO `post_likes` (`id`, `create_time`, `post_id`, `user_id`)
+                VALUES (401, "2026-01-05 03:04:05.123", 201, 101);
+              '
+          }
+
+          expect_ddl_failure() {
+            if apply_ddl_raw; then
+              echo "full_ddl.sql unexpectedly accepted an incompatible schema" >&2
+              exit 1
+            fi
+          }
+
+          # A missing UNIQUE index must still reject duplicate non-NULL values.
+          reset_database
+          apply_ddl
+          docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --execute='ALTER TABLE `users` DROP INDEX `idx_users_invite_code`; INSERT INTO `users` (`username`, `password`, `invite_code`) VALUES ("duplicate-a", "x", "ABC123"), ("duplicate-b", "y", "ABC123");'
+          expect_ddl_failure
+
+          duplicate_state="$(docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --raw \
+            --skip-column-names \
+            --execute='SELECT CONCAT(
+              (SELECT COUNT(*) FROM `users` WHERE `invite_code` = "ABC123"),
+              ":",
+              (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code")
+            );')"
+          [[ "${duplicate_state}" == "2:0" ]]
+
+          docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --execute='UPDATE `users` SET `invite_code` = NULL WHERE `username` = "duplicate-b";'
+          apply_ddl
+          apply_ddl
+          assert_schema_contract
+          recovered_rows="$(docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --raw \
+            --skip-column-names \
+            --execute='SELECT COUNT(*) FROM `users` WHERE `username` IN ("duplicate-a", "duplicate-b");')"
+          [[ "${recovered_rows}" == "2" ]]
+
+          # Upgrade the independently frozen current-production baseline. Future
+          # additive DDL is appended to full_ddl.sql and is exercised here in order;
+          # update this fixture only after that schema is already the production base.
+          reset_database
+          load_production_baseline
+          production_before="$(production_data_snapshot)"
+          apply_ddl
+          assert_schema_contract
+          apply_ddl
+          assert_schema_contract
+          production_after="$(production_data_snapshot)"
+          [[ "${production_before}" == "${production_after}" ]]
+
+          legacy_state="$(docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --raw \
+            --skip-column-names \
+            --execute='SELECT CONCAT(
+              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `invite_code` IS NULL),
+              ":",
+              (SELECT COUNT(*) FROM `invitations`)
+            );')"
+          [[ "${legacy_state}" == "1:0" ]]
+
       - name: Build production binary
         env:
           CGO_ENABLED: "0"
@@ -61,6 +431,16 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: ${{ runner.temp }}/my-bbs-linux-amd64
+          archive: false
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload database schema component
+        id: upload-ddl
+        if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: scripts/full_ddl.sql
           archive: false
           if-no-files-found: error
           retention-days: 1
@@ -148,6 +528,13 @@ jobs:
           path: ${{ runner.temp }}/components
           digest-mismatch: error
 
+      - name: Download database schema component
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.backend.outputs.ddl-artifact-id }}
+          path: ${{ runner.temp }}/components
+          digest-mismatch: error
+
       - name: Assemble immutable release
         shell: bash
         run: |
@@ -165,19 +552,31 @@ jobs:
           install -m 0644 \
             "${RUNNER_TEMP}/components/my-bbs-frontend.tar.gz" \
             "${release_dir}/my-bbs-frontend.tar.gz"
+          install -m 0644 \
+            "${RUNNER_TEMP}/components/full_ddl.sql" \
+            "${release_dir}/my-bbs-full-ddl.sql"
+
+          ddl_sha256="$(sha256sum "${release_dir}/my-bbs-full-ddl.sql" | awk '{print $1}')"
+          [[ "${ddl_sha256}" =~ ^[0-9a-f]{64}$ ]]
 
           jq -n \
             --arg commit_sha "${GITHUB_SHA}" \
             --arg source_ref "${GITHUB_REF}" \
+            --arg ddl_sha256 "${ddl_sha256}" \
             '{
-              schema_version: 1,
+              schema_version: 2,
               application: "my-bbs",
               commit_sha: $commit_sha,
               source_ref: $source_ref,
               target_os: "linux",
               target_arch: "amd64",
               go_version: "go1.26.7",
-              node_version: "v24.19.0"
+              node_version: "v24.19.0",
+              database: {
+                engine: "mariadb",
+                ddl_file: "my-bbs-full-ddl.sql",
+                ddl_sha256: $ddl_sha256
+              }
             }' > "${release_dir}/release.json"
 
           (
@@ -185,6 +584,7 @@ jobs:
             sha256sum \
               my-bbs-linux-amd64 \
               my-bbs-frontend.tar.gz \
+              my-bbs-full-ddl.sql \
               release.json \
               > SHA256SUMS
             sha256sum --check SHA256SUMS
@@ -199,14 +599,18 @@ jobs:
             -cf - \
             my-bbs-linux-amd64 \
             my-bbs-frontend.tar.gz \
+            my-bbs-full-ddl.sql \
             release.json \
             SHA256SUMS \
             | gzip -n -9 > "${bundle}"
 
-          mapfile -t members < <(tar -tzf "${bundle}")
+          members_file="${RUNNER_TEMP}/release-members.txt"
+          tar -tzf "${bundle}" > "${members_file}"
+          mapfile -t members < "${members_file}"
           expected=(
             my-bbs-linux-amd64
             my-bbs-frontend.tar.gz
+            my-bbs-full-ddl.sql
             release.json
             SHA256SUMS
           )
