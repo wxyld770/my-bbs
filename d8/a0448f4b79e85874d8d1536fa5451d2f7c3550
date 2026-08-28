@@ -1,0 +1,100 @@
+readme.md
+  s_8464988174a9d2::t_2b8ce2690dbde3 62,366
+  s_8464988174a9d2::t_2e2b30aacf2b49 69,369
+web/src/lib/api.ts
+  s_8464988174a9d2::t_795b56c7e11e7b 23,267-271
+internal/handler/httpresponse/user.go
+  s_8464988174a9d2::t_53c13e12bd52ab 35-37,48-57,71
+internal/repository/errors.go
+  s_8464988174a9d2::t_1462a7c81734b8 14
+tests/service/user_service_port_test.go
+  s_8464988174a9d2::t_0d59d3b925f3b4 7,123-140
+  s_8464988174a9d2::t_65d931d67c31eb 23-25,44,55-56
+tests/service/invitation_eligibility_test.go
+  s_8464988174a9d2::t_9f6f28dbd32af8 1-102
+pkg/bizerr/bizerr.go
+  s_8464988174a9d2::t_1462a7c81734b8 88
+  s_8464988174a9d2::t_65d931d67c31eb 66-87
+internal/handler/httpresponse/search.go
+  s_8464988174a9d2::t_53c13e12bd52ab 31,35-38,82,107-110
+scripts/full_ddl.sql
+  s_8464988174a9d2::t_b130b260b7ff51 81,83
+  s_8464988174a9d2::t_c8b7c22e151f92 82
+web/src/styles.css
+  s_8464988174a9d2::t_795b56c7e11e7b 329,1303-1308,1361-1365
+  s_8464988174a9d2::t_2b8ce2690dbde3 1264-1272,2322-2324
+internal/repository/gormrepo/user_repo.go
+  s_8464988174a9d2::t_53c13e12bd52ab 108-109
+  s_8464988174a9d2::t_d05064d39e77c8 131-158
+  s_8464988174a9d2::t_8aedaeb2e79411 95
+  s_8464988174a9d2::t_1462a7c81734b8 6,94,96-107,110-130,159
+  s_8464988174a9d2::t_f64eaac0eab3cc 9
+internal/repository/gormrepo/invitation_repo.go
+  s_8464988174a9d2::t_65d931d67c31eb 5,26-41
+internal/modules/user/module.go
+  s_8464988174a9d2::t_64e4675167d5e1 44
+web/src/pages/MePage.tsx
+  s_8464988174a9d2::t_2b8ce2690dbde3 179-186,190-192
+  s_8464988174a9d2::t_795b56c7e11e7b 27-30,37,40-54,109-123,241-269
+tests/service/repository_not_found_test.go
+  s_8464988174a9d2::t_0d59d3b925f3b4 111-113
+  s_8464988174a9d2::t_b8218b1685551d 22-25
+internal/repository/ports.go
+  s_8464988174a9d2::t_1462a7c81734b8 17
+  s_8464988174a9d2::t_65d931d67c31eb 25
+.github/workflows/ci.yml
+  s_8464988174a9d2::t_c8b7c22e151f92 153
+  s_8464988174a9d2::t_b130b260b7ff51 154-156,184,419-420,423
+tests/api/avatar_test.go
+  s_8464988174a9d2::t_835d505d8c8022 1-100
+internal/handler/httprequest/user.go
+  s_8464988174a9d2::t_64e4675167d5e1 19-20,22
+  s_8464988174a9d2::t_b130b260b7ff51 21
+tests/api/api_test.go
+  s_8464988174a9d2::t_c9ce67fd3fd576 54
+web/src/components/Avatar.tsx
+  s_8464988174a9d2::t_97ddfc98525d8c 12-13,15-17,19-32
+  s_8464988174a9d2::t_795b56c7e11e7b 1,6,14,18
+web/src/types.ts
+  s_8464988174a9d2::t_795b56c7e11e7b 27-28,154,161,206-207
+tests/api/invitation_registration_test.go
+  s_8464988174a9d2::t_c9ce67fd3fd576 146-184,187
+internal/handler/user_handler.go
+  s_8464988174a9d2::t_64e4675167d5e1 149-161,163-169
+  s_8464988174a9d2::t_b130b260b7ff51 162
+  s_8464988174a9d2::t_53c13e12bd52ab 109
+tests/repository/user_avatar_test.go
+  s_8464988174a9d2::t_6eeed3b72614a6 1-5,9-27,29-48,51-83,137-138
+  s_8464988174a9d2::t_2f2e76d08cc4fb 6-8,84-136
+  s_8464988174a9d2::t_c8b7c22e151f92 28,49-50
+internal/repository/gormrepo/search_reader.go
+  s_8464988174a9d2::t_53c13e12bd52ab 41
+internal/service/user_service.go
+  s_8464988174a9d2::t_ce32ca70b400f3 151,179-180
+  s_8464988174a9d2::t_b130b260b7ff51 349,352
+  s_8464988174a9d2::t_64e4675167d5e1 8,127-128,295-348,350-351,353
+  s_8464988174a9d2::t_65d931d67c31eb 126,152-158
+internal/model/user.go
+  s_8464988174a9d2::t_d05064d39e77c8 19
+  s_8464988174a9d2::t_1462a7c81734b8 3-4,20-22
+tests/service/user_service_test.go
+  s_8464988174a9d2::t_d3c595cf5ea082 6,8,84-150
+internal/service/user_service_internal_test.go
+  s_8464988174a9d2::t_ce32ca70b400f3 1-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "d8a0448f4b79e85874d8d1536fa5451d2f7c3550",
+  "prompts": {},
+  "sessions": {
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
