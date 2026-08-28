@@ -97,6 +97,48 @@ func TestLoad_ReadsAdminUsernamesFromEnvironment(t *testing.T) {
 	}
 }
 
+func TestLoad_DBAutoMigrateDefaultsByAppMode(t *testing.T) {
+	t.Run("debug defaults enabled", func(t *testing.T) {
+		t.Setenv("APP_MODE", "debug")
+		t.Setenv("DB_AUTO_MIGRATE", "")
+
+		cfg := config.Load()
+		if !cfg.DBAutoMigrate {
+			t.Fatal("DBAutoMigrate=false, want true in debug mode")
+		}
+	})
+
+	t.Run("release defaults disabled", func(t *testing.T) {
+		t.Setenv("APP_MODE", "release")
+		t.Setenv("DB_AUTO_MIGRATE", "")
+
+		cfg := config.Load()
+		if cfg.DBAutoMigrate {
+			t.Fatal("DBAutoMigrate=true, want false in release mode")
+		}
+	})
+
+	t.Run("release mode matching is case insensitive", func(t *testing.T) {
+		t.Setenv("APP_MODE", " ReLeAsE ")
+		t.Setenv("DB_AUTO_MIGRATE", "")
+
+		cfg := config.Load()
+		if cfg.DBAutoMigrate {
+			t.Fatal("DBAutoMigrate=true, want false for a release-mode spelling variant")
+		}
+	})
+
+	t.Run("explicit value overrides release default", func(t *testing.T) {
+		t.Setenv("APP_MODE", "release")
+		t.Setenv("DB_AUTO_MIGRATE", "true")
+
+		cfg := config.Load()
+		if !cfg.DBAutoMigrate {
+			t.Fatal("DBAutoMigrate=false, want explicit true")
+		}
+	})
+}
+
 func validConfig() *config.Config {
 	return &config.Config{
 		DBDSN:                     "root:x@tcp(127.0.0.1:3306)/db",

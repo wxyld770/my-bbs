@@ -14,6 +14,7 @@ import (
 
 type Config struct {
 	DBDSN                     string
+	DBAutoMigrate             bool
 	DBMaxOpenConns            int
 	DBMaxIdleConns            int
 	DBConnMaxLifetime         time.Duration
@@ -56,9 +57,11 @@ func Load() *Config {
 	if err := godotenv.Load("config/.env"); err != nil {
 		logger.Warn("未找到 .env 文件，使用系统环境变量")
 	}
+	appMode := getEnv("APP_MODE", "debug")
 
 	return &Config{
 		DBDSN:                     getEnv("DB_DSN", ""),
+		DBAutoMigrate:             getEnvBool("DB_AUTO_MIGRATE", !strings.EqualFold(strings.TrimSpace(appMode), "release")),
 		DBMaxOpenConns:            getEnvInt("DB_MAX_OPEN_CONNS", 25),
 		DBMaxIdleConns:            getEnvInt("DB_MAX_IDLE_CONNS", 10),
 		DBConnMaxLifetime:         getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
@@ -68,7 +71,7 @@ func Load() *Config {
 		JWTSecret:                 getEnv("JWT_SECRET", ""),
 		AdminUsernames:            getEnv("ADMIN_USERNAMES", "admin"),
 		AppPort:                   getEnv("APP_PORT", "8080"),
-		AppMode:                   getEnv("APP_MODE", "debug"),
+		AppMode:                   appMode,
 		LogDir:                    getEnv("LOG_DIR", "logs"),
 		HTTPReadHeaderTimeout:     getEnvDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second),
 		HTTPReadTimeout:           getEnvDuration("HTTP_READ_TIMEOUT", 10*time.Second),
@@ -191,6 +194,19 @@ func getEnvInt(key string, defaultValue int) int {
 	value, err := strconv.Atoi(raw)
 	if err != nil {
 		logger.Warn("配置 %s=%q 不是有效整数，使用默认值 %d", key, raw, defaultValue)
+		return defaultValue
+	}
+	return value
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		logger.Warn("配置 %s=%q 不是有效布尔值，使用默认值 %t", key, raw, defaultValue)
 		return defaultValue
 	}
 	return value

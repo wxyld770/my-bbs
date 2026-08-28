@@ -77,9 +77,13 @@ func main() {
 		logger.Fatal("Redis 初始化失败: %v", err)
 	}
 
-	// 4. 执行迁移
-	if err := database.AutoMigrate(db); err != nil {
-		logger.Fatal("迁移失败: %v", err)
+	// 4. 开发环境可自动迁移；生产环境由发布流程执行版本内的 full_ddl.sql。
+	if cfg.DBAutoMigrate {
+		if err := database.AutoMigrate(db); err != nil {
+			logger.Fatal("迁移失败: %v", err)
+		}
+	} else {
+		logger.Info("数据库自动迁移已关闭，使用部署流程管理数据库结构")
 	}
 	adminCheckCtx, adminCheckCancel := context.WithTimeout(context.Background(), cfg.HealthCheckTimeout)
 	if err := authorization.ValidateExistingAdminUsers(
