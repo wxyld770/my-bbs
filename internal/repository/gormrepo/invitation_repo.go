@@ -2,6 +2,7 @@ package gormrepo
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"my-bbs/internal/model"
@@ -20,6 +21,24 @@ func NewInvitationRepository(db *gorm.DB) *InvitationRepository {
 
 func (r *InvitationRepository) CreateInvitation(ctx context.Context, invitation *model.Invitation) error {
 	return translateError(r.db.WithContext(ctx).Create(invitation).Error)
+}
+
+// HasCreatorEverPublishedPost 查询用户是否曾成功创建过帖子。
+// 私密帖和后来软删除的帖子仍然计入，因为发布是已经发生的历史事实。
+func (r *InvitationRepository) HasCreatorEverPublishedPost(ctx context.Context, creatorID uint) (bool, error) {
+	var post model.Post
+	err := r.db.WithContext(ctx).
+		Unscoped().
+		Select("id").
+		Where("user_id = ?", creatorID).
+		Take(&post).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, translateError(err)
+	}
+	return true, nil
 }
 
 // RegisterUserWithInvitation 原子地消费邀请码并创建用户。

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
@@ -19,8 +20,9 @@ type memoryUserRepository struct {
 }
 
 type memoryInvitationRepository struct {
-	userRepo  *memoryUserRepository
-	available map[string]bool
+	userRepo    *memoryUserRepository
+	available   map[string]bool
+	publishedBy map[uint]bool
 }
 
 var _ repository.UserRepository = (*memoryUserRepository)(nil)
@@ -39,7 +41,7 @@ func newMemoryInvitationRepository(userRepo *memoryUserRepository, codes ...stri
 	for _, code := range codes {
 		available[code] = true
 	}
-	return &memoryInvitationRepository{userRepo: userRepo, available: available}
+	return &memoryInvitationRepository{userRepo: userRepo, available: available, publishedBy: make(map[uint]bool)}
 }
 
 func (r *memoryInvitationRepository) CreateInvitation(_ context.Context, invitation *model.Invitation) error {
@@ -48,6 +50,10 @@ func (r *memoryInvitationRepository) CreateInvitation(_ context.Context, invitat
 	}
 	r.available[invitation.Code] = true
 	return nil
+}
+
+func (r *memoryInvitationRepository) HasCreatorEverPublishedPost(_ context.Context, creatorID uint) (bool, error) {
+	return r.publishedBy[creatorID], nil
 }
 
 func (r *memoryInvitationRepository) RegisterUserWithInvitation(
@@ -111,6 +117,27 @@ func (r *memoryUserRepository) UpdateProfile(_ context.Context, id uint, nicknam
 		user.Nickname = nickname
 		user.Introduction = introduction
 	}
+	return nil
+}
+
+func (r *memoryUserRepository) UpdateAvatar(
+	_ context.Context,
+	id uint,
+	avatarURL string,
+	changedAt, eligibleBefore time.Time,
+) error {
+	user := r.byID[id]
+	if user == nil {
+		return repository.ErrNotFound
+	}
+	if user.AvatarURL == avatarURL {
+		return nil
+	}
+	if user.AvatarUpdatedAt != nil && user.AvatarUpdatedAt.After(eligibleBefore) {
+		return repository.ErrAvatarUpdateTooFrequent
+	}
+	user.AvatarURL = avatarURL
+	user.AvatarUpdatedAt = &changedAt
 	return nil
 }
 

@@ -24,13 +24,33 @@ export function MePage() {
   const [introduction, setIntroduction] = useState('')
   const [profileError, setProfileError] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [avatarURL, setAvatarURL] = useState('')
+  const [avatarError, setAvatarError] = useState('')
+  const [savingAvatar, setSavingAvatar] = useState(false)
+  const [avatarClock, setAvatarClock] = useState(() => Date.now())
   const [invitationCode, setInvitationCode] = useState<string | null>(null)
   const [generatingInvitation, setGeneratingInvitation] = useState(false)
 
   useEffect(() => {
     setNickname(user?.nickname ?? '')
     setIntroduction(user?.introduction ?? '')
+    setAvatarURL(user?.avatar_url ?? '')
   }, [user])
+
+  const avatarAvailableAt = user?.avatar_updated_at
+    ? new Date(user.avatar_updated_at).getTime() + 24 * 60 * 60 * 1000
+    : Number.NaN
+  const avatarCoolingDown = Number.isFinite(avatarAvailableAt) && avatarAvailableAt > avatarClock
+  const avatarChanged = avatarURL.trim() !== (user?.avatar_url ?? '')
+
+  useEffect(() => {
+    if (!Number.isFinite(avatarAvailableAt) || avatarAvailableAt <= Date.now()) return
+    const timeout = window.setTimeout(
+      () => setAvatarClock(Date.now()),
+      Math.min(avatarAvailableAt - Date.now() + 100, 2_147_483_647),
+    )
+    return () => window.clearTimeout(timeout)
+  }, [avatarAvailableAt])
 
   const loadPosts = useCallback(async () => {
     if (!token) {
@@ -86,6 +106,24 @@ export function MePage() {
     }
   }
 
+  const saveAvatar = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!token || savingAvatar || avatarCoolingDown || !avatarChanged) return
+    setSavingAvatar(true)
+    setAvatarError('')
+    try {
+      await api.updateAvatar(token, { avatar_url: avatarURL.trim() })
+      await refreshUser()
+      setAvatarClock(Date.now())
+      notify('success', avatarURL.trim() ? '头像已更新' : '已经恢复默认头像')
+    } catch (saveError) {
+      if (handleSessionError(saveError)) openAuth('login')
+      else setAvatarError(getErrorMessage(saveError))
+    } finally {
+      setSavingAvatar(false)
+    }
+  }
+
   const signOut = async () => {
     await logout()
     notify('success', '已经退出登录')
@@ -138,10 +176,20 @@ export function MePage() {
             <div className="profile-meta"><CalendarDays size={14} aria-hidden="true" /> 加入于 {formatDateTime(user.create_time, { year: 'numeric', month: 'long', day: 'numeric', hour: undefined, minute: undefined })}</div>
           </div>
           <div className="profile-card__actions">
-            <button className="button button--dark" type="button" onClick={() => void generateInvitation()} disabled={generatingInvitation || Boolean(invitationCode)}>
+            <button
+              className="button button--dark"
+              type="button"
+              onClick={() => void generateInvitation()}
+              disabled={generatingInvitation || Boolean(invitationCode)}
+              aria-describedby="invitation-eligibility-help"
+              aria-busy={generatingInvitation}
+            >
               <KeyRound size={16} aria-hidden="true" />
               {generatingInvitation ? '生成中…' : '生成邀请码'}
             </button>
+            <p className="profile-card__invitation-help" id="invitation-eligibility-help">
+              注册满 7 天后可生成；成功发布一篇帖子后可立即生成。
+            </p>
             <button className="button button--soft" type="button" onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />退出登录</button>
           </div>
         </section>
@@ -190,6 +238,35 @@ export function MePage() {
 
           <aside className="form-card">
             <h2>编辑资料</h2>
+            <form onSubmit={saveAvatar}>
+              <div className="field">
+                <label htmlFor="profile-avatar">头像链接 <span>{avatarURL.length}/2048</span></label>
+                <input
+                  id="profile-avatar"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="url"
+                  value={avatarURL}
+                  onChange={(event) => setAvatarURL(event.target.value)}
+                  maxLength={2048}
+                  placeholder="https://example.com/avatar.jpg"
+                  disabled={savingAvatar || avatarCoolingDown}
+                  aria-describedby="profile-avatar-help"
+                />
+              </div>
+              <p className="field-help" id="profile-avatar-help">
+                {avatarCoolingDown
+                  ? `头像每 24 小时只能修改一次，下次可修改：${formatDateTime(new Date(avatarAvailableAt))}`
+                  : '仅支持 HTTPS 图片链接；留空可恢复默认头像。修改成功后 24 小时内不能再次更换。'}
+              </p>
+              {avatarError && <p className="form-error" role="alert">{avatarError}</p>}
+              <div className="form-actions">
+                <button className="button button--soft button--wide" type="submit" disabled={savingAvatar || avatarCoolingDown || !avatarChanged}>
+                  {savingAvatar ? '更新中…' : '更新头像'}
+                </button>
+              </div>
+            </form>
+            <div className="form-card__divider" aria-hidden="true" />
             <form onSubmit={saveProfile}>
               <div className="field">
                 <label htmlFor="profile-nickname">昵称 <span>{Array.from(nickname).length}/64</span></label>

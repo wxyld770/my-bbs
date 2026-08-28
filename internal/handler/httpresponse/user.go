@@ -25,14 +25,16 @@ func NewInvitationResponse(code string) InvitationResponse {
 
 // UserResponse 是对外用户模型，不包含密码、软删除状态等数据库字段。
 type UserResponse struct {
-	ID           uint      `json:"id"`
-	CreateTime   time.Time `json:"create_time"`
-	UpdateTime   time.Time `json:"update_time"`
-	Username     string    `json:"username"`
-	Nickname     string    `json:"nickname"`
-	Status       uint      `json:"status"`
-	Introduction string    `json:"introduction"`
-	IsAdmin      bool      `json:"is_admin"`
+	ID              uint       `json:"id"`
+	CreateTime      time.Time  `json:"create_time"`
+	UpdateTime      time.Time  `json:"update_time"`
+	Username        string     `json:"username"`
+	Nickname        string     `json:"nickname"`
+	Status          uint       `json:"status"`
+	Introduction    string     `json:"introduction"`
+	AvatarURL       string     `json:"avatar_url"`
+	AvatarUpdatedAt *time.Time `json:"avatar_updated_at,omitempty"`
+	IsAdmin         bool       `json:"is_admin"`
 }
 
 type UserProfileResponse struct {
@@ -41,6 +43,16 @@ type UserProfileResponse struct {
 
 func NewUserProfileResponse(user *model.User, isAdmin ...bool) UserProfileResponse {
 	return UserProfileResponse{User: newUserResponse(user, isAdmin...)}
+}
+
+// NewCurrentUserProfileResponse 只在“我的资料”返回头像冷却时间；公开用户资料、
+// 帖子作者和评论作者无需暴露该内部限额状态。
+func NewCurrentUserProfileResponse(user *model.User, isAdmin ...bool) UserProfileResponse {
+	response := newUserResponse(user, isAdmin...)
+	if response != nil {
+		response.AvatarUpdatedAt = user.AvatarUpdatedAt
+	}
+	return UserProfileResponse{User: response}
 }
 
 func newUserResponse(user *model.User, isAdmin ...bool) *UserResponse {
@@ -56,6 +68,7 @@ func newUserResponse(user *model.User, isAdmin ...bool) *UserResponse {
 		Nickname:     user.Nickname,
 		Status:       user.Status,
 		Introduction: user.Introduction,
+		AvatarURL:    user.AvatarURL,
 		IsAdmin:      admin,
 	}
 }

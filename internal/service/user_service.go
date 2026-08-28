@@ -5,6 +5,7 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -122,6 +123,9 @@ const (
 	invitationCodeLength      = 6
 	invitationCodeCreateTries = 10
 	invitationCodeAlphabet    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	InvitationNewUserPeriod   = 7 * 24 * time.Hour
+	avatarURLMaxBytes         = 2048
+	AvatarUpdateInterval      = 24 * time.Hour
 )
 
 // GenerateInvitation 为当前用户生成一个新的单次使用邀请码。
@@ -144,6 +148,15 @@ func (s *UserService) GenerateInvitation(ctx context.Context, creatorID uint) (s
 	if !creator.IsActive() {
 		return "", bizerr.ErrUserMuted
 	}
+	if invitationRequiresPublishedPost(creator.CreateTime, time.Now()) {
+		hasPublishedPost, err := s.invitationRepo.HasCreatorEverPublishedPost(ctx, creatorID)
+		if err != nil {
+			return "", err
+		}
+		if !hasPublishedPost {
+			return "", bizerr.ErrInvitationGenerationRestricted
+		}
+	}
 
 	for range invitationCodeCreateTries {
 		code, err := newInvitationCode()
@@ -161,6 +174,10 @@ func (s *UserService) GenerateInvitation(ctx context.Context, creatorID uint) (s
 	}
 
 	return "", fmt.Errorf("generate a unique invitation code after %d attempts", invitationCodeCreateTries)
+}
+
+func invitationRequiresPublishedPost(createdAt, now time.Time) bool {
+	return !createdAt.IsZero() && now.Before(createdAt.Add(InvitationNewUserPeriod))
 }
 
 func validateInvitationCode(inviteCode string) (string, error) {
@@ -273,6 +290,67 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint, nickname, 
 		return err
 	}
 	return nil
+}
+
+// UpdateAvatar 更新当前用户的头像链接。空链接用于恢复默认头像；真正发生
+// 变化的两次更新至少间隔 24 小时，最终限额由 Repository 条件更新原子保证。
+func (s *UserService) UpdateAvatar(ctx context.Context, userID uint, rawAvatarURL string) error {
+	if userID == 0 {
+		return bizerr.ErrUnauthorized
+	}
+	avatarURL, err := normalizeAvatarURL(rawAvatarURL)
+	if err != nil {
+		return err
+	}
+
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return bizerr.ErrUserNotFound
+	}
+	if user.AvatarURL == avatarURL {
+		return nil
+	}
+
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	if user.AvatarUpdatedAt != nil && now.Before(user.AvatarUpdatedAt.Add(AvatarUpdateInterval)) {
+		return bizerr.ErrAvatarUpdateTooFrequent
+	}
+	if err := s.userRepo.UpdateAvatar(
+		ctx,
+		userID,
+		avatarURL,
+		now,
+		now.Add(-AvatarUpdateInterval),
+	); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			return bizerr.ErrUserNotFound
+		case errors.Is(err, repository.ErrAvatarUpdateTooFrequent):
+			return bizerr.ErrAvatarUpdateTooFrequent
+		default:
+			return err
+		}
+	}
+	return nil
+}
+
+func normalizeAvatarURL(rawAvatarURL string) (string, error) {
+	avatarURL := strings.TrimSpace(rawAvatarURL)
+	if avatarURL == "" {
+		return "", nil
+	}
+	if len(avatarURL) > avatarURLMaxBytes {
+		return "", bizerr.ErrInvalidAvatarURL
+	}
+	parsed, err := url.ParseRequestURI(avatarURL)
+	if err != nil || !strings.EqualFold(parsed.Scheme, "https") || parsed.Host == "" || parsed.Hostname() == "" || parsed.User != nil {
+		return "", bizerr.ErrInvalidAvatarURL
+	}
+	parsed.Scheme = "https"
+	return parsed.String(), nil
 }
 
 // SetUserStatus 允许配置中的管理员禁言或解禁普通用户。

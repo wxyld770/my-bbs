@@ -106,7 +106,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 
-	response.OK(c, httpresp.NewUserProfileResponse(user, h.userService.IsAdminUsername(user.Username)))
+	response.OK(c, httpresp.NewCurrentUserProfileResponse(user, h.userService.IsAdminUsername(user.Username)))
 }
 
 func (h *UserHandler) GetPublicProfile(c *gin.Context) {
@@ -144,6 +144,27 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	response.OKMsg(c, "资料更新成功")
+}
+
+func (h *UserHandler) UpdateAvatar(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+
+	var req httpreq.UpdateAvatarRequest
+	if err := httpreq.BindJSON(c, &req); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	if err := h.userService.UpdateAvatar(c.Request.Context(), userID, *req.AvatarURL); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OKMsg(c, "头像更新成功")
 }
 
 func (h *UserHandler) MuteUser(c *gin.Context) {

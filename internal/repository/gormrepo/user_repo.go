@@ -3,8 +3,10 @@ package gormrepo
 import (
 	"context"
 	"errors"
+	"time"
 
 	"my-bbs/internal/model"
+	"my-bbs/internal/repository"
 
 	"gorm.io/gorm"
 )
@@ -88,4 +90,71 @@ func (r *UserRepository) UpdateProfile(ctx context.Context, id uint, nickname, i
 			"introduction": introduction,
 		})
 	return translateError(result.Error)
+}
+
+// UpdateAvatar 用带时间条件的 CAS 更新原子执行 24 小时限额；即使两个请求并发，
+// 也只有第一个请求能把 avatar_updated_at 从可更新区间推进到当前时间。
+func (r *UserRepository) UpdateAvatar(
+	ctx context.Context,
+	id uint,
+	avatarURL string,
+	changedAt, eligibleBefore time.Time,
+) error {
+	var storedURL any
+	if avatarURL != "" {
+		storedURL = avatarURL
+	}
+	result := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ? AND COALESCE(avatar_url, '') <> ?", id, avatarURL).
+		Where("avatar_updated_at IS NULL OR avatar_updated_at <= ?", eligibleBefore).
+		Updates(map[string]any{
+			"avatar_url":        storedURL,
+			"avatar_updated_at": changedAt,
+		})
+	if result.Error != nil {
+		return translateError(result.Error)
+	}
+	if result.RowsAffected > 0 {
+		return nil
+	}
+
+	// 相同链接按幂等成功处理，不重复占用额度；否则区分限额与用户不存在。
+	var user model.User
+	if err := r.db.WithContext(ctx).
+		Select("id", "avatar_url", "avatar_updated_at").
+		First(&user, id).Error; err != nil {
+		return translateError(err)
+	}
+	if user.AvatarURL == avatarURL {
+		return nil
+	}
+	if user.AvatarUpdatedAt == nil || !user.AvatarUpdatedAt.After(eligibleBefore) {
+		// 生产列使用 utf8mb4_bin；这个二次 CAS 同时兼容由 AutoMigrate
+		// 创建为不区分大小写排序规则的开发库。若并发请求已占用额度，
+		// avatar_updated_at 条件会使本次更新失败。
+		result = r.db.WithContext(ctx).Model(&model.User{}).
+			Where("id = ?", id).
+			Where("avatar_updated_at IS NULL OR avatar_updated_at <= ?", eligibleBefore).
+			Updates(map[string]any{
+				"avatar_url":        storedURL,
+				"avatar_updated_at": changedAt,
+			})
+		if result.Error != nil {
+			return translateError(result.Error)
+		}
+		if result.RowsAffected > 0 {
+			return nil
+		}
+
+		// 可能有另一个并发请求已经写入同一 URL。
+		if err := r.db.WithContext(ctx).
+			Select("id", "avatar_url").
+			First(&user, id).Error; err != nil {
+			return translateError(err)
+		}
+		if user.AvatarURL == avatarURL {
+			return nil
+		}
+	}
+	return repository.ErrAvatarUpdateTooFrequent
 }

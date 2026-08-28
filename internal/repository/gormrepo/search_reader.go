@@ -38,7 +38,7 @@ func (r *SearchReader) SearchUsers(ctx context.Context, keyword string, offset, 
 
 	var users []model.User
 	err := r.db.WithContext(ctx).
-		Select("id", "create_time", "update_time", "username", "nickname", "introduction").
+		Select("id", "create_time", "update_time", "username", "nickname", "introduction", "avatar_url").
 		Where("username LIKE ? ESCAPE '!' OR nickname LIKE ? ESCAPE '!'", containsPattern, containsPattern).
 		Clauses(clause.OrderBy{Expression: clause.Expr{
 			SQL:                rankExpression,

@@ -24,6 +24,8 @@ export interface User {
   nickname: string
   status: UserStatus
   introduction: string
+  avatar_url: string
+  avatar_updated_at?: ISODateTime | null
   is_admin: boolean
 }
 
@@ -149,12 +151,14 @@ export interface SearchUser {
   username: string
   nickname: string
   introduction: string
+  avatar_url: string
 }
 
 export interface SearchPostAuthor {
   id: number
   username: string
   nickname: string
+  avatar_url: string
 }
 
 export interface SearchPost {
@@ -197,6 +201,10 @@ export interface LoginRequest {
 export interface UpdateProfileRequest {
   nickname: string
   introduction: string
+}
+
+export interface UpdateAvatarRequest {
+  avatar_url: string
 }
 
 export interface CreatePostRequest {

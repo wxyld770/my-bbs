@@ -41,6 +41,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 		auth.POST("/invitations", m.Handler.GenerateInvitation)
 		auth.GET("/user/me", m.Handler.GetMe)
 		auth.POST("/user/profile", m.Handler.UpdateProfile)
+		auth.POST("/user/avatar", m.Handler.UpdateAvatar)
 		auth.POST("/users/:id/mute", m.Handler.MuteUser)
 		auth.POST("/users/:id/unmute", m.Handler.UnmuteUser)
 	}

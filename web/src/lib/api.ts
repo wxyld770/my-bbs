@@ -20,6 +20,7 @@ import type {
   SearchData,
   SearchQuery,
   UpdatePostRequest,
+  UpdateAvatarRequest,
   UpdateProfileRequest,
   UserProfileData,
 } from '../types'
@@ -257,6 +258,17 @@ export const api = {
     input: UpdateProfileRequest,
   ): Promise<ApiMessage> {
     return requestMessage('/user/profile', {
+      method: 'POST',
+      token,
+      body: input,
+    })
+  },
+
+  updateAvatar(
+    token: string,
+    input: UpdateAvatarRequest,
+  ): Promise<ApiMessage> {
+    return requestMessage('/user/avatar', {
       method: 'POST',
       token,
       body: input,

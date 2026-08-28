@@ -150,6 +150,10 @@ jobs:
                 ":",
                 (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "invite_code" AND LOWER(COLUMN_TYPE) = "char(6)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_unicode_ci" AND COLUMN_COMMENT = "注册时使用的邀请码"),
                 ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "avatar_url" AND LOWER(COLUMN_TYPE) = "varchar(2048)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_bin" AND COLUMN_COMMENT = "头像图片链接"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "avatar_updated_at" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "头像最后修改时间"),
+                ":",
                 (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations" AND UPPER(ENGINE) = "INNODB" AND LOWER(TABLE_COLLATION) = "utf8mb4_unicode_ci"),
                 ":",
                 (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations"),
@@ -177,7 +181,7 @@ jobs:
                   (TABLE_NAME = "invitations" AND INDEX_NAME IN ("PRIMARY", "idx_invitations_code", "idx_invitations_creator_id", "idx_invitations_used_by"))
                 ))
               );')"
-            if [[ "${state}" != "5:1:1:7:7:5:5" ]]; then
+            if [[ "${state}" != "5:1:1:1:1:7:7:5:5" ]]; then
               printf 'unexpected schema contract state: %q\n' "${state}" >&2
               return 1
             fi
@@ -412,9 +416,11 @@ jobs:
             --execute='SELECT CONCAT(
               (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `invite_code` IS NULL),
               ":",
+              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `avatar_url` IS NULL AND `avatar_updated_at` IS NULL),
+              ":",
               (SELECT COUNT(*) FROM `invitations`)
             );')"
-          [[ "${legacy_state}" == "1:0" ]]
+          [[ "${legacy_state}" == "1:1:0" ]]
 
       - name: Build production binary
         env:

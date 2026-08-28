@@ -326,6 +326,7 @@ textarea:focus-visible {
   font-family: "Noto Serif SC", serif;
   font-weight: 700;
   box-shadow: 1.5px 1.5px 0 var(--ink);
+  object-fit: cover;
 }
 
 .avatar--sm {
@@ -1260,6 +1261,15 @@ button.stat-pill {
   gap: 0.65rem;
 }
 
+.profile-card__invitation-help {
+  max-width: 16rem;
+  margin: -0.1rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.55;
+  text-align: right;
+}
+
 .profile-meta {
   margin-top: 0.75rem;
   display: flex;
@@ -1288,6 +1298,12 @@ button.stat-pill {
 .form-card h3 {
   margin: 0 0 1rem;
   font-family: "Noto Serif SC", serif;
+}
+
+.form-card__divider {
+  height: 1px;
+  margin: 1.35rem 0;
+  background: rgba(32, 36, 31, 0.18);
 }
 
 .field {
@@ -1340,6 +1356,13 @@ button.stat-pill {
 .field input::placeholder,
 .field textarea::placeholder {
   color: #9da399;
+}
+
+.field-help {
+  margin: 0.6rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  line-height: 1.55;
 }
 
 .form-error {
@@ -2294,6 +2317,11 @@ button.stat-pill {
     grid-column: 1 / -1;
     width: 100%;
     align-items: stretch;
+  }
+
+  .profile-card__invitation-help {
+    max-width: none;
+    text-align: left;
   }
 
   .invitation-code {

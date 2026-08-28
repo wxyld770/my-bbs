@@ -78,8 +78,10 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `invite_code` CHAR(6) NULL COMMENT 
 -- 给用户邀请码增加唯一索引
 ALTER TABLE `users` ADD UNIQUE INDEX IF NOT EXISTS `idx_users_invite_code` (`invite_code`);
 
+-- 给用户表增加头像链接及独立修改时间；空链接恢复默认头像
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatar_url` VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL COMMENT '头像图片链接' AFTER `introduction`;
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatar_updated_at` DATETIME(3) NULL COMMENT '头像最后修改时间' AFTER `avatar_url`;
 
 
 -- end check
 SELECT 'FULL_DDL_OK' AS status;
-

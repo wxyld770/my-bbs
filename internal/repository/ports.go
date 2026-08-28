@@ -14,6 +14,7 @@ type UserRepository interface {
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 	UpdateUserStatus(ctx context.Context, id uint, status uint) error
 	UpdateProfile(ctx context.Context, id uint, nickname, introduction string) error
+	UpdateAvatar(ctx context.Context, id uint, avatarURL string, changedAt, eligibleBefore time.Time) error
 }
 
 // InvitationRepository 是邀请码生成和注册消费所需的持久化端口。
@@ -21,6 +22,7 @@ type UserRepository interface {
 // 和使用记录更新，并保证同一邀请码并发消费时最多一个请求成功。
 type InvitationRepository interface {
 	CreateInvitation(ctx context.Context, invitation *model.Invitation) error
+	HasCreatorEverPublishedPost(ctx context.Context, creatorID uint) (bool, error)
 	RegisterUserWithInvitation(ctx context.Context, user *model.User, code string) error
 }
 

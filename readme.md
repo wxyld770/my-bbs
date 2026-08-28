@@ -59,13 +59,14 @@ my-bbs/
 
 ### 用户
 - ✅ 邀请注册（6 位字母数字邀请码，单次使用；账号记录注册来源）
-- ✅ 登录用户可生成邀请码，明文仅在创建响应中展示一次
+- ✅ 登录用户注册满 7 天，或曾成功发布过帖子后可生成邀请码；明文仅在创建响应中展示一次
 - ✅ 用户名唯一索引，密码 bcrypt
 - ✅ 登录（返回带独立 JTI 的 JWT）
 - ✅ 管理员账号由 `ADMIN_USERNAMES` 配置（逗号分隔，仅授权已有账号）
 - ✅ 管理员可禁言和解除禁言普通用户
 - ✅ 当前用户资料 `GET /user/me`
 - ✅ 修改昵称 / 个人介绍
+- ✅ 使用 HTTPS 图片链接设置头像（每 24 小时最多修改一次，清空恢复默认头像）
 - ✅ 退出（服务端撤销当前 Token，不影响同一用户的其他会话）
 
 ### 帖子
@@ -362,9 +363,10 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 | POST | `/api/register` | 否 | 使用 6 位邀请码注册 |
 | POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
 | POST | `/api/logout` | 是 | 立即撤销当前 Token |
-| POST | `/api/invitations` | 是 | 生成一个单次使用邀请码；邀请码仅在本次响应中展示 |
+| POST | `/api/invitations` | 是 | 注册满 7 天或曾成功发布过帖子后，生成一个单次使用邀请码；帖子后续转私密或删除不收回资格 |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
+| POST | `/api/user/avatar` | 是 | 修改头像 HTTPS 链接；每 24 小时最多一次，空链接恢复默认头像 |
 | GET | `/api/search` | 否 | 搜索用户和公开帖子，支持 `q`/`scope`/`pageNo`/`pageSize` |
 | GET | `/api/posts` | 否 | 广场（公开帖，支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/hot` | 否 | 今日最热榜单（最多 10 篇） |

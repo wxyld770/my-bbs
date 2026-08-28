@@ -143,9 +143,48 @@ func TestAPI_InvitationRegistrationLifecycle(t *testing.T) {
 	})
 
 	invitedToken := loginAPIUser(t, r, "inviteduser", "password1")
+	var invitationsBefore int64
+	if err := db.Model(&model.Invitation{}).Count(&invitationsBefore).Error; err != nil {
+		t.Fatalf("count invitations before eligibility check: %v", err)
+	}
+	restrictedGeneration := doJSON(t, r, http.MethodPost, "/api/invitations", invitedToken, nil)
+	if restrictedGeneration.Code != bizerr.ErrInvitationGenerationRestricted.HTTPStatus {
+		t.Fatalf("new user generation status=%d, want=%d body=%s", restrictedGeneration.Code, bizerr.ErrInvitationGenerationRestricted.HTTPStatus, restrictedGeneration.Body.String())
+	}
+	restrictedBody := decodeResp(t, restrictedGeneration)
+	if got := int(restrictedBody["code"].(float64)); got != bizerr.ErrInvitationGenerationRestricted.Code {
+		t.Fatalf("new user generation code=%d, want=%d body=%v", got, bizerr.ErrInvitationGenerationRestricted.Code, restrictedBody)
+	}
+	var invitationsAfter int64
+	if err := db.Model(&model.Invitation{}).Count(&invitationsAfter).Error; err != nil {
+		t.Fatalf("count invitations after eligibility check: %v", err)
+	}
+	if invitationsAfter != invitationsBefore {
+		t.Fatalf("restricted generation created invitation: before=%d after=%d", invitationsBefore, invitationsAfter)
+	}
+
+	invalidPost := doJSON(t, r, http.MethodPost, "/api/posts/create", invitedToken, map[string]string{
+		"title":   "",
+		"content": "not published",
+	})
+	if invalidPost.Code != http.StatusBadRequest {
+		t.Fatalf("invalid post status=%d, want=400 body=%s", invalidPost.Code, invalidPost.Body.String())
+	}
+	stillRestricted := doJSON(t, r, http.MethodPost, "/api/invitations", invitedToken, nil)
+	if stillRestricted.Code != bizerr.ErrInvitationGenerationRestricted.HTTPStatus {
+		t.Fatalf("failed post unlocked invitation: status=%d body=%s", stillRestricted.Code, stillRestricted.Body.String())
+	}
+
+	publishedPost := doJSON(t, r, http.MethodPost, "/api/posts/create", invitedToken, map[string]string{
+		"title":   "My first post",
+		"content": "Publishing unlocks invitation generation.",
+	})
+	if publishedPost.Code != http.StatusOK {
+		t.Fatalf("publish first post status=%d body=%s", publishedPost.Code, publishedPost.Body.String())
+	}
 	secondGeneration := doJSON(t, r, http.MethodPost, "/api/invitations", invitedToken, nil)
 	if secondGeneration.Code != http.StatusOK {
-		t.Fatalf("ordinary user generate status=%d body=%s", secondGeneration.Code, secondGeneration.Body.String())
+		t.Fatalf("published new user generate status=%d body=%s", secondGeneration.Code, secondGeneration.Body.String())
 	}
 	secondCode, _ := decodeResp(t, secondGeneration)["data"].(map[string]any)["code"].(string)
 	if !invitationCodePattern.MatchString(secondCode) || secondCode == code {

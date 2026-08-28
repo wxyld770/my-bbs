@@ -28,12 +28,14 @@ type SearchUserResponse struct {
 	Username     string `json:"username"`
 	Nickname     string `json:"nickname"`
 	Introduction string `json:"introduction"`
+	AvatarURL    string `json:"avatar_url"`
 }
 
 type SearchUserCompactResponse struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	Nickname string `json:"nickname"`
+	ID        uint   `json:"id"`
+	Username  string `json:"username"`
+	Nickname  string `json:"nickname"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 type SearchPostResponse struct {
@@ -77,6 +79,7 @@ func newSearchUserResponse(user model.User) SearchUserResponse {
 		Username:     user.Username,
 		Nickname:     user.Nickname,
 		Introduction: user.Introduction,
+		AvatarURL:    user.AvatarURL,
 	}
 }
 
@@ -101,8 +104,9 @@ func newSearchUserCompactResponse(user *model.User) *SearchUserCompactResponse {
 		return nil
 	}
 	return &SearchUserCompactResponse{
-		ID:       user.ID,
-		Username: user.Username,
-		Nickname: user.Nickname,
+		ID:        user.ID,
+		Username:  user.Username,
+		Nickname:  user.Nickname,
+		AvatarURL: user.AvatarURL,
 	}
 }

@@ -19,6 +19,10 @@ func TestUserService_MapsMutationNotFound(t *testing.T) {
 	if !errors.Is(err, bizerr.ErrUserNotFound) {
 		t.Fatalf("UpdateProfile() error = %v, want ErrUserNotFound", err)
 	}
+	err = svc.UpdateAvatar(context.Background(), 7, "https://cdn.example.com/avatar.png")
+	if !errors.Is(err, bizerr.ErrUserNotFound) {
+		t.Fatalf("UpdateAvatar() error = %v, want ErrUserNotFound", err)
+	}
 }
 
 func TestPostService_MapsMutationNotFound(t *testing.T) {
@@ -102,6 +106,9 @@ func (*mutationNotFoundUserRepository) UpdateUserStatus(context.Context, uint, u
 	return repository.ErrNotFound
 }
 func (*mutationNotFoundUserRepository) UpdateProfile(context.Context, uint, string, string) error {
+	return repository.ErrNotFound
+}
+func (*mutationNotFoundUserRepository) UpdateAvatar(context.Context, uint, string, time.Time, time.Time) error {
 	return repository.ErrNotFound
 }
 

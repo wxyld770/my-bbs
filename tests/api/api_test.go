@@ -51,10 +51,11 @@ func setupTestRouterWithAdminUsers(t *testing.T, usernames ...string) (*gin.Engi
 			t.Fatalf("hash configured admin %q password: %v", username, err)
 		}
 		if err := userRepo.CreateUser(context.Background(), &model.User{
-			Username: username,
-			Password: hashedPassword,
-			Nickname: username,
-			Status:   model.UserStatusNormal,
+			BaseModel: model.BaseModel{CreateTime: time.Now().Add(-8 * 24 * time.Hour)},
+			Username:  username,
+			Password:  hashedPassword,
+			Nickname:  username,
+			Status:    model.UserStatusNormal,
 		}); err != nil {
 			t.Fatalf("seed configured admin %q before router startup: %v", username, err)
 		}
