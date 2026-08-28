@@ -10,6 +10,7 @@ export function AuthDialog() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -50,6 +51,11 @@ export function AuthDialog() {
       setError('密码至少需要 6 个字符')
       return
     }
+    const cleanInviteCode = inviteCode.trim().toUpperCase()
+    if (authMode === 'register' && !/^[A-Z0-9]{6}$/.test(cleanInviteCode)) {
+      setError('请输入 6 位邀请码')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -60,11 +66,20 @@ export function AuthDialog() {
               username: cleanUsername,
               password,
               nickname: nickname.trim() || undefined,
+              invite_code: cleanInviteCode,
             })
+      if (!user) {
+        setNickname('')
+        setInviteCode('')
+        openAuth('login')
+        notify('success', '注册成功', '自动登录失败，请使用刚才的用户名和密码登录。')
+        return
+      }
       closeAuth()
       setUsername('')
       setPassword('')
       setNickname('')
+      setInviteCode('')
       notify('success', authMode === 'login' ? '欢迎回来' : '加入成功', `你好，${user.nickname || user.username}`)
     } catch (submitError) {
       setError(getErrorMessage(submitError))
@@ -109,10 +124,29 @@ export function AuthDialog() {
               <input id="auth-username" name="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="你的登录用户名" maxLength={64} required autoFocus />
             </div>
             {authMode === 'register' && (
-              <div className="field">
-                <label htmlFor="auth-nickname">昵称 <span>可选</span></label>
-                <input id="auth-nickname" name="nickname" autoComplete="nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="大家怎么称呼你" maxLength={64} />
-              </div>
+              <>
+                <div className="field">
+                  <label htmlFor="auth-nickname">昵称 <span>可选</span></label>
+                  <input id="auth-nickname" name="nickname" autoComplete="nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="大家怎么称呼你" maxLength={64} />
+                </div>
+                <div className="field">
+                  <label htmlFor="auth-invite-code">邀请码 <span>6 位</span></label>
+                  <input
+                    id="auth-invite-code"
+                    name="invite_code"
+                    autoComplete="one-time-code"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                    placeholder="请输入 6 位邀请码"
+                    minLength={6}
+                    maxLength={6}
+                    pattern="[A-Z0-9]{6}"
+                    required
+                  />
+                </div>
+              </>
             )}
             <div className="field">
               <label htmlFor="auth-password">密码 <span>6–64 字符</span></label>

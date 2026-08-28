@@ -22,6 +22,7 @@ func NewTestDB(t *testing.T) *gorm.DB {
 	dsn := fmt.Sprintf("file:my-bbs-test-%d?mode=memory&cache=shared", testDBSequence.Add(1))
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger:                                   logger.Default.LogMode(logger.Silent),
+		TranslateError:                           true,
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
 	if err != nil {

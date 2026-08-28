@@ -18,7 +18,13 @@ type memoryUserRepository struct {
 	createErr  error
 }
 
+type memoryInvitationRepository struct {
+	userRepo  *memoryUserRepository
+	available map[string]bool
+}
+
 var _ repository.UserRepository = (*memoryUserRepository)(nil)
+var _ repository.InvitationRepository = (*memoryInvitationRepository)(nil)
 
 func newMemoryUserRepository() *memoryUserRepository {
 	return &memoryUserRepository{
@@ -26,6 +32,38 @@ func newMemoryUserRepository() *memoryUserRepository {
 		byID:       make(map[uint]*model.User),
 		byUsername: make(map[string]*model.User),
 	}
+}
+
+func newMemoryInvitationRepository(userRepo *memoryUserRepository, codes ...string) *memoryInvitationRepository {
+	available := make(map[string]bool, len(codes))
+	for _, code := range codes {
+		available[code] = true
+	}
+	return &memoryInvitationRepository{userRepo: userRepo, available: available}
+}
+
+func (r *memoryInvitationRepository) CreateInvitation(_ context.Context, invitation *model.Invitation) error {
+	if _, exists := r.available[invitation.Code]; exists {
+		return repository.ErrAlreadyExists
+	}
+	r.available[invitation.Code] = true
+	return nil
+}
+
+func (r *memoryInvitationRepository) RegisterUserWithInvitation(
+	ctx context.Context,
+	user *model.User,
+	code string,
+) error {
+	if !r.available[code] {
+		return repository.ErrInvitationUnavailable
+	}
+	user.InviteCode = &code
+	if err := r.userRepo.CreateUser(ctx, user); err != nil {
+		return err
+	}
+	r.available[code] = false
+	return nil
 }
 
 func (r *memoryUserRepository) CreateUser(_ context.Context, user *model.User) error {
@@ -42,9 +80,10 @@ func (r *memoryUserRepository) CreateUser(_ context.Context, user *model.User) e
 func TestUserService_MapsRepositoryConflict(t *testing.T) {
 	repo := newMemoryUserRepository()
 	repo.createErr = repository.ErrAlreadyExists
-	svc := service.NewUserService(repo)
+	invitationRepo := newMemoryInvitationRepository(repo, "CNFL01")
+	svc := service.NewUserServiceWithInvitations(repo, invitationRepo)
 
-	err := svc.Register(context.Background(), "conflict_user", "password1", "Conflict")
+	err := svc.Register(context.Background(), "conflict_user", "password1", "Conflict", "CNFL01")
 	if !errors.Is(err, bizerr.ErrUsernameExists) {
 		t.Fatalf("want ErrUsernameExists, got %v", err)
 	}
@@ -78,9 +117,10 @@ func (r *memoryUserRepository) UpdateProfile(_ context.Context, id uint, nicknam
 func TestUserService_DependsOnRepositoryPort(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemoryUserRepository()
-	svc := service.NewUserService(repo)
+	invitationRepo := newMemoryInvitationRepository(repo, "PORT01")
+	svc := service.NewUserServiceWithInvitations(repo, invitationRepo)
 
-	if err := svc.Register(ctx, "port_user", "password1", "Port User"); err != nil {
+	if err := svc.Register(ctx, "port_user", "password1", "Port User", "PORT01"); err != nil {
 		t.Fatalf("register through repository port: %v", err)
 	}
 	stored := repo.byUsername["port_user"]
@@ -92,6 +132,9 @@ func TestUserService_DependsOnRepositoryPort(t *testing.T) {
 	}
 	if stored.Status != model.UserStatusNormal {
 		t.Fatalf("status=%d, want normal", stored.Status)
+	}
+	if stored.InviteCode == nil || *stored.InviteCode != "PORT01" {
+		t.Fatalf("invite_code=%v, want PORT01", stored.InviteCode)
 	}
 
 	profile, err := svc.GetMe(ctx, stored.ID)

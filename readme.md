@@ -58,7 +58,9 @@ my-bbs/
 ## 核心功能
 
 ### 用户
-- ✅ 注册（用户名唯一索引，密码 bcrypt）
+- ✅ 邀请注册（6 位字母数字邀请码，单次使用；账号记录注册来源）
+- ✅ 登录用户可生成邀请码，明文仅在创建响应中展示一次
+- ✅ 用户名唯一索引，密码 bcrypt
 - ✅ 登录（返回带独立 JTI 的 JWT）
 - ✅ 管理员账号由 `ADMIN_USERNAMES` 配置（逗号分隔，仅授权已有账号）
 - ✅ 管理员可禁言和解除禁言普通用户
@@ -123,7 +125,8 @@ my-bbs/
 docker compose up --build -d
 ```
 
-这会启动 MySQL、Redis 和应用，数据库表会在应用启动时自动迁移。Redis 开启
+这会启动 MySQL、Redis 和应用。Compose 显式设置 `DB_AUTO_MIGRATE=true`，仅在
+本地开发栈中由应用自动建表。Redis 开启
 AOF，并通过 `redis_data` volume 持久化尚未过期的 Token 撤销记录。服务启动后访问
 `http://localhost:8080`。查看应用日志：
 
@@ -160,6 +163,7 @@ cp config/.env.example config/.env
 
 ```bash
 DB_DSN="root:密码@tcp(127.0.0.1:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
+DB_AUTO_MIGRATE="true"
 DB_MAX_OPEN_CONNS="25"
 DB_MAX_IDLE_CONNS="10"
 DB_CONN_MAX_LIFETIME="30m"
@@ -225,7 +229,31 @@ REDIS_PASS=""
 JSON 业务码 `42900`。共享限流区文件只能安装一次，修改配置后必须先执行
 `nginx -t`，通过后再 reload。
 
-> 若表仍是旧字段（`created_at` 等），开发环境可删表后重启，让 AutoMigrate 重建；或手动改列名。
+`DB_AUTO_MIGRATE` 在 `debug` 模式默认开启，在 `release` 模式默认关闭。生产环境由
+发布流程执行 [`scripts/full_ddl.sql`](scripts/full_ddl.sql)，不要同时启用 AutoMigrate。
+若表仍是旧字段（`created_at` 等），开发环境可删表后重启重建；生产环境必须使用
+经过备份和演练的一次性迁移，不能把字段重命名混入每次发布都会执行的脚本。
+
+### 数据库结构发布
+
+`scripts/full_ddl.sql` 同时包含完整建表语句和已知的增量补齐语句，并设计为可在
+MariaDB 10.3 上重复执行。CI 会在与当前生产一致的 MariaDB 10.3.28 临时实例中验证
+空库执行、再次执行、从旧结构
+升级以及升级后再次执行。正式发布包会记录 SQL 的 SHA-256，服务器在切换新版本前
+校验并执行它；执行失败时不会激活新应用版本。
+
+这个自动脚本只允许向后兼容的扩展：新增表、新增可空列和新增索引。`DROP`、
+`TRUNCATE`、`RENAME`、缩窄类型、改为 `NOT NULL` 等破坏性 DDL 必须使用独立的
+维护脚本，在备份、恢复演练和维护窗口中人工执行。MariaDB 的 DDL 可能隐式提交，
+所以应用版本回滚不会撤销已经成功执行的数据库变更。
+
+文件前部的完整建表语句作为已经审计的线上基线保留，不再因后续功能重写。以后新增
+表、字段或索引时，直接在文件末尾按发布顺序追加可重复执行的 `CREATE TABLE IF NOT
+EXISTS` 或 `ALTER TABLE ... ADD ... IF NOT EXISTS`；已经发布过的增量语句不得删除或
+改写。
+
+数据库迁移账号和密码只保存在服务器的 root-only 配置中，不进入 GitHub、发布包
+或应用 `.env`。生产应用账号应仅保留业务所需的 DML 权限。
 
 ### 3. 运行
 
@@ -259,9 +287,10 @@ make down      # 停止 Docker 服务
 `Frontend` 是分支保护使用的稳定检查名称。
 
 只有可信的 `main` 运行会继续执行 `Package`：它不会重新构建，而是把同一次
-运行中已经通过检查的后端二进制和前端构建产物组合成与完整 Git commit SHA
-绑定的不可变发布包。发布包不含 `.env`、数据库、Redis、Nginx、systemd 或 TLS
-密钥，也不包含服务器上的部署脚本或配置文件。
+运行中已经通过检查的后端二进制、前端构建产物和已验证的 `full_ddl.sql` 组合成与
+完整 Git commit SHA 绑定的不可变发布包。发布包不含 `.env`、数据库数据、Redis
+数据、Nginx、systemd、数据库凭据或 TLS 密钥，也不包含服务器上的部署脚本或
+配置文件。
 
 ### Redis 生命周期封装
 
@@ -330,9 +359,10 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 |---|---|---|---|
 | GET | `/livez` | 否 | 进程存活检查，不访问外部依赖 |
 | GET | `/readyz` | 仅本机 | 服务就绪检查，限定时间内检查 MySQL 和 Redis；公网统一隐藏为 404 |
-| POST | `/api/register` | 否 | 注册 |
+| POST | `/api/register` | 否 | 使用 6 位邀请码注册 |
 | POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
 | POST | `/api/logout` | 是 | 立即撤销当前 Token |
+| POST | `/api/invitations` | 是 | 生成一个单次使用邀请码；邀请码仅在本次响应中展示 |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
 | GET | `/api/search` | 否 | 搜索用户和公开帖子，支持 `q`/`scope`/`pageNo`/`pageSize` |

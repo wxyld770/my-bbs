@@ -14,6 +14,15 @@ func NewLoginResponse(token string) LoginResponse {
 	return LoginResponse{Token: token}
 }
 
+// InvitationResponse 只用于创建邀请码的单次响应；没有历史查询接口。
+type InvitationResponse struct {
+	Code string `json:"code"`
+}
+
+func NewInvitationResponse(code string) InvitationResponse {
+	return InvitationResponse{Code: code}
+}
+
 // UserResponse 是对外用户模型，不包含密码、软删除状态等数据库字段。
 type UserResponse struct {
 	ID           uint      `json:"id"`

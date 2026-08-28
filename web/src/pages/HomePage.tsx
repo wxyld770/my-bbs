@@ -1,5 +1,5 @@
-import { ArrowRight, Feather, MessageCircle, RefreshCw, Sparkles } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { ArrowUp, Feather, MessageCircle, RefreshCw, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
@@ -20,22 +20,49 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState('')
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const [hotPosts, setHotPosts] = useState<HotPostItem[]>([])
   const [hotLoading, setHotLoading] = useState(true)
   const [hotError, setHotError] = useState('')
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null)
+  const homeTitleRef = useRef<HTMLHeadingElement | null>(null)
+  const feedGenerationRef = useRef(0)
+  const firstPageInFlightRef = useRef(true)
+  const loadMoreInFlightRef = useRef(false)
+  const firstPageControllerRef = useRef<AbortController | null>(null)
+  const loadMoreControllerRef = useRef<AbortController | null>(null)
 
   const loadFirstPage = useCallback(async () => {
+    const generation = feedGenerationRef.current + 1
+    feedGenerationRef.current = generation
+    firstPageControllerRef.current?.abort()
+    loadMoreControllerRef.current?.abort()
+    const controller = new AbortController()
+    firstPageControllerRef.current = controller
+    loadMoreControllerRef.current = null
+    firstPageInFlightRef.current = true
+    loadMoreInFlightRef.current = false
     setLoading(true)
+    setLoadingMore(false)
     setError('')
+    setLoadMoreError('')
+    setHasMore(false)
     try {
-      const page = await api.listPosts({ pageNo: 1, pageSize: PAGE_SIZE })
+      const page = await api.listPosts({ pageNo: 1, pageSize: PAGE_SIZE }, controller.signal)
+      if (generation !== feedGenerationRef.current) return
       setPosts(page.list)
       setPageNo(1)
       setHasMore(page.hasMore && page.list.length > 0)
     } catch (loadError) {
+      if (generation !== feedGenerationRef.current) return
       setError(getErrorMessage(loadError))
     } finally {
-      setLoading(false)
+      if (firstPageControllerRef.current === controller) firstPageControllerRef.current = null
+      if (generation === feedGenerationRef.current) {
+        firstPageInFlightRef.current = false
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -57,11 +84,25 @@ export function HomePage() {
     void loadHotPosts()
   }, [contentVersion, loadFirstPage, loadHotPosts])
 
-  const loadMore = async () => {
+  useEffect(() => () => {
+    feedGenerationRef.current += 1
+    firstPageControllerRef.current?.abort()
+    loadMoreControllerRef.current?.abort()
+  }, [])
+
+  const loadMore = useCallback(async () => {
+    if (loading || firstPageInFlightRef.current || !hasMore || loadMoreInFlightRef.current) return
+
+    const generation = feedGenerationRef.current
+    const nextPage = pageNo + 1
+    const controller = new AbortController()
+    loadMoreControllerRef.current = controller
+    loadMoreInFlightRef.current = true
     setLoadingMore(true)
+    setLoadMoreError('')
     try {
-      const nextPage = pageNo + 1
-      const page = await api.listPosts({ pageNo: nextPage, pageSize: PAGE_SIZE })
+      const page = await api.listPosts({ pageNo: nextPage, pageSize: PAGE_SIZE }, controller.signal)
+      if (generation !== feedGenerationRef.current) return
       setPosts((current) => {
         const knownIds = new Set(current.map((post) => post.id))
         return [...current, ...page.list.filter((post) => !knownIds.has(post.id))]
@@ -69,10 +110,62 @@ export function HomePage() {
       setPageNo(nextPage)
       setHasMore(page.hasMore && page.list.length > 0)
     } catch (loadError) {
-      setError(getErrorMessage(loadError))
+      if (generation !== feedGenerationRef.current) return
+      setLoadMoreError(getErrorMessage(loadError))
     } finally {
-      setLoadingMore(false)
+      if (loadMoreControllerRef.current === controller) loadMoreControllerRef.current = null
+      if (generation === feedGenerationRef.current) {
+        loadMoreInFlightRef.current = false
+        setLoadingMore(false)
+      }
     }
+  }, [hasMore, loading, pageNo])
+
+  useEffect(() => {
+    const sentinel = loadMoreSentinelRef.current
+    if (!sentinel || loading || loadingMore || !hasMore || loadMoreError) return
+    const generation = feedGenerationRef.current
+
+    const observer = new IntersectionObserver((entries) => {
+      if (
+        generation === feedGenerationRef.current &&
+        entries.some((entry) => entry.isIntersecting)
+      ) {
+        void loadMore()
+      }
+    }, {
+      root: null,
+      rootMargin: '0px 0px 420px 0px',
+      threshold: 0,
+    })
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, loadMoreError, loading, loadingMore])
+
+  useEffect(() => {
+    let animationFrame: number | null = null
+
+    const updateVisibility = () => {
+      if (animationFrame !== null) return
+      animationFrame = window.requestAnimationFrame(() => {
+        setShowBackToTop(window.scrollY > 640)
+        animationFrame = null
+      })
+    }
+
+    updateVisibility()
+    window.addEventListener('scroll', updateVisibility, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', updateVisibility)
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame)
+    }
+  }, [])
+
+  const scrollToTop = () => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+    homeTitleRef.current?.focus({ preventScroll: true })
+    window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' })
   }
 
   const startWriting = () => {
@@ -85,7 +178,7 @@ export function HomePage() {
       <section className="home-intro" aria-labelledby="home-title">
         <div className="home-intro__copy">
           <span className="eyebrow"><Sparkles size={14} aria-hidden="true" />YEJI / REAL WORDS</span>
-          <h1 id="home-title">把没说完的话，留在这里。</h1>
+          <h1 ref={homeTitleRef} id="home-title" tabIndex={-1}>把没说完的话，留在这里。</h1>
           <p className="home-intro__description">
             认真写下此刻所想，也耐心读完另一个人的故事。这里记录最新的表达，也看见今天正在发生的讨论。
           </p>
@@ -138,14 +231,22 @@ export function HomePage() {
               <div className="post-list">
                 {posts.map((post) => <PostCard key={post.id} post={post} />)}
               </div>
-              {error && <p className="form-error" role="alert">{error}</p>}
-              {hasMore && (
-                <div className="load-more">
-                  <button className="button button--soft" type="button" onClick={() => void loadMore()} disabled={loadingMore}>
-                    {loadingMore ? '正在翻页…' : '再读一些'} <ArrowRight size={16} aria-hidden="true" />
-                  </button>
-                </div>
-              )}
+              <div className="infinite-scroll-status" aria-live="polite">
+                {loadMoreError ? (
+                  <div className="infinite-scroll-status__error" role="alert">
+                    <span>后面的内容暂时没有加载成功：{loadMoreError}</span>
+                    <button className="button button--soft button--small" type="button" onClick={() => void loadMore()}>
+                      重试
+                    </button>
+                  </div>
+                ) : loadingMore ? (
+                  <span className="infinite-scroll-status__loading" role="status">正在加载更多内容…</span>
+                ) : hasMore ? (
+                  <div ref={loadMoreSentinelRef} className="infinite-scroll-status__sentinel" aria-hidden="true" />
+                ) : (
+                  <span className="infinite-scroll-status__end">已经读到广场尽头了</span>
+                )}
+              </div>
             </>
           )}
         </section>
@@ -204,6 +305,18 @@ export function HomePage() {
           </section>
         </aside>
       </div>
+
+      {showBackToTop && (
+        <button
+          className="back-to-top"
+          type="button"
+          onClick={scrollToTop}
+          aria-label="回到页面顶部"
+          title="回到顶部"
+        >
+          <ArrowUp size={20} aria-hidden="true" />
+        </button>
+      )}
     </div>
   )
 }

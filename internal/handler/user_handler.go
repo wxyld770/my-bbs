@@ -29,12 +29,35 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.Register(c.Request.Context(), req.Username, req.Password, req.Nickname); err != nil {
+	if err := h.userService.Register(
+		c.Request.Context(),
+		req.Username,
+		req.Password,
+		req.Nickname,
+		req.InviteCode,
+	); err != nil {
 		response.ReportError(c, err)
 		return
 	}
 
 	response.OKMsg(c, "注册成功")
+}
+
+// GenerateInvitation 创建一个新的单次使用邀请码。
+func (h *UserHandler) GenerateInvitation(c *gin.Context) {
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+
+	code, err := h.userService.GenerateInvitation(c.Request.Context(), userID)
+	if err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OK(c, httpresp.NewInvitationResponse(code))
 }
 
 func (h *UserHandler) Login(c *gin.Context) {

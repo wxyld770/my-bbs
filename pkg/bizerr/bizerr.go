@@ -81,4 +81,6 @@ var (
 	ErrCommentNotFound        = New(http.StatusNotFound, 40403, "评论不存在")
 	ErrCommentNoPermission    = New(http.StatusForbidden, 40302, "无权限操作此评论")
 	ErrInvalidCommentID       = New(http.StatusBadRequest, 40003, "无效的评论ID")
+	ErrInvitationRequired     = New(http.StatusBadRequest, 40005, "请输入邀请码")
+	ErrInvitationUnavailable  = New(http.StatusBadRequest, 40006, "邀请码无效或已使用")
 )

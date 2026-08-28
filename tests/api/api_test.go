@@ -19,7 +19,7 @@ import (
 	"my-bbs/internal/modules/user"
 	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/router"
-	"my-bbs/internal/service"
+	"my-bbs/pkg/bcrypt"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/tests/testutil"
 
@@ -45,9 +45,17 @@ func setupTestRouterWithAdminUsers(t *testing.T, usernames ...string) (*gin.Engi
 	redisClient := testutil.NewTestRedis(t)
 	adminUsers := authorization.NewAdminUsers(usernames...)
 	userRepo := gormrepo.NewUserRepository(db)
-	userService := service.NewUserService(userRepo)
 	for _, username := range adminUsers.Usernames() {
-		if err := userService.Register(context.Background(), username, "password1", username); err != nil {
+		hashedPassword, err := bcrypt.HashPassword("password1")
+		if err != nil {
+			t.Fatalf("hash configured admin %q password: %v", username, err)
+		}
+		if err := userRepo.CreateUser(context.Background(), &model.User{
+			Username: username,
+			Password: hashedPassword,
+			Nickname: username,
+			Status:   model.UserStatusNormal,
+		}); err != nil {
 			t.Fatalf("seed configured admin %q before router startup: %v", username, err)
 		}
 	}
@@ -110,6 +118,56 @@ func decodeResp(t *testing.T, w *httptest.ResponseRecorder) map[string]any {
 		t.Fatalf("decode response: %v body=%s", err, w.Body.String())
 	}
 	return resp
+}
+
+func loginAPIUser(t *testing.T, r http.Handler, username, password string) string {
+	t.Helper()
+	w := doJSON(t, r, http.MethodPost, "/api/login", "", map[string]string{
+		"username": username,
+		"password": password,
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("login %s status=%d body=%s", username, w.Code, w.Body.String())
+	}
+	data, _ := decodeResp(t, w)["data"].(map[string]any)
+	token, _ := data["token"].(string)
+	if token == "" {
+		t.Fatalf("login %s returned empty token: %v", username, data)
+	}
+	return token
+}
+
+func generateAPIInvitation(t *testing.T, r http.Handler, token string) string {
+	t.Helper()
+	w := doJSON(t, r, http.MethodPost, "/api/invitations", token, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("generate invitation status=%d body=%s", w.Code, w.Body.String())
+	}
+	data, _ := decodeResp(t, w)["data"].(map[string]any)
+	code, _ := data["code"].(string)
+	if code == "" {
+		t.Fatalf("generate invitation returned empty code: %v", data)
+	}
+	return code
+}
+
+func registerAPIUser(
+	t *testing.T,
+	r http.Handler,
+	inviterToken, username, password, nickname string,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	return doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
+		"username":    username,
+		"password":    password,
+		"nickname":    nickname,
+		"invite_code": generateAPIInvitation(t, r, inviterToken),
+	})
+}
+
+func registerDefaultAPIUser(t *testing.T, r http.Handler, username, nickname string) *httptest.ResponseRecorder {
+	t.Helper()
+	return registerAPIUser(t, r, loginAPIUser(t, r, "admin", "password1"), username, "password1", nickname)
 }
 
 func TestAPI_HealthChecks(t *testing.T) {
@@ -283,11 +341,7 @@ func TestAPI_RejectsMalformedPaginationQuery(t *testing.T) {
 func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 	r, _ := setupTestRouter(t)
 
-	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": "coreuser",
-		"password": "password1",
-		"nickname": "Core",
-	})
+	w := registerDefaultAPIUser(t, r, "coreuser", "Core")
 	if w.Code != http.StatusOK {
 		t.Fatalf("register status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -378,11 +432,7 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 func TestAPI_LogoutRevokesOnlyCurrentToken(t *testing.T) {
 	r, _ := setupTestRouter(t)
 
-	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": "logoutuser",
-		"password": "password1",
-		"nickname": "Logout",
-	})
+	w := registerDefaultAPIUser(t, r, "logoutuser", "Logout")
 	if w.Code != http.StatusOK {
 		t.Fatalf("register status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -431,11 +481,7 @@ func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
 	r, db := setupTestRouter(t)
 	userRepo := gormrepo.NewUserRepository(db)
 
-	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": "mutedapi",
-		"password": "password1",
-		"nickname": "M",
-	})
+	w := registerDefaultAPIUser(t, r, "mutedapi", "M")
 	if w.Code != http.StatusOK {
 		t.Fatalf("register: %s", w.Body.String())
 	}
@@ -479,11 +525,7 @@ func TestAPI_PrivatePost_AuthorOnly(t *testing.T) {
 
 	registerLogin := func(username string) string {
 		t.Helper()
-		w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-			"username": username,
-			"password": "password1",
-			"nickname": username,
-		})
+		w := registerDefaultAPIUser(t, r, username, username)
 		if w.Code != http.StatusOK {
 			t.Fatalf("register %s: %s", username, w.Body.String())
 		}
@@ -534,11 +576,7 @@ func TestAPI_PrivatePost_AuthorOnly(t *testing.T) {
 func TestAPI_PublicProfileAndPosts(t *testing.T) {
 	r, _ := setupTestRouter(t)
 
-	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": "profileuser",
-		"password": "password1",
-		"nickname": "Profile",
-	})
+	w := registerDefaultAPIUser(t, r, "profileuser", "Profile")
 	if w.Code != http.StatusOK {
 		t.Fatalf("register: %s", w.Body.String())
 	}

@@ -16,7 +16,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
   isBootstrapping: boolean
   login: (input: LoginRequest) => Promise<User>
-  register: (input: RegisterRequest) => Promise<User>
+  register: (input: RegisterRequest) => Promise<User | null>
   logout: () => Promise<void>
   refreshUser: () => Promise<User | null>
   clearSession: () => void
@@ -100,9 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = useCallback(
     async (input: RegisterRequest) => {
       await api.register(input)
-      return login({ username: input.username, password: input.password })
+      try {
+        return await login({ username: input.username, password: input.password })
+      } catch {
+        // 注册已经成功且邀请码已经消费，不能让自动登录失败看起来像注册失败。
+        clearSession()
+        return null
+      }
     },
-    [login],
+    [clearSession, login],
   )
 
   const logout = useCallback(async () => {

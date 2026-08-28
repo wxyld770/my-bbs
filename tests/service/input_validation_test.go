@@ -20,14 +20,14 @@ func TestServices_EnforceInputInvariantsOutsideHTTP(t *testing.T) {
 			name: "bcrypt byte limit",
 			call: func() error {
 				// 25 个汉字是 75 字节，字符数未超过 HTTP 的 64 字符限制。
-				return service.NewUserService(nil).Register(context.Background(), "alice", strings.Repeat("密", 25), "")
+				return service.NewUserService(nil).Register(context.Background(), "alice", strings.Repeat("密", 25), "", "TEST01")
 			},
 			message: "密码不能超过72字节",
 		},
 		{
 			name: "registration nickname length",
 			call: func() error {
-				return service.NewUserService(nil).Register(context.Background(), "alice", "password1", strings.Repeat("a", 65))
+				return service.NewUserService(nil).Register(context.Background(), "alice", "password1", strings.Repeat("a", 65), "TEST01")
 			},
 			message: "昵称长度不能超过64个字符",
 		},

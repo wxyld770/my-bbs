@@ -24,18 +24,19 @@ func TestAPI_ConfiguredAdminUsesExistingAccountAndUsernameRemainsUnique(t *testi
 	assertAdminIdentityResponse(t, r, adminToken, true)
 
 	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": adminTestUsername,
-		"password": "password1",
-		"nickname": "duplicate admin",
+		"username":    adminTestUsername,
+		"password":    "password1",
+		"nickname":    "duplicate admin",
+		"invite_code": generateAPIInvitation(t, r, adminToken),
 	})
 	assertAdminBizError(t, w, bizerr.ErrUsernameExists)
 }
 
 func TestAPI_AdminPrivilegesFollowConfiguredUsernames(t *testing.T) {
 	r, _ := setupTestRouterWithAdminUsers(t, "moderator")
-	authorToken := registerAndLoginAdminTestUser(t, r, "configauthor")
-	unconfiguredAdminToken := registerAndLoginAdminTestUser(t, r, "admin")
 	moderatorToken := loginAdminTestUser(t, r, "moderator", "password1")
+	authorToken := registerAndLoginAdminTestUserWithInviter(t, r, moderatorToken, "configauthor")
+	unconfiguredAdminToken := registerAndLoginAdminTestUserWithInviter(t, r, moderatorToken, "admin")
 	postID := createAdminTestPost(t, r, authorToken, "configured-admin-target")
 
 	w := doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/pin/%d", postID), unconfiguredAdminToken, nil)
@@ -220,11 +221,17 @@ func TestAPI_AdminPostPinLifecycle(t *testing.T) {
 
 func registerAndLoginAdminTestUser(t *testing.T, r http.Handler, username string) string {
 	t.Helper()
-	w := doJSON(t, r, http.MethodPost, "/api/register", "", map[string]string{
-		"username": username,
-		"password": "password1",
-		"nickname": username,
-	})
+	inviterToken := loginAdminTestUser(t, r, adminTestUsername, "password1")
+	return registerAndLoginAdminTestUserWithInviter(t, r, inviterToken, username)
+}
+
+func registerAndLoginAdminTestUserWithInviter(
+	t *testing.T,
+	r http.Handler,
+	inviterToken, username string,
+) string {
+	t.Helper()
+	w := registerAPIUser(t, r, inviterToken, username, "password1", username)
 	if w.Code != http.StatusOK {
 		t.Fatalf("register %s status=%d body=%s", username, w.Code, w.Body.String())
 	}

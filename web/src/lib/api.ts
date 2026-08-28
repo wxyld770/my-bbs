@@ -6,6 +6,7 @@ import type {
   CreateCommentRequest,
   CreatePostRequest,
   HotPostData,
+  InvitationData,
   LikeToggleData,
   LoginData,
   LoginRequest,
@@ -262,6 +263,13 @@ export const api = {
     })
   },
 
+  createInvitation(token: string): Promise<InvitationData> {
+    return requestData('/invitations', {
+      method: 'POST',
+      token,
+    })
+  },
+
   muteUser(token: string, userId: number): Promise<ApiMessage> {
     return requestMessage(`/users/${encodeId(userId)}/mute`, {
       method: 'POST',
@@ -288,8 +296,8 @@ export const api = {
     })
   },
 
-  listPosts(query: PageQuery = {}): Promise<PageData<PostListItem>> {
-    return requestData('/posts', { query: pageQuery(query) })
+  listPosts(query: PageQuery = {}, signal?: AbortSignal): Promise<PageData<PostListItem>> {
+    return requestData('/posts', { query: pageQuery(query), signal })
   },
 
   listHotPosts(): Promise<HotPostData> {

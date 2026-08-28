@@ -89,6 +89,10 @@ export interface LoginData {
   token: string
 }
 
+export interface InvitationData {
+  code: string
+}
+
 export interface LikeToggleData {
   liked: boolean
   like_count: number
@@ -177,6 +181,7 @@ export interface RegisterRequest {
   username: string
   password: string
   nickname?: string
+  invite_code: string
 }
 
 export interface LoginRequest {

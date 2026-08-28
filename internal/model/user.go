@@ -14,6 +14,8 @@ type User struct {
 	Nickname     string `gorm:"type:varchar(64);comment:用户昵称" json:"nickname"`
 	Status       uint   `gorm:"type:tinyint(4);default:1;comment:用户状态，1:正常，0禁言" json:"status"`
 	Introduction string `gorm:"type:varchar(1024);comment:个人介绍" json:"introduction"`
+	// InviteCode 记录注册该账号时消费的邀请码。历史用户没有邀请码，值为 NULL。
+	InviteCode *string `gorm:"column:invite_code;type:char(6);uniqueIndex;comment:注册时使用的邀请码" json:"-"`
 }
 
 // IsActive 是否可登录 / 访问需登录接口

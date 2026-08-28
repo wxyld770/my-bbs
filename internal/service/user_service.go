@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -18,13 +20,27 @@ import (
 )
 
 type UserService struct {
-	userRepo repository.UserRepository
-	redis    redis.Cmdable
-	admins   authorization.AdminChecker
+	userRepo       repository.UserRepository
+	invitationRepo repository.InvitationRepository
+	redis          redis.Cmdable
+	admins         authorization.AdminChecker
 }
 
 func NewUserService(userRepo repository.UserRepository, adminCheckers ...authorization.AdminChecker) *UserService {
 	return &UserService{userRepo: userRepo, admins: firstAdminChecker(adminCheckers)}
+}
+
+// NewUserServiceWithInvitations 为注册和邀请码生成注入邀请码仓储。
+func NewUserServiceWithInvitations(
+	userRepo repository.UserRepository,
+	invitationRepo repository.InvitationRepository,
+	adminCheckers ...authorization.AdminChecker,
+) *UserService {
+	return &UserService{
+		userRepo:       userRepo,
+		invitationRepo: invitationRepo,
+		admins:         firstAdminChecker(adminCheckers),
+	}
 }
 
 // NewUserServiceWithRedis 为 Token 撤销注入 Redis 命令接口。
@@ -36,8 +52,26 @@ func NewUserServiceWithRedis(
 	return &UserService{userRepo: userRepo, redis: redisCommands, admins: firstAdminChecker(adminCheckers)}
 }
 
+// NewUserServiceWithRedisAndInvitations 注入用户模块的全部生产依赖。
+func NewUserServiceWithRedisAndInvitations(
+	userRepo repository.UserRepository,
+	invitationRepo repository.InvitationRepository,
+	redisCommands redis.Cmdable,
+	adminCheckers ...authorization.AdminChecker,
+) *UserService {
+	return &UserService{
+		userRepo:       userRepo,
+		invitationRepo: invitationRepo,
+		redis:          redisCommands,
+		admins:         firstAdminChecker(adminCheckers),
+	}
+}
+
 // Register 注册新用户
-func (s *UserService) Register(ctx context.Context, username, password, nickname string) error {
+func (s *UserService) Register(
+	ctx context.Context,
+	username, password, nickname, inviteCode string,
+) error {
 	username = strings.TrimSpace(username)
 	nickname = strings.TrimSpace(nickname)
 	if err := validateRuneLength(username, "用户名", 3, 64); err != nil {
@@ -53,13 +87,12 @@ func (s *UserService) Register(ctx context.Context, username, password, nickname
 	if err := validateRuneLength(nickname, "昵称", 0, 64); err != nil {
 		return err
 	}
-
-	existing, err := s.userRepo.FindUserByUsername(ctx, username)
+	inviteCode, err := validateInvitationCode(inviteCode)
 	if err != nil {
 		return err
 	}
-	if existing != nil {
-		return bizerr.ErrUsernameExists
+	if s.invitationRepo == nil {
+		return fmt.Errorf("invitation repository is required for registration")
 	}
 
 	hashed, err := bcrypt.HashPassword(password)
@@ -73,13 +106,98 @@ func (s *UserService) Register(ctx context.Context, username, password, nickname
 		Nickname: nickname,
 		Status:   model.UserStatusNormal,
 	}
-	if err := s.userRepo.CreateUser(ctx, user); err != nil {
+	if err := s.invitationRepo.RegisterUserWithInvitation(ctx, user, inviteCode); err != nil {
+		if errors.Is(err, repository.ErrInvitationUnavailable) {
+			return bizerr.ErrInvitationUnavailable
+		}
 		if errors.Is(err, repository.ErrAlreadyExists) {
 			return bizerr.ErrUsernameExists
 		}
 		return err
 	}
 	return nil
+}
+
+const (
+	invitationCodeLength      = 6
+	invitationCodeCreateTries = 10
+	invitationCodeAlphabet    = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+)
+
+// GenerateInvitation 为当前用户生成一个新的单次使用邀请码。
+// 明文邀请码只由当前调用返回；服务端不提供历史查询接口。
+func (s *UserService) GenerateInvitation(ctx context.Context, creatorID uint) (string, error) {
+	if creatorID == 0 {
+		return "", bizerr.ErrUnauthorized
+	}
+	if s.invitationRepo == nil {
+		return "", fmt.Errorf("invitation repository is required for invitation generation")
+	}
+
+	creator, err := s.userRepo.FindUserByID(ctx, creatorID)
+	if err != nil {
+		return "", err
+	}
+	if creator == nil {
+		return "", bizerr.ErrUserNotFound
+	}
+	if !creator.IsActive() {
+		return "", bizerr.ErrUserMuted
+	}
+
+	for range invitationCodeCreateTries {
+		code, err := newInvitationCode()
+		if err != nil {
+			return "", fmt.Errorf("generate invitation code: %w", err)
+		}
+		invitation := &model.Invitation{Code: code, CreatorID: creatorID}
+		if err := s.invitationRepo.CreateInvitation(ctx, invitation); err != nil {
+			if errors.Is(err, repository.ErrAlreadyExists) {
+				continue
+			}
+			return "", err
+		}
+		return code, nil
+	}
+
+	return "", fmt.Errorf("generate a unique invitation code after %d attempts", invitationCodeCreateTries)
+}
+
+func validateInvitationCode(inviteCode string) (string, error) {
+	code := strings.ToUpper(strings.TrimSpace(inviteCode))
+	if code == "" {
+		return "", bizerr.ErrInvitationRequired
+	}
+	if len(code) != invitationCodeLength {
+		return "", bizerr.ErrInvitationUnavailable
+	}
+	for i := range len(code) {
+		char := code[i]
+		if (char < 'A' || char > 'Z') && (char < '0' || char > '9') {
+			return "", bizerr.ErrInvitationUnavailable
+		}
+	}
+	return code, nil
+}
+
+// newInvitationCode 使用拒绝采样避免直接取模带来的轻微分布偏差。
+func newInvitationCode() (string, error) {
+	code := make([]byte, invitationCodeLength)
+	const unbiasedLimit = 252 // 36 * 7，是不超过 256 的最大 36 倍数。
+	for i := range code {
+		for {
+			var randomByte [1]byte
+			if _, err := cryptorand.Read(randomByte[:]); err != nil {
+				return "", err
+			}
+			if randomByte[0] >= unbiasedLimit {
+				continue
+			}
+			code[i] = invitationCodeAlphabet[int(randomByte[0])%len(invitationCodeAlphabet)]
+			break
+		}
+	}
+	return string(code), nil
 }
 
 // Login 登录，验证密码与账号状态，生成 JWT

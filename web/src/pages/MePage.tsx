@@ -1,6 +1,7 @@
-import { ArrowRight, CalendarDays, LogIn, LogOut, PenLine, RefreshCw } from 'lucide-react'
+import { ArrowRight, CalendarDays, KeyRound, LogIn, LogOut, PenLine, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Avatar } from '../components/Avatar'
+import { InvitationDialog } from '../components/InvitationDialog'
 import { PostCard } from '../components/PostCard'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
@@ -23,6 +24,8 @@ export function MePage() {
   const [introduction, setIntroduction] = useState('')
   const [profileError, setProfileError] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [invitationCode, setInvitationCode] = useState<string | null>(null)
+  const [generatingInvitation, setGeneratingInvitation] = useState(false)
 
   useEffect(() => {
     setNickname(user?.nickname ?? '')
@@ -88,6 +91,24 @@ export function MePage() {
     notify('success', '已经退出登录')
   }
 
+  const generateInvitation = async () => {
+    if (!token || generatingInvitation || invitationCode) return
+    setGeneratingInvitation(true)
+    try {
+      const invitation = await api.createInvitation(token)
+      setInvitationCode(invitation.code)
+    } catch (generateError) {
+      if (handleSessionError(generateError)) openAuth('login')
+      else notify('error', '邀请码生成失败', getErrorMessage(generateError))
+    } finally {
+      setGeneratingInvitation(false)
+    }
+  }
+
+  const closeInvitation = useCallback(() => {
+    setInvitationCode(null)
+  }, [])
+
   if (isBootstrapping) {
     return <div className="page-wrap"><div className="skeleton-card" style={{ height: 380 }} /></div>
   }
@@ -106,78 +127,87 @@ export function MePage() {
   }
 
   return (
-    <div className="page-wrap">
-      <section className="profile-card" aria-labelledby="profile-name">
-        <Avatar user={user} size="lg" />
-        <div>
-          <h1 id="profile-name">{getDisplayName(user)}</h1>
-          <div className="profile-card__handle">@{user.username}</div>
-          <p className="profile-card__intro">{user.introduction || '这个人还没有留下自我介绍。'}</p>
-          <div className="profile-meta"><CalendarDays size={14} aria-hidden="true" /> 加入于 {formatDateTime(user.create_time, { year: 'numeric', month: 'long', day: 'numeric', hour: undefined, minute: undefined })}</div>
-        </div>
-        <button className="button button--soft" type="button" onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />退出登录</button>
-      </section>
-
-      <div className="profile-layout">
-        <section aria-labelledby="my-posts-heading">
-          <div className="section-heading">
-            <div>
-              <span className="eyebrow">MY WRITING</span>
-              <h2 id="my-posts-heading">我写下的</h2>
-              <p>公开与私密内容都会显示在这里。</p>
-            </div>
-            <button className="button button--primary button--small" type="button" onClick={() => openComposer()}><PenLine size={14} aria-hidden="true" />新帖子</button>
+    <>
+      <div className="page-wrap">
+        <section className="profile-card" aria-labelledby="profile-name">
+          <Avatar user={user} size="lg" />
+          <div>
+            <h1 id="profile-name">{getDisplayName(user)}</h1>
+            <div className="profile-card__handle">@{user.username}</div>
+            <p className="profile-card__intro">{user.introduction || '这个人还没有留下自我介绍。'}</p>
+            <div className="profile-meta"><CalendarDays size={14} aria-hidden="true" /> 加入于 {formatDateTime(user.create_time, { year: 'numeric', month: 'long', day: 'numeric', hour: undefined, minute: undefined })}</div>
           </div>
-
-          {loadingPosts ? (
-            <div className="post-list"><div className="skeleton-card" /><div className="skeleton-card" /></div>
-          ) : postError && posts.length === 0 ? (
-            <div className="error-state">
-              <div className="error-state__icon"><RefreshCw size={23} aria-hidden="true" /></div>
-              <h2>暂时没能读到帖子</h2>
-              <p>{postError}</p>
-              <button className="button button--dark" type="button" onClick={() => void loadPosts()}>重新加载</button>
-            </div>
-          ) : posts.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state__icon"><PenLine size={23} aria-hidden="true" /></div>
-              <h3>还没有写过帖子</h3>
-              <p>第一篇不必完美，只要是真实的。</p>
-              <button className="button button--primary" type="button" onClick={() => openComposer()}>开始写</button>
-            </div>
-          ) : (
-            <>
-              <div className="post-list">
-                {posts.map((post) => <PostCard key={post.id} post={post} manageable onChanged={() => void loadPosts()} />)}
-              </div>
-              {postError && <p className="form-error" role="alert">{postError}</p>}
-              {hasMore && (
-                <div className="load-more">
-                  <button className="button button--soft" type="button" onClick={() => void loadMore()}>继续加载 <ArrowRight size={15} aria-hidden="true" /></button>
-                </div>
-              )}
-            </>
-          )}
+          <div className="profile-card__actions">
+            <button className="button button--dark" type="button" onClick={() => void generateInvitation()} disabled={generatingInvitation || Boolean(invitationCode)}>
+              <KeyRound size={16} aria-hidden="true" />
+              {generatingInvitation ? '生成中…' : '生成邀请码'}
+            </button>
+            <button className="button button--soft" type="button" onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />退出登录</button>
+          </div>
         </section>
 
-        <aside className="form-card">
-          <h2>编辑资料</h2>
-          <form onSubmit={saveProfile}>
-            <div className="field">
-              <label htmlFor="profile-nickname">昵称 <span>{Array.from(nickname).length}/64</span></label>
-              <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" />
+        <div className="profile-layout">
+          <section aria-labelledby="my-posts-heading">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">MY WRITING</span>
+                <h2 id="my-posts-heading">我写下的</h2>
+                <p>公开与私密内容都会显示在这里。</p>
+              </div>
+              <button className="button button--primary button--small" type="button" onClick={() => openComposer()}><PenLine size={14} aria-hidden="true" />新帖子</button>
             </div>
-            <div className="field">
-              <label htmlFor="profile-introduction">个人介绍 <span>{Array.from(introduction).length}/1024</span></label>
-              <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" />
-            </div>
-            {profileError && <p className="form-error" role="alert">{profileError}</p>}
-            <div className="form-actions">
-              <button className="button button--dark button--wide" type="submit" disabled={savingProfile}>{savingProfile ? '保存中…' : '保存资料'}</button>
-            </div>
-          </form>
-        </aside>
+
+            {loadingPosts ? (
+              <div className="post-list"><div className="skeleton-card" /><div className="skeleton-card" /></div>
+            ) : postError && posts.length === 0 ? (
+              <div className="error-state">
+                <div className="error-state__icon"><RefreshCw size={23} aria-hidden="true" /></div>
+                <h2>暂时没能读到帖子</h2>
+                <p>{postError}</p>
+                <button className="button button--dark" type="button" onClick={() => void loadPosts()}>重新加载</button>
+              </div>
+            ) : posts.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state__icon"><PenLine size={23} aria-hidden="true" /></div>
+                <h3>还没有写过帖子</h3>
+                <p>第一篇不必完美，只要是真实的。</p>
+                <button className="button button--primary" type="button" onClick={() => openComposer()}>开始写</button>
+              </div>
+            ) : (
+              <>
+                <div className="post-list">
+                  {posts.map((post) => <PostCard key={post.id} post={post} manageable onChanged={() => void loadPosts()} />)}
+                </div>
+                {postError && <p className="form-error" role="alert">{postError}</p>}
+                {hasMore && (
+                  <div className="load-more">
+                    <button className="button button--soft" type="button" onClick={() => void loadMore()}>继续加载 <ArrowRight size={15} aria-hidden="true" /></button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          <aside className="form-card">
+            <h2>编辑资料</h2>
+            <form onSubmit={saveProfile}>
+              <div className="field">
+                <label htmlFor="profile-nickname">昵称 <span>{Array.from(nickname).length}/64</span></label>
+                <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" />
+              </div>
+              <div className="field">
+                <label htmlFor="profile-introduction">个人介绍 <span>{Array.from(introduction).length}/1024</span></label>
+                <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" />
+              </div>
+              {profileError && <p className="form-error" role="alert">{profileError}</p>}
+              <div className="form-actions">
+                <button className="button button--dark button--wide" type="submit" disabled={savingProfile}>{savingProfile ? '保存中…' : '保存资料'}</button>
+              </div>
+            </form>
+          </aside>
+        </div>
       </div>
-    </div>
+      <InvitationDialog code={invitationCode} onClose={closeInvitation} />
+    </>
   )
 }

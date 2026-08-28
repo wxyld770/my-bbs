@@ -22,7 +22,8 @@ type Module struct {
 // Initialize 初始化用户模块
 func Initialize(db *gorm.DB, redisClient redis.Cmdable, admins authorization.AdminChecker) *Module {
 	repo := gormrepo.NewUserRepository(db)
-	svc := service.NewUserServiceWithRedis(repo, redisClient, admins)
+	invitationRepo := gormrepo.NewInvitationRepository(db)
+	svc := service.NewUserServiceWithRedisAndInvitations(repo, invitationRepo, redisClient, admins)
 	hdl := handler.NewUserHandler(svc)
 	return &Module{Handler: hdl, userRepo: repo, redis: redisClient}
 }
@@ -37,6 +38,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	{
 		auth.POST("/logout", m.Handler.Logout)
+		auth.POST("/invitations", m.Handler.GenerateInvitation)
 		auth.GET("/user/me", m.Handler.GetMe)
 		auth.POST("/user/profile", m.Handler.UpdateProfile)
 		auth.POST("/users/:id/mute", m.Handler.MuteUser)

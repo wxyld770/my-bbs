@@ -17,12 +17,13 @@ func TestBindJSONSuccess(t *testing.T) {
 	err := bindBody(t, "application/json; charset=utf-8", `{
 		"username":"alice",
 		"password":"secret12",
-		"nickname":"Alice"
+		"nickname":"Alice",
+		"invite_code":"A1B2C3"
 	}`, &req)
 	if err != nil {
 		t.Fatalf("BindJSON() error = %v", err)
 	}
-	if req.Username != "alice" || req.Password != "secret12" || req.Nickname != "Alice" {
+	if req.Username != "alice" || req.Password != "secret12" || req.Nickname != "Alice" || req.InviteCode != "A1B2C3" {
 		t.Fatalf("BindJSON() request = %#v", req)
 	}
 }
@@ -115,6 +116,12 @@ func TestBindJSONConvertsValidationErrors(t *testing.T) {
 			body:    `{"username":"ab","password":"secret"}`,
 			dst:     &httprequest.RegisterRequest{},
 			message: "字段 username 长度不能少于 3 个字符",
+		},
+		{
+			name:    "invitation required",
+			body:    `{"username":"alice","password":"secret12","nickname":"Alice"}`,
+			dst:     &httprequest.RegisterRequest{},
+			message: "字段 invite_code 不能为空",
 		},
 		{
 			name:    "maximum length",

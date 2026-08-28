@@ -32,12 +32,15 @@ func InitDB(dsn string, pool PoolConfig) (*gorm.DB, *sql.DB, error) {
 			SlowThreshold:             200 * time.Millisecond,
 			LogLevel:                  gormlogger.Info,
 			IgnoreRecordNotFoundError: true,
-			Colorful:                  false,
+			// SQL 日志只保留语句结构，不记录邀请码、密码摘要等参数值。
+			ParameterizedQueries: true,
+			Colorful:             false,
 		},
 	)
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: gormLog,
+		Logger:         gormLog,
+		TranslateError: true,
 		// 只保留逻辑关联（Preload），迁移时不创建物理外键
 		DisableForeignKeyConstraintWhenMigrating: true,
 	})
@@ -68,6 +71,7 @@ func InitDB(dsn string, pool PoolConfig) (*gorm.DB, *sql.DB, error) {
 func AutoMigrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(
 		&model.User{},
+		&model.Invitation{},
 		&model.Post{},
 		&model.Comment{},
 		&model.PostLike{},
