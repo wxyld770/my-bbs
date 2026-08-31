@@ -3,6 +3,8 @@
 一个基于 Go 语言、Gin 框架和 GORM 构建的轻量级 BBS（论坛/广场）项目。  
 学习 Go 语法、Gin 基础、GORM 之后，用来检验学习成果的实战练习。
 
+**在线访问：** [https://5iyeji.xyz/](https://5iyeji.xyz/)
+
 ## 项目目标
 
 - 将 Go 语法、Gin 路由与中间件、GORM 数据库操作串联起来
