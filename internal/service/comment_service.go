@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
@@ -15,6 +16,7 @@ type CommentService struct {
 	commentRepo repository.CommentRepository
 	postRepo    repository.PostReader
 	userRepo    repository.UserReader
+	countCache  *postcache.PostCountCache
 }
 
 func NewCommentService(
@@ -22,10 +24,20 @@ func NewCommentService(
 	postRepo repository.PostReader,
 	userRepo repository.UserReader,
 ) *CommentService {
+	return NewCommentServiceWithCountCache(commentRepo, postRepo, userRepo, nil)
+}
+
+func NewCommentServiceWithCountCache(
+	commentRepo repository.CommentRepository,
+	postRepo repository.PostReader,
+	userRepo repository.UserReader,
+	countCache *postcache.PostCountCache,
+) *CommentService {
 	return &CommentService{
 		commentRepo: commentRepo,
 		postRepo:    postRepo,
 		userRepo:    userRepo,
+		countCache:  countCache,
 	}
 }
 
@@ -47,7 +59,13 @@ func (s *CommentService) CreateComment(ctx context.Context, postID, userID uint,
 		UserID:  userID,
 		Content: content,
 	}
-	return s.commentRepo.Create(ctx, comment)
+	if err := s.commentRepo.Create(ctx, comment); err != nil {
+		return err
+	}
+	if s.countCache != nil {
+		s.countCache.DeleteCommentCounts(ctx, postID)
+	}
+	return nil
 }
 
 // ListComments 分页获取公开帖的评论
@@ -83,6 +101,9 @@ func (s *CommentService) DeleteComment(ctx context.Context, commentID, userID ui
 			return bizerr.ErrCommentNotFound
 		}
 		return err
+	}
+	if s.countCache != nil {
+		s.countCache.DeleteCommentCounts(ctx, comment.PostID)
 	}
 	return nil
 }

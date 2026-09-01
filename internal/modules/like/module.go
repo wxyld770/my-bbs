@@ -1,6 +1,7 @@
 package like
 
 import (
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/repository/gormrepo"
@@ -19,11 +20,15 @@ type Module struct {
 }
 
 // Initialize 初始化点赞模块
-func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable, countCaches ...*postcache.PostCountCache) *Module {
+	var countCache *postcache.PostCountCache
+	if len(countCaches) > 0 {
+		countCache = countCaches[0]
+	}
 	likeRepo := gormrepo.NewLikeRepository(db)
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
-	svc := service.NewLikeService(likeRepo, postRepo)
+	svc := service.NewLikeServiceWithCountCache(likeRepo, postRepo, countCache)
 	hdl := handler.NewLikeHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }

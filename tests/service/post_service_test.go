@@ -3,14 +3,20 @@ package service_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
+	"time"
 
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository/gormrepo"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/pagination"
 	"my-bbs/tests/testutil"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/redis/go-redis/v9"
 )
 
 func TestPostService_GetPostByID_AuthorCanReadPrivate(t *testing.T) {
@@ -199,4 +205,82 @@ func TestPostService_GetAllPosts_IncludesInteractionCounts(t *testing.T) {
 	if got := counts[quietPost.ID]; got.LikeCount != 0 || got.CommentCount != 0 {
 		t.Fatalf("quiet post counts = likes %d, comments %d; want 0, 0", got.LikeCount, got.CommentCount)
 	}
+}
+
+func TestPostService_PostCountsUseLRUAndFallBackToDatabase(t *testing.T) {
+	ctx := context.Background()
+	db := testutil.NewTestDB(t)
+	userRepo := gormrepo.NewUserRepository(db)
+	postRepo := gormrepo.NewPostRepository(db)
+	commentRepo := gormrepo.NewCommentRepository(db)
+	likeRepo := gormrepo.NewLikeRepository(db)
+
+	redisServer := miniredis.RunT(t)
+	redisClient := redis.NewClient(&redis.Options{Addr: redisServer.Addr()})
+	t.Cleanup(func() { _ = redisClient.Close() })
+	countCache := postcache.NewPostCountCache(redisClient, postcache.PostCountConfig{
+		TTL:              30 * time.Second,
+		OperationTimeout: 20 * time.Millisecond,
+	})
+	svc := service.NewPostServiceWithCountCache(postRepo, userRepo, commentRepo, likeRepo, countCache)
+
+	author := &model.User{Username: "cache-author", Password: "x", Status: model.UserStatusNormal}
+	if err := userRepo.CreateUser(ctx, author); err != nil {
+		t.Fatalf("create author: %v", err)
+	}
+	post := &model.Post{UserID: author.ID, Title: "cached counts", Content: "body", Visible: model.VisiblePublic}
+	if err := postRepo.CreatePost(ctx, post); err != nil {
+		t.Fatalf("create post: %v", err)
+	}
+	like := &model.PostLike{PostID: post.ID, UserID: author.ID}
+	if err := likeRepo.Create(ctx, like); err != nil {
+		t.Fatalf("create like: %v", err)
+	}
+	comment := &model.Comment{PostID: post.ID, UserID: author.ID, Content: "cached"}
+	if err := commentRepo.Create(ctx, comment); err != nil {
+		t.Fatalf("create comment: %v", err)
+	}
+
+	assertPostCounts(t, svc, post.ID, 1, 1)
+	if !redisServer.Exists("mybbs:v1:lru:post:"+strconv.FormatUint(uint64(post.ID), 10)+":likes-count") ||
+		!redisServer.Exists("mybbs:v1:lru:post:"+strconv.FormatUint(uint64(post.ID), 10)+":comments-count") {
+		t.Fatal("post interaction counts were not written to LRU Redis")
+	}
+
+	if err := likeRepo.DeleteByUserAndPost(ctx, author.ID, post.ID); err != nil {
+		t.Fatalf("delete like directly: %v", err)
+	}
+	if err := commentRepo.SoftDelete(ctx, comment.ID); err != nil {
+		t.Fatalf("delete comment directly: %v", err)
+	}
+	assertPostCounts(t, svc, post.ID, 1, 1)
+
+	redisServer.FastForward(31 * time.Second)
+	assertPostCounts(t, svc, post.ID, 0, 0)
+
+	if err := likeRepo.Create(ctx, &model.PostLike{PostID: post.ID, UserID: author.ID}); err != nil {
+		t.Fatalf("recreate like: %v", err)
+	}
+	if err := commentRepo.Create(ctx, &model.Comment{PostID: post.ID, UserID: author.ID, Content: "fallback"}); err != nil {
+		t.Fatalf("recreate comment: %v", err)
+	}
+	redisServer.Close()
+	assertPostCounts(t, svc, post.ID, 1, 1)
+}
+
+func assertPostCounts(t *testing.T, svc *service.PostService, postID uint, wantLikes, wantComments int64) {
+	t.Helper()
+	result, err := svc.GetAllPosts(context.Background(), pagination.Query{PageNo: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("GetAllPosts: %v", err)
+	}
+	for _, item := range result.List {
+		if item.Post.ID == postID {
+			if item.LikeCount != wantLikes || item.CommentCount != wantComments {
+				t.Fatalf("post %d counts=(%d,%d), want=(%d,%d)", postID, item.LikeCount, item.CommentCount, wantLikes, wantComments)
+			}
+			return
+		}
+	}
+	t.Fatalf("post %d was not returned", postID)
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
@@ -16,14 +17,24 @@ type LikeToggleResult struct {
 }
 
 type LikeService struct {
-	likeRepo repository.LikeRepository
-	postRepo repository.PostReader
+	likeRepo   repository.LikeRepository
+	postRepo   repository.PostReader
+	countCache *postcache.PostCountCache
 }
 
 func NewLikeService(likeRepo repository.LikeRepository, postRepo repository.PostReader) *LikeService {
+	return NewLikeServiceWithCountCache(likeRepo, postRepo, nil)
+}
+
+func NewLikeServiceWithCountCache(
+	likeRepo repository.LikeRepository,
+	postRepo repository.PostReader,
+	countCache *postcache.PostCountCache,
+) *LikeService {
 	return &LikeService{
-		likeRepo: likeRepo,
-		postRepo: postRepo,
+		likeRepo:   likeRepo,
+		postRepo:   postRepo,
+		countCache: countCache,
 	}
 }
 
@@ -64,6 +75,9 @@ func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeTog
 	count, err := s.likeRepo.CountByPostID(ctx, postID)
 	if err != nil {
 		return nil, err
+	}
+	if s.countCache != nil {
+		s.countCache.SetLikeCounts(ctx, map[uint]int64{postID: count})
 	}
 	return &LikeToggleResult{Liked: liked, LikeCount: count}, nil
 }

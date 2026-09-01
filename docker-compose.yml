@@ -14,13 +14,48 @@ services:
       timeout: 5s
       retries: 20
 
-  redis:
+  redis-persist:
     image: redis:7.4-alpine
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "change-me"]
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - "0"
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - change-me
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "change-me", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis-lru:
+    image: redis:7.4-alpine
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --maxmemory-samples
+      - "10"
+      - --requirepass
+      - change-me
+    ports:
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "change-me", "ping"]
       interval: 5s
@@ -39,8 +74,10 @@ services:
       DB_MAX_IDLE_CONNS: "10"
       DB_CONN_MAX_LIFETIME: "30m"
       DB_CONN_MAX_IDLE_TIME: "5m"
-      REDIS_ADDR: "redis:6379"
-      REDIS_PASS: "change-me"
+      REDIS_PERSIST_ADDR: "redis-persist:6379"
+      REDIS_PERSIST_PASS: "change-me"
+      REDIS_LRU_ADDR: "redis-lru:6379"
+      REDIS_LRU_PASS: "change-me"
       JWT_SECRET: "replace-this-before-any-public-deployment"
       ADMIN_USERNAMES: "${ADMIN_USERNAMES:?ADMIN_USERNAMES is required}"
       HTTP_READ_HEADER_TIMEOUT: "5s"
@@ -54,7 +91,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
+      redis-persist:
+        condition: service_healthy
+      redis-lru:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/readyz"]

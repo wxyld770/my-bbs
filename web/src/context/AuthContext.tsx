@@ -113,14 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const currentToken = token
-    clearSession()
     if (!currentToken) return
-    try {
-      await api.logout(currentToken)
-    } catch {
-      // The local session is already cleared; a failed remote revoke must not
-      // leave the browser looking signed in.
-    }
+    await api.logout(currentToken)
+    clearSession()
   }, [clearSession, token])
 
   const value = useMemo<AuthContextValue>(

@@ -30,6 +30,7 @@ export function MePage() {
   const [avatarClock, setAvatarClock] = useState(() => Date.now())
   const [invitationCode, setInvitationCode] = useState<string | null>(null)
   const [generatingInvitation, setGeneratingInvitation] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     setNickname(user?.nickname ?? '')
@@ -125,8 +126,20 @@ export function MePage() {
   }
 
   const signOut = async () => {
-    await logout()
-    notify('success', '已经退出登录')
+    if (signingOut) return
+    setSigningOut(true)
+    try {
+      await logout()
+      notify('success', '已经退出登录')
+    } catch (logoutError) {
+      if (handleSessionError(logoutError)) {
+        notify('success', '登录状态已失效，本地会话已清除')
+      } else {
+        notify('error', '退出失败', getErrorMessage(logoutError))
+      }
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   const generateInvitation = async () => {
@@ -186,7 +199,16 @@ export function MePage() {
               <KeyRound size={16} aria-hidden="true" />
               {generatingInvitation ? '生成中…' : '生成邀请码'}
             </button>
-            <button className="button button--soft" type="button" onClick={() => void signOut()}><LogOut size={16} aria-hidden="true" />退出登录</button>
+            <button
+              className="button button--soft"
+              type="button"
+              onClick={() => void signOut()}
+              disabled={signingOut}
+              aria-busy={signingOut}
+            >
+              <LogOut size={16} aria-hidden="true" />
+              {signingOut ? '退出中…' : '退出登录'}
+            </button>
           </div>
         </section>
 

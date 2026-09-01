@@ -1,6 +1,7 @@
 package comment
 
 import (
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/repository/gormrepo"
@@ -19,11 +20,15 @@ type Module struct {
 }
 
 // Initialize 初始化评论模块
-func Initialize(db *gorm.DB, redisClient redis.Cmdable) *Module {
+func Initialize(db *gorm.DB, redisClient redis.Cmdable, countCaches ...*postcache.PostCountCache) *Module {
+	var countCache *postcache.PostCountCache
+	if len(countCaches) > 0 {
+		countCache = countCaches[0]
+	}
 	commentRepo := gormrepo.NewCommentRepository(db)
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
-	svc := service.NewCommentService(commentRepo, postRepo, userRepo)
+	svc := service.NewCommentServiceWithCountCache(commentRepo, postRepo, userRepo, countCache)
 	hdl := handler.NewCommentHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }

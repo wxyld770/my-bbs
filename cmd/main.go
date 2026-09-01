@@ -10,6 +10,7 @@ import (
 	"syscall"
 
 	"my-bbs/internal/authorization"
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/config"
 	"my-bbs/internal/database"
 	"my-bbs/internal/handler"
@@ -29,7 +30,7 @@ import (
 )
 
 func main() {
-	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET / REDIS_ADDR / ADMIN_USERNAMES 直接退出）
+	// 1. 加载并校验配置（缺 DB_DSN / JWT_SECRET / 双 Redis 地址 / ADMIN_USERNAMES 直接退出）
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "配置错误: %v\n", err)
@@ -68,13 +69,22 @@ func main() {
 	startupCancel()
 
 	redisStartupCtx, redisStartupCancel := context.WithTimeout(context.Background(), cfg.HealthCheckTimeout)
-	redisClient, err := redisstore.Open(redisStartupCtx, redisstore.Config{
-		Addr:     cfg.RedisAddr,
-		Password: cfg.RedisPass,
-	})
+	redisStores, err := redisstore.OpenStores(
+		redisStartupCtx,
+		redisstore.StoresConfig{
+			Persist: redisstore.Config{
+				Addr:     cfg.RedisPersistAddr,
+				Password: cfg.RedisPersistPass,
+			},
+			LRU: redisstore.Config{
+				Addr:     cfg.RedisLRUAddr,
+				Password: cfg.RedisLRUPass,
+			},
+		},
+	)
 	redisStartupCancel()
 	if err != nil {
-		logger.Fatal("Redis 初始化失败: %v", err)
+		logger.Fatal("双 Redis 初始化失败: %v", err)
 	}
 
 	// 4. 开发环境可自动迁移；生产环境由发布流程执行版本内的 full_ddl.sql。
@@ -97,10 +107,11 @@ func main() {
 	adminCheckCancel()
 
 	// 5. 初始化各模块（每个模块封装了自己的依赖）
-	userMod := user.Initialize(db, redisClient, adminUsers)
-	postMod := post.Initialize(db, redisClient, adminUsers)
-	commentMod := comment.Initialize(db, redisClient)
-	likeMod := like.Initialize(db, redisClient)
+	postCountCache := postcache.NewPostCountCache(redisStores.LRU)
+	userMod := user.Initialize(db, redisStores.Persist, adminUsers)
+	postMod := post.Initialize(db, redisStores.Persist, adminUsers, postCountCache)
+	commentMod := comment.Initialize(db, redisStores.Persist, postCountCache)
+	likeMod := like.Initialize(db, redisStores.Persist, postCountCache)
 	searchMod := search.Initialize(db, cfg.SearchTimeout)
 	rateLimiter, err := middleware.NewTieredRateLimiter(middleware.TieredRateLimitConfig{
 		Login: middleware.RateLimitPolicy{
@@ -144,7 +155,8 @@ func main() {
 			likeMod,
 			searchMod,
 		},
-		ReadinessChecker: handler.ReadinessCheckers{sqlDB, redisClient},
+		// LRU 缓存允许短暂不可用；readyz 只依赖数据库和不可淘汰的 Persist Redis。
+		ReadinessChecker: handler.ReadinessCheckers{sqlDB, redisStores.Persist},
 		HealthTimeout:    cfg.HealthCheckTimeout,
 		RateLimiter:      rateLimiter,
 	}
@@ -188,10 +200,10 @@ func main() {
 	}
 
 	// 9. 释放资源：Redis → 数据库 → 日志（日志在 defer 中最后关闭）
-	if err := redisClient.Close(); err != nil {
-		logger.Error("Redis 连接关闭异常: %v", err)
+	if err := redisStores.Close(); err != nil {
+		logger.Error("双 Redis 连接关闭异常: %v", err)
 	} else {
-		logger.Info("Redis 连接已关闭")
+		logger.Info("双 Redis 连接已关闭")
 	}
 
 	if err := database.Close(sqlDB); err != nil {

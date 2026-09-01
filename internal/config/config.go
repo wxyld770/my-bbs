@@ -19,8 +19,10 @@ type Config struct {
 	DBMaxIdleConns            int
 	DBConnMaxLifetime         time.Duration
 	DBConnMaxIdleTime         time.Duration
-	RedisAddr                 string
-	RedisPass                 string
+	RedisPersistAddr          string
+	RedisPersistPass          string
+	RedisLRUAddr              string
+	RedisLRUPass              string
 	JWTSecret                 string
 	AdminUsernames            string
 	AppPort                   string
@@ -58,6 +60,8 @@ func Load() *Config {
 		logger.Warn("未找到 .env 文件，使用系统环境变量")
 	}
 	appMode := getEnv("APP_MODE", "debug")
+	legacyRedisAddr := getEnv("REDIS_ADDR", "localhost:6379")
+	legacyRedisPass := getEnv("REDIS_PASS", "")
 
 	return &Config{
 		DBDSN:                     getEnv("DB_DSN", ""),
@@ -66,8 +70,10 @@ func Load() *Config {
 		DBMaxIdleConns:            getEnvInt("DB_MAX_IDLE_CONNS", 10),
 		DBConnMaxLifetime:         getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 		DBConnMaxIdleTime:         getEnvDuration("DB_CONN_MAX_IDLE_TIME", 5*time.Minute),
-		RedisAddr:                 getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPass:                 getEnv("REDIS_PASS", ""),
+		RedisPersistAddr:          getEnv("REDIS_PERSIST_ADDR", legacyRedisAddr),
+		RedisPersistPass:          getEnv("REDIS_PERSIST_PASS", legacyRedisPass),
+		RedisLRUAddr:              getEnv("REDIS_LRU_ADDR", "localhost:6380"),
+		RedisLRUPass:              getEnv("REDIS_LRU_PASS", ""),
 		JWTSecret:                 getEnv("JWT_SECRET", ""),
 		AdminUsernames:            getEnv("ADMIN_USERNAMES", "admin"),
 		AppPort:                   getEnv("APP_PORT", "8080"),
@@ -111,8 +117,16 @@ func (c *Config) Validate() error {
 	if strings.TrimSpace(c.JWTSecret) == "" {
 		return fmt.Errorf("缺少必要配置 JWT_SECRET")
 	}
-	if strings.TrimSpace(c.RedisAddr) == "" {
-		return fmt.Errorf("缺少必要配置 REDIS_ADDR")
+	persistAddr := strings.TrimSpace(c.RedisPersistAddr)
+	lruAddr := strings.TrimSpace(c.RedisLRUAddr)
+	if persistAddr == "" {
+		return fmt.Errorf("缺少必要配置 REDIS_PERSIST_ADDR")
+	}
+	if lruAddr == "" {
+		return fmt.Errorf("缺少必要配置 REDIS_LRU_ADDR")
+	}
+	if strings.EqualFold(persistAddr, lruAddr) {
+		return fmt.Errorf("REDIS_PERSIST_ADDR 与 REDIS_LRU_ADDR 必须指向不同的 Redis 实例")
 	}
 	if strings.TrimSpace(c.AdminUsernames) == "" {
 		return fmt.Errorf("缺少必要配置 ADMIN_USERNAMES")

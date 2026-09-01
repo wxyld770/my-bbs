@@ -32,9 +32,38 @@ func TestValidate_RequiresDBDSNJWTSecretAndRedis(t *testing.T) {
 			wantSub: "DB_DSN",
 		},
 		{
-			name:    "missing redis",
+			name:    "missing persist redis",
 			cfg:     config.Config{DBDSN: "root:x@tcp(127.0.0.1:3306)/db", JWTSecret: "secret"},
-			wantSub: "REDIS_ADDR",
+			wantSub: "REDIS_PERSIST_ADDR",
+		},
+		{
+			name: "missing lru redis",
+			cfg: config.Config{
+				DBDSN:            "root:x@tcp(127.0.0.1:3306)/db",
+				JWTSecret:        "secret",
+				RedisPersistAddr: "127.0.0.1:6379",
+			},
+			wantSub: "REDIS_LRU_ADDR",
+		},
+		{
+			name: "redis instances must differ",
+			cfg: config.Config{
+				DBDSN:            "root:x@tcp(127.0.0.1:3306)/db",
+				JWTSecret:        "secret",
+				RedisPersistAddr: " 127.0.0.1:6379 ",
+				RedisLRUAddr:     "127.0.0.1:6379",
+			},
+			wantSub: "必须指向不同",
+		},
+		{
+			name: "redis instance host comparison is case insensitive",
+			cfg: config.Config{
+				DBDSN:            "root:x@tcp(127.0.0.1:3306)/db",
+				JWTSecret:        "secret",
+				RedisPersistAddr: "LOCALHOST:6379",
+				RedisLRUAddr:     "localhost:6379",
+			},
+			wantSub: "必须指向不同",
 		},
 		{
 			name:    "whitespace only",
@@ -97,6 +126,48 @@ func TestLoad_ReadsAdminUsernamesFromEnvironment(t *testing.T) {
 	}
 }
 
+func TestLoad_RedisConfiguration(t *testing.T) {
+	t.Run("new persist variables fall back to legacy variables", func(t *testing.T) {
+		t.Setenv("REDIS_PERSIST_ADDR", "")
+		t.Setenv("REDIS_PERSIST_PASS", "")
+		t.Setenv("REDIS_ADDR", "legacy-redis:6379")
+		t.Setenv("REDIS_PASS", "legacy-secret")
+		t.Setenv("REDIS_LRU_ADDR", "")
+		t.Setenv("REDIS_LRU_PASS", "")
+
+		cfg := config.Load()
+		if cfg.RedisPersistAddr != "legacy-redis:6379" {
+			t.Fatalf("RedisPersistAddr=%q, want legacy-redis:6379", cfg.RedisPersistAddr)
+		}
+		if cfg.RedisPersistPass != "legacy-secret" {
+			t.Fatalf("RedisPersistPass=%q, want legacy-secret", cfg.RedisPersistPass)
+		}
+		if cfg.RedisLRUAddr != "localhost:6380" {
+			t.Fatalf("RedisLRUAddr=%q, want localhost:6380", cfg.RedisLRUAddr)
+		}
+		if cfg.RedisLRUPass != "" {
+			t.Fatalf("RedisLRUPass=%q, want empty default", cfg.RedisLRUPass)
+		}
+	})
+
+	t.Run("new variables take precedence", func(t *testing.T) {
+		t.Setenv("REDIS_PERSIST_ADDR", "persist-redis:6379")
+		t.Setenv("REDIS_PERSIST_PASS", "persist-secret")
+		t.Setenv("REDIS_ADDR", "legacy-redis:6379")
+		t.Setenv("REDIS_PASS", "legacy-secret")
+		t.Setenv("REDIS_LRU_ADDR", "lru-redis:6379")
+		t.Setenv("REDIS_LRU_PASS", "lru-secret")
+
+		cfg := config.Load()
+		if cfg.RedisPersistAddr != "persist-redis:6379" || cfg.RedisPersistPass != "persist-secret" {
+			t.Fatalf("persist Redis=(%q, %q), want new values", cfg.RedisPersistAddr, cfg.RedisPersistPass)
+		}
+		if cfg.RedisLRUAddr != "lru-redis:6379" || cfg.RedisLRUPass != "lru-secret" {
+			t.Fatalf("LRU Redis=(%q, %q), want new values", cfg.RedisLRUAddr, cfg.RedisLRUPass)
+		}
+	})
+}
+
 func TestLoad_DBAutoMigrateDefaultsByAppMode(t *testing.T) {
 	t.Run("debug defaults enabled", func(t *testing.T) {
 		t.Setenv("APP_MODE", "debug")
@@ -146,7 +217,8 @@ func validConfig() *config.Config {
 		DBMaxIdleConns:            10,
 		DBConnMaxLifetime:         30 * time.Minute,
 		DBConnMaxIdleTime:         5 * time.Minute,
-		RedisAddr:                 "127.0.0.1:6379",
+		RedisPersistAddr:          "127.0.0.1:6379",
+		RedisLRUAddr:              "127.0.0.1:6380",
 		JWTSecret:                 "a-long-enough-secret",
 		AdminUsernames:            "admin",
 		AppPort:                   "8080",

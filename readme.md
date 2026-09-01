@@ -19,7 +19,7 @@
 | Go 1.26+ | 后端主语言 |
 | Gin | Web 框架，路由与中间件 |
 | GORM + MySQL | ORM 与数据持久化 |
-| Redis + go-redis | Token 撤销存储（必需依赖） |
+| 双 Redis + go-redis | 持久安全状态与可淘汰业务缓存分层（必需依赖） |
 | JWT | 带独立 JTI 的登录认证 |
 | bcrypt | 密码哈希 |
 | 标准库 log + channel | 异步日志落盘 |
@@ -35,6 +35,7 @@ my-bbs/
 │   ├── config/                 # 配置加载
 │   ├── database/               # DB 初始化与迁移
 │   ├── redisstore/             # Redis 配置、连接池与生命周期
+│   ├── cache/                  # 可回源的 LRU 帖子互动计数缓存
 │   ├── authsession/            # Token 撤销的 Redis 语义
 │   ├── logger/                 # 异步日志
 │   ├── model/                  # User / Post / Comment / PostLike / BaseModel
@@ -96,7 +97,7 @@ my-bbs/
 - ✅ 优雅启停（SIGINT/SIGTERM）
 - ✅ 请求 `context.Context` 全链路传递与数据库取消
 - ✅ HTTP 超时、数据库连接池与启动连通性检查
-- ✅ 存活检查 `/livez`、仅本机可访问的 MySQL + Redis 就绪检查 `/readyz`
+- ✅ 存活检查 `/livez`、仅本机可访问的 MySQL + Persist Redis 就绪检查 `/readyz`
 - ✅ 登录、注册、读接口和写接口的分级限流（429 + `Retry-After`）
 - ✅ JWT 当前 Token 撤销（Redis 记录保留到 Token 原始过期时间）
 - ✅ 统一模型字段：`create_time` / `update_time` / `deleted`
@@ -128,16 +129,17 @@ my-bbs/
 docker compose up --build -d
 ```
 
-这会启动 MySQL、Redis 和应用。Compose 显式设置 `DB_AUTO_MIGRATE=true`，仅在
-本地开发栈中由应用自动建表。Redis 开启
-AOF，并通过 `redis_data` volume 持久化尚未过期的 Token 撤销记录。服务启动后访问
-`http://localhost:8080`。查看应用日志：
+这会启动 MySQL、两个相互隔离的 Redis 实例和应用。Compose 显式设置
+`DB_AUTO_MIGRATE=true`，仅在本地开发栈中由应用自动建表。`redis-persist` 开启
+AOF（`appendfsync everysec`）并复用 `redis_data` volume，持久化尚未过期的 Token
+撤销记录；`redis-lru` 不落盘，在 Redis 数据内存达到 256MB 后按近似 LRU 淘汰 Key。
+服务启动后访问 `http://localhost:8080`。查看应用日志：
 
 ```bash
 docker compose logs -f app
 ```
 
-停止服务但保留 MySQL 和 Redis 数据：
+停止服务但保留 MySQL 和 Persist Redis 数据：
 
 ```bash
 docker compose down
@@ -147,8 +149,9 @@ docker compose down
 
 ### 方式 B：本地运行
 
-前提：Go 1.26+、本地 MySQL 8+、Redis 7+，且已创建数据库 `my_bbs`。
-MySQL 和 Redis 都是启动必需依赖：任一连接检查失败，应用都会拒绝启动。
+前提：Go 1.26+、本地 MySQL 8+、两个 Redis 7+ 实例，且已创建数据库 `my_bbs`。
+MySQL、Persist Redis 和 LRU Redis 都是启动必需依赖：任一连接检查失败，应用都会
+拒绝启动。
 
 ### 1. 安装依赖
 
@@ -162,7 +165,7 @@ go mod tidy
 cp config/.env.example config/.env
 ```
 
-编辑 `config/.env`（将数据库密码、Redis 密码和 `JWT_SECRET` 替换为自己的值）：
+编辑 `config/.env`（将数据库密码、两个 Redis 密码和 `JWT_SECRET` 替换为自己的值）：
 
 ```bash
 DB_DSN="root:密码@tcp(127.0.0.1:3306)/my_bbs?charset=utf8mb4&parseTime=True&loc=Local"
@@ -200,8 +203,10 @@ RATE_LIMIT_WRITE_BURST="10"
 RATE_LIMIT_READ_REQUESTS="600"
 RATE_LIMIT_READ_WINDOW="1m"
 RATE_LIMIT_READ_BURST="120"
-REDIS_ADDR="127.0.0.1:6379"
-REDIS_PASS=""
+REDIS_PERSIST_ADDR="127.0.0.1:6379"
+REDIS_PERSIST_PASS=""
+REDIS_LRU_ADDR="127.0.0.1:6380"
+REDIS_LRU_PASS=""
 ```
 
 `ADMIN_USERNAMES` 从环境变量读取管理员账号名，多个账号使用英文逗号分隔，例如
@@ -212,6 +217,45 @@ REDIS_PASS=""
 
 直接运行应用时会读取 `config/.env`；使用 Docker Compose 时，请在仓库根目录的 `.env`
 或部署平台环境变量中设置同名配置。
+
+#### 双 Redis 缓存分层
+
+Redis 的 `maxmemory` 和淘汰策略作用于整个实例，不能给同一实例中的不同数据库或
+不同 Key 分别设置策略，因此本项目使用两个独立实例：
+
+- **Persist Redis**（默认 `localhost:6379`）：`maxmemory-policy noeviction`、AOF
+  `appendfsync everysec`。本地 Compose 使用 `maxmemory 0`；生产环境也可以在容量评估后
+  设置上限，但到达上限时必须拒绝新写入，不能淘汰旧 Key。它用来保存不能被提前丢弃的
+  安全状态。Token 撤销记录只写入此实例；如果记录被 LRU 淘汰，已经退出的 JWT 可能
+  重新有效。
+- **LRU Redis**（默认 `localhost:6380`）：`maxmemory 256mb`、
+  `maxmemory-policy allkeys-lru`、`maxmemory-samples 10`，并关闭 RDB、AOF 和持久卷。
+  达到上限后 Redis 会优先淘汰最久未使用的 Key。Redis LRU 是采样近似算法，不保证
+  每次都选中全局绝对最旧的 Key。当前用于缓存帖子的点赞数和评论数，Key 为
+  `mybbs:v1:lru:post:<postID>:likes-count` 与
+  `mybbs:v1:lru:post:<postID>:comments-count`，TTL 为 30 秒。列表和详情仍先从数据库读取
+  帖子本身、可见性和作者信息，`is_liked` 也始终按当前用户查库，因此缓存过期或失效
+  不会暴露私密帖或混入用户态数据。
+
+这里的 **`256mb` 按 Redis 语义等于 256 MiB（268,435,456 字节）**，是 Redis 用于
+`maxmemory` 判定的数据内存，不是 Redis 进程 RSS 的硬上限；
+连接、复制缓冲区、分配器碎片等仍会增加进程实际内存。Compose 中 Persist 的
+`maxmemory 0` 表示 Redis 不设置内存上限，不代表服务器内存无限；生产环境必须监控
+内存、拒绝写入次数、磁盘和 AOF。
+Key 的 TTL 到期属于业务语义上的过期，不属于内存压力淘汰；例如 Token 撤销记录仍会
+在对应 JWT 原始过期时间到达后自动删除。
+
+应用启动时会通过 Redis `INFO` 核对两个实例的 `run_id`、实际内存策略和 AOF 状态：
+两个 `run_id` 必须不同，Persist 必须是 `noeviction` 且启用 AOF，LRU 必须是 256MB、
+`allkeys-lru` 且关闭 AOF。配置接反、不同地址实际指向同一进程或策略漂移都会拒绝启动。
+启动部署时两个实例都必须可用；应用运行后，LRU 单次读写最多等待 100ms，失败按未命中
+回源数据库且不影响业务响应，`/readyz` 只把数据库和 Persist Redis 作为硬依赖。互动写入
+成功后会更新或删除对应计数 Key，缓存失效失败也不会回滚已成功的数据库事务。
+
+新配置优先使用 `REDIS_PERSIST_ADDR` / `REDIS_PERSIST_PASS` 和
+`REDIS_LRU_ADDR` / `REDIS_LRU_PASS`。为平滑升级，未提供 Persist 新变量时，应用仍会
+将旧的 `REDIS_ADDR` / `REDIS_PASS` 作为 Persist 配置回退；LRU 使用自己的新变量，且
+两个地址不能相同。
 
 时长配置使用 Go `time.ParseDuration` 格式，例如 `500ms`、`10s`、`5m`。
 
@@ -227,10 +271,9 @@ REDIS_PASS=""
 可信代理边界，不能直接信任任意代理地址。进程内限流不跨应用实例共享，多实例
 部署仍需在 Nginx、网关或共享存储层增加全局限流。
 
-生产 Nginx 模板位于 `deploy/nginx/`：入口对通用 API、写操作、登录、注册和
-`/livez` 分级限流，每 IP 并发 API 请求上限为 20；Nginx 产生的 429 也返回统一
-JSON 业务码 `42900`。共享限流区文件只能安装一次，修改配置后必须先执行
-`nginx -t`，通过后再 reload。
+生产 Redis、Nginx、systemd、TLS 和密钥配置仅在服务器维护，不提交到本仓库或发布包。
+上线双 Redis 版本前，应先在服务器创建并验证两个独立实例，再更新应用环境变量；仓库
+中的 `docker-compose.yml` 只用于本地开发和验证。
 
 `DB_AUTO_MIGRATE` 在 `debug` 模式默认开启，在 `release` 模式默认关闭。生产环境由
 发布流程执行 [`scripts/full_ddl.sql`](scripts/full_ddl.sql)，不要同时启用 AutoMigrate。
@@ -286,8 +329,8 @@ make down      # 停止 Docker 服务
 ### 持续集成与发布包
 
 `.github/workflows/ci.yml` 在 Pull Request 和 `main` 更新时分别执行后端测试、
-`go vet`、Linux/amd64 编译，以及前端类型检查和生产构建。`Backend` 与
-`Frontend` 是分支保护使用的稳定检查名称。
+`go vet`、真实 Redis 的淘汰/AOF 策略测试、Linux/amd64 编译，以及前端类型检查和
+生产构建。`Backend` 与 `Frontend` 是分支保护使用的稳定检查名称。
 
 只有可信的 `main` 运行会继续执行 `Package`：它不会重新构建，而是把同一次
 运行中已经通过检查的后端二进制、前端构建产物和已验证的 `full_ddl.sql` 组合成与
@@ -307,61 +350,57 @@ Service 的依赖契约。
 startupCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 defer cancel()
 
-redisClient, err := redisstore.Open(startupCtx, redisstore.Config{
-	Addr:         cfg.RedisAddr,
-	Password:     cfg.RedisPass,
-	PoolSize:     20,
-	MinIdleConns: 2,
-})
+redisStores, err := redisstore.OpenStores(
+	startupCtx,
+	redisstore.StoresConfig{
+		Persist: redisstore.Config{Addr: cfg.RedisPersistAddr, Password: cfg.RedisPersistPass},
+		LRU:     redisstore.Config{Addr: cfg.RedisLRUAddr, Password: cfg.RedisLRUPass},
+	},
+)
 if err != nil {
 	return err
 }
-defer redisClient.Close()
+defer redisStores.Close()
 
-if err := redisClient.HSet(ctx, "demo:hash", "name", "alice").Err(); err != nil {
-	return err
-}
-_, err = redisClient.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-	pipe.SAdd(ctx, "demo:set", "go", "redis")
-	pipe.ZIncrBy(ctx, "demo:ranking", 1, "item:1")
-	return nil
-})
+persistRedis := redisStores.Persist
+lruRedis := redisStores.LRU
 ```
 
-向 Service 注入 Redis 时只传入命令接口：
+向业务层接入 Redis 时按数据性质显式选择实例。Token 撤销 Service 只接收
+`persistRedis`；`internal/cache.PostCountCache` 只接收 `lruRedis`，并由帖子、点赞和
+评论 Service 共享：
 
 ```go
-type ExampleService struct {
+type PersistentStateService struct {
 	redis redis.Cmdable
 }
 
-func NewExampleService(redisClient redis.Cmdable) *ExampleService {
-	return &ExampleService{redis: redisClient}
+func NewPersistentStateService(persistRedis redis.Cmdable) *PersistentStateService {
+	return &PersistentStateService{redis: persistRedis}
 }
 
-func Initialize(redisClient redis.Cmdable) *Module {
-	svc := NewExampleService(redisClient) // 直接传入，不需要额外取 Client
-	return &Module{Service: svc}
-}
+postCountCache := cache.NewPostCountCache(lruRedis)
 ```
 
-依赖链为 `main → redisstore.Open/Close → module → service(redis.Cmdable)`；Service
-不导入 `internal/redisstore`，也不创建或关闭连接。缺失 Key 保留 go-redis 原生的
-`redis.Nil` 语义。当前只将 Redis 注入 Token 撤销所需的 Service 和认证中间件。
+依赖链为 `main → redisstore.OpenStores/Close → cache/module → service`；两个客户端均由
+`main` 通过 `OpenStores` 创建、核验角色并统一幂等关闭。任一实例连接或启动角色检查
+失败都会清理已打开的连接并拒绝启动。Service 不创建或关闭连接。Persist Redis 注入
+Token 撤销 Service 和认证中间件；LRU Redis 只通过 `PostCountCache` 缓存可重建的互动
+计数，不纳入运行期 `/readyz`。
 
 #### Token 撤销
 
-Redis 当前只用于 Token 撤销。登录生成的 JWT 包含独立 JTI；
+Persist Redis 当前用于 Token 撤销。登录生成的 JWT 包含独立 JTI；
 `POST /api/logout` 会将当前 JTI 写入 `mybbs:v1:auth:revoked:{jti}`，
 TTL 等于 Token 剩余有效期。当前 Token 立即失效，其他登录会话不受影响。
-Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需重新登录。
+Persist Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需重新登录。
 
 ## 接口一览
 
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
 | GET | `/livez` | 否 | 进程存活检查，不访问外部依赖 |
-| GET | `/readyz` | 仅本机 | 服务就绪检查，限定时间内检查 MySQL 和 Redis；公网统一隐藏为 404 |
+| GET | `/readyz` | 仅本机 | 服务就绪检查，限定时间内检查 MySQL 和 Persist Redis；公网统一隐藏为 404 |
 | POST | `/api/register` | 否 | 使用 6 位邀请码注册 |
 | POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
 | POST | `/api/logout` | 是 | 立即撤销当前 Token |
@@ -389,8 +428,9 @@ Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Token 需�
 
 认证 Header：`Authorization: Bearer <token>`
 
-健康检查成功返回 `200 {"status":"ok"}`；MySQL、Redis 任一不可用或检查超时，
-`/readyz` 返回 `503 {"status":"unavailable"}`。`/readyz` 只接受 loopback 客户端；
+健康检查成功返回 `200 {"status":"ok"}`；MySQL 或 Persist Redis 不可用或检查超时，
+`/readyz` 返回 `503 {"status":"unavailable"}`。LRU Redis 用于可回源的互动计数缓存，
+运行期故障按缓存未命中处理，因此不纳入 `/readyz`。`/readyz` 只接受 loopback 客户端；
 通过本机 Nginx 转发的公网请求仍按真实客户端 IP 判断并返回 404。生产监控应直接请求
 `http://127.0.0.1:{APP_PORT}/readyz`。
 
@@ -481,7 +521,8 @@ GET /api/search?q=Go&scope=all&pageNo=1&pageSize=10
 
 ## 后续计划
 
-- □ 业务数据缓存
+- ☑ 帖子点赞数与评论数的 LRU 缓存
+- □ 按实际慢查询评估更多可安全回源的缓存
 - □ 提高边界场景测试覆盖率
 - □ OpenAPI / Swagger
 

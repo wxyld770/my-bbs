@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"my-bbs/internal/authorization"
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/model"
 	"my-bbs/internal/repository"
 	"my-bbs/pkg/bizerr"
@@ -21,6 +22,7 @@ type PostService struct {
 	userRepo    repository.UserReader
 	commentRepo repository.CommentCounter
 	likeRepo    repository.LikeReader
+	countCache  *postcache.PostCountCache
 	admins      authorization.AdminChecker
 }
 
@@ -31,11 +33,30 @@ func NewPostService(
 	likeRepo repository.LikeReader,
 	adminCheckers ...authorization.AdminChecker,
 ) *PostService {
+	return NewPostServiceWithCountCache(
+		postRepo,
+		userRepo,
+		commentRepo,
+		likeRepo,
+		nil,
+		adminCheckers...,
+	)
+}
+
+func NewPostServiceWithCountCache(
+	postRepo repository.PostRepository,
+	userRepo repository.UserReader,
+	commentRepo repository.CommentCounter,
+	likeRepo repository.LikeReader,
+	countCache *postcache.PostCountCache,
+	adminCheckers ...authorization.AdminChecker,
+) *PostService {
 	return &PostService{
 		postRepo:    postRepo,
 		userRepo:    userRepo,
 		commentRepo: commentRepo,
 		likeRepo:    likeRepo,
+		countCache:  countCache,
 		admins:      firstAdminChecker(adminCheckers),
 	}
 }
@@ -99,11 +120,11 @@ func (s *PostService) GetPostByID(ctx context.Context, id uint, viewerID uint) (
 		return nil, err
 	}
 
-	likeCount, err := s.likeRepo.CountByPostID(ctx, id)
+	likeCounts, err := s.loadLikeCounts(ctx, []uint{id})
 	if err != nil {
 		return nil, err
 	}
-	commentCount, err := s.commentRepo.CountByPostID(ctx, id)
+	commentCounts, err := s.loadCommentCounts(ctx, []uint{id})
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +139,8 @@ func (s *PostService) GetPostByID(ctx context.Context, id uint, viewerID uint) (
 
 	return &PostDetail{
 		Post:         *post,
-		LikeCount:    likeCount,
-		CommentCount: commentCount,
+		LikeCount:    likeCounts[id],
+		CommentCount: commentCounts[id],
 		IsLiked:      isLiked,
 	}, nil
 }
@@ -213,7 +234,14 @@ func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) 
 	if _, err := s.requireAuthorOrAdmin(ctx, postID, userID); err != nil {
 		return err
 	}
-	return mapPostMutationError(s.postRepo.DeletePost(ctx, postID))
+	if err := mapPostMutationError(s.postRepo.DeletePost(ctx, postID)); err != nil {
+		return err
+	}
+	if s.countCache != nil {
+		s.countCache.DeleteLikeCounts(ctx, postID)
+		s.countCache.DeleteCommentCounts(ctx, postID)
+	}
+	return nil
 }
 
 // PinPost 将公开帖子置顶默认时长，仅管理员可操作。
@@ -377,11 +405,11 @@ func (s *PostService) summarizePosts(ctx context.Context, posts []model.Post) ([
 		postIDs[i] = posts[i].ID
 	}
 
-	likeCounts, err := s.likeRepo.CountByPostIDs(ctx, postIDs)
+	likeCounts, err := s.loadLikeCounts(ctx, postIDs)
 	if err != nil {
 		return nil, err
 	}
-	commentCounts, err := s.commentRepo.CountByPostIDs(ctx, postIDs)
+	commentCounts, err := s.loadCommentCounts(ctx, postIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -395,6 +423,71 @@ func (s *PostService) summarizePosts(ctx context.Context, posts []model.Post) ([
 		}
 	}
 	return summaries, nil
+}
+
+func (s *PostService) loadLikeCounts(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	cached := map[uint]int64{}
+	if s.countCache != nil {
+		cached = s.countCache.GetLikeCounts(ctx, postIDs)
+	}
+	return loadPostCounts(ctx, postIDs, cached, s.likeRepo.CountByPostIDs, func(values map[uint]int64) {
+		if s.countCache != nil {
+			s.countCache.SetLikeCounts(ctx, values)
+		}
+	})
+}
+
+func (s *PostService) loadCommentCounts(ctx context.Context, postIDs []uint) (map[uint]int64, error) {
+	cached := map[uint]int64{}
+	if s.countCache != nil {
+		cached = s.countCache.GetCommentCounts(ctx, postIDs)
+	}
+	return loadPostCounts(ctx, postIDs, cached, s.commentRepo.CountByPostIDs, func(values map[uint]int64) {
+		if s.countCache != nil {
+			s.countCache.SetCommentCounts(ctx, values)
+		}
+	})
+}
+
+func loadPostCounts(
+	ctx context.Context,
+	postIDs []uint,
+	cached map[uint]int64,
+	load func(context.Context, []uint) (map[uint]int64, error),
+	store func(map[uint]int64),
+) (map[uint]int64, error) {
+	counts := make(map[uint]int64, len(postIDs))
+	missing := make([]uint, 0, len(postIDs))
+	seenMissing := make(map[uint]struct{}, len(postIDs))
+	for _, postID := range postIDs {
+		if value, ok := cached[postID]; ok {
+			counts[postID] = value
+			continue
+		}
+		if postID == 0 {
+			continue
+		}
+		if _, seen := seenMissing[postID]; !seen {
+			seenMissing[postID] = struct{}{}
+			missing = append(missing, postID)
+		}
+	}
+	if len(missing) == 0 {
+		return counts, nil
+	}
+
+	loaded, err := load(ctx, missing)
+	if err != nil {
+		return nil, err
+	}
+	toCache := make(map[uint]int64, len(missing))
+	for _, postID := range missing {
+		value := loaded[postID]
+		counts[postID] = value
+		toCache[postID] = value
+	}
+	store(toCache)
+	return counts, nil
 }
 
 func toPostPtrs(posts []model.Post) []*model.Post {

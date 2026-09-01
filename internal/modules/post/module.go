@@ -2,6 +2,7 @@ package post
 
 import (
 	"my-bbs/internal/authorization"
+	postcache "my-bbs/internal/cache"
 	"my-bbs/internal/handler"
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/repository/gormrepo"
@@ -20,12 +21,21 @@ type Module struct {
 }
 
 // Initialize 初始化帖子模块
-func Initialize(db *gorm.DB, redisClient redis.Cmdable, admins authorization.AdminChecker) *Module {
+func Initialize(
+	db *gorm.DB,
+	redisClient redis.Cmdable,
+	admins authorization.AdminChecker,
+	countCaches ...*postcache.PostCountCache,
+) *Module {
+	var countCache *postcache.PostCountCache
+	if len(countCaches) > 0 {
+		countCache = countCaches[0]
+	}
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
 	commentRepo := gormrepo.NewCommentRepository(db)
 	likeRepo := gormrepo.NewLikeRepository(db)
-	svc := service.NewPostService(postRepo, userRepo, commentRepo, likeRepo, admins)
+	svc := service.NewPostServiceWithCountCache(postRepo, userRepo, commentRepo, likeRepo, countCache, admins)
 	hotSvc := service.NewHotPostService(gormrepo.NewHotPostReader(db), userRepo)
 	hdl := handler.NewPostHandler(svc, hotSvc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}

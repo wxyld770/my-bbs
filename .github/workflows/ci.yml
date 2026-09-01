@@ -47,6 +47,10 @@ jobs:
       - name: Run Go vet
         run: go vet ./...
 
+      - name: Verify Redis eviction and persistence policies
+        shell: bash
+        run: bash scripts/verify_redis_policies.sh
+
       - name: Validate repeatable MariaDB schema
         shell: bash
         run: |
