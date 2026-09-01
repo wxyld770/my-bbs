@@ -1,0 +1,111 @@
+internal/modules/comment/module.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 42
+internal/model/user.go
+  s_8464988174a9d2::t_62cabfdeed9bc9 27
+web/src/types.ts
+  s_8464988174a9d2::t_33f9e99d2df578 19-28,56,117-118,185
+web/src/styles.css
+  s_8464988174a9d2::t_04031e7451f371 662-695,697-709
+  s_8464988174a9d2::t_d5a8d9652df3d4 696
+web/src/context/AuthContext.tsx
+  s_8464988174a9d2::t_abe688791e1e93 11,17,127
+internal/service/user_service.go
+  s_8464988174a9d2::t_6e8f79df45d509 274,277,297
+  s_8464988174a9d2::t_ce26f4a6a1a068 220,301
+tests/service/user_service_test.go
+  s_8464988174a9d2::t_9408048e6cd0fa 20,36-41
+web/src/components/ComposerDialog.tsx
+  s_8464988174a9d2::t_19354c3391d59a 9,102,106,111
+  s_8464988174a9d2::t_15a62ecf5272c2 56-59
+web/src/pages/UserPage.tsx
+  s_8464988174a9d2::t_19354c3391d59a 18,120
+tests/api/api_test.go
+  s_8464988174a9d2::t_33c455c087123a 481,496-509,523-546,548-555,559-564,567-576,579-585
+  s_8464988174a9d2::t_63073f0a63d4d8 556-558,565-566
+web/src/pages/MePage.tsx
+  s_8464988174a9d2::t_8d021c530e7543 1,16,46,113,147,184-189,203,230,247,278,289,298,302,306
+tests/service/post_count_invalidation_test.go
+  s_8464988174a9d2::t_4a3bb415e6a114 34
+internal/handler/post_handler.go
+  s_8464988174a9d2::t_c6b4b74a9d646d 180-193,206,212
+  s_8464988174a9d2::t_85efcf73f9a692 9
+internal/service/comment_service.go
+  s_8464988174a9d2::t_6e8f79df45d509 54
+  s_8464988174a9d2::t_ce26f4a6a1a068 92-94
+web/src/components/PostCard.tsx
+  s_8464988174a9d2::t_a8e8e4631cca84 173
+  s_8464988174a9d2::t_1d62a86d3505e8 1,9,12,21,26,98,111-113,143-144,170-172,174-177
+internal/handler/httprequest/post.go
+  s_8464988174a9d2::t_c6b4b74a9d646d 3-4,19-21
+internal/model/post.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 5-27,54-67
+internal/service/like_service.go
+  s_8464988174a9d2::t_ce26f4a6a1a068 22,26-27,33,39,46-48
+internal/service/actor_status.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 1-9,14-15,17-31
+  s_8464988174a9d2::t_81429f7bf1de8a 10-13,16
+pkg/bizerr/bizerr.go
+  s_8464988174a9d2::t_ce26f4a6a1a068 88
+readme.md
+  s_8464988174a9d2::t_1ffccd22d8c873 70,82,419-420,469-475
+tests/service/muted_write_test.go
+  s_8464988174a9d2::t_387487eccdf960 25,28-30
+  s_8464988174a9d2::t_d15d3667cb5ed9 1-24,26-27,31-82
+web/src/lib/api.ts
+  s_8464988174a9d2::t_33f9e99d2df578 16,371-372,375
+web/src/components/Shell.tsx
+  s_8464988174a9d2::t_15a62ecf5272c2 17-20
+  s_8464988174a9d2::t_19354c3391d59a 9-10,65,86
+tests/middleware/auth_test.go
+  s_8464988174a9d2::t_533ae11da892cf 31-70
+web/src/pages/SearchPage.tsx
+  s_8464988174a9d2::t_959fc39301ea0d 354-355
+tests/api/admin_post_test.go
+  s_8464988174a9d2::t_3a9ac4db146435 103-109,114-117,155-160,175-201,204-212,217-224
+  s_8464988174a9d2::t_7e9101b2b2a313 231-233
+  s_8464988174a9d2::t_959fc39301ea0d 202-203
+  s_8464988174a9d2::t_b333d23dbbe0d8 213-216
+internal/middleware/auth.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 22,32-33,82-99
+web/src/components/PinControl.tsx
+  s_8464988174a9d2::t_33f9e99d2df578 1-51
+internal/modules/post/module.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 57-69
+web/src/pages/PostPage.tsx
+  s_8464988174a9d2::t_41d440c1d75f53 243,251,271,347
+  s_8464988174a9d2::t_15a62ecf5272c2 216,293
+  s_8464988174a9d2::t_101290026c09db 1,7,13,144,242,255-256,259,261,389,394-396,398-401,425-426,436,461-466,493
+  s_8464988174a9d2::t_a8e8e4631cca84 397
+web/src/pages/HomePage.tsx
+  s_8464988174a9d2::t_19354c3391d59a 15-16,172-180,199,201
+internal/modules/user/module.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 42-51
+internal/service/post_service.go
+  s_8464988174a9d2::t_ce26f4a6a1a068 17-21,243-245,259-260,276-280,304-306,358,368-380
+  s_8464988174a9d2::t_6e8f79df45d509 99-101,235-236
+internal/handler/httpresponse/post.go
+  s_8464988174a9d2::t_c6b4b74a9d646d 23,43,50-53,65-71,115,125,133,144,150,152,154
+internal/handler/httpresponse/search.go
+  s_8464988174a9d2::t_4a3bb415e6a114 49,88,97
+tests/service/repository_not_found_test.go
+  s_8464988174a9d2::t_4a3bb415e6a114 85,192-203
+  s_8464988174a9d2::t_6e8f79df45d509 37,69,104
+internal/modules/like/module.go
+  s_8464988174a9d2::t_bfd6f39fd8cdfa 31,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "cfd082b339191e0cc5edc49eb25469d12d91e803",
+  "prompts": {},
+  "sessions": {
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
