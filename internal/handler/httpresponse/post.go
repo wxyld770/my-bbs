@@ -20,6 +20,7 @@ type PostResponse struct {
 	Visible     uint8         `json:"visible"`
 	PinnedUntil *time.Time    `json:"pinned_until"`
 	IsPinned    bool          `json:"is_pinned"`
+	IsPermanent bool          `json:"is_permanent"`
 	User        *UserResponse `json:"user"`
 }
 
@@ -39,14 +40,17 @@ type PostListItemResponse struct {
 	Visible      uint8         `json:"visible"`
 	PinnedUntil  *time.Time    `json:"pinned_until"`
 	IsPinned     bool          `json:"is_pinned"`
+	IsPermanent  bool          `json:"is_permanent"`
 	User         *UserResponse `json:"user"`
 	LikeCount    int64         `json:"like_count"`
 	CommentCount int64         `json:"comment_count"`
 }
 
 type PinPostResponse struct {
-	PinnedUntil time.Time `json:"pinned_until"`
-	IsPinned    bool      `json:"is_pinned"`
+	PinnedUntil time.Time             `json:"pinned_until"`
+	IsPinned    bool                  `json:"is_pinned"`
+	IsPermanent bool                  `json:"is_permanent"`
+	Duration    model.PostPinDuration `json:"duration"`
 }
 
 type HotPostListItemResponse struct {
@@ -58,8 +62,13 @@ type HotPostListResponse struct {
 	List []HotPostListItemResponse `json:"list"`
 }
 
-func NewPinPostResponse(pinnedUntil time.Time) PinPostResponse {
-	return PinPostResponse{PinnedUntil: pinnedUntil, IsPinned: true}
+func NewPinPostResponse(pinnedUntil time.Time, duration model.PostPinDuration) PinPostResponse {
+	return PinPostResponse{
+		PinnedUntil: pinnedUntil,
+		IsPinned:    true,
+		IsPermanent: duration == model.PostPinDurationPermanent,
+		Duration:    duration,
+	}
 }
 
 func NewHotPostListResponse(summaries []service.HotPostSummary) HotPostListResponse {
@@ -103,7 +112,7 @@ func NewPostPageResponse(result pagination.Result[service.PostSummary]) PageResp
 }
 
 func newPostListItemResponse(summary service.PostSummary, now time.Time) PostListItemResponse {
-	pinnedUntil, isPinned := activePin(summary.Post, now)
+	pinnedUntil, isPinned, isPermanent := activePin(summary.Post, now)
 	return PostListItemResponse{
 		ID:           summary.Post.ID,
 		CreateTime:   summary.Post.CreateTime,
@@ -113,6 +122,7 @@ func newPostListItemResponse(summary service.PostSummary, now time.Time) PostLis
 		Visible:      summary.Post.Visible,
 		PinnedUntil:  pinnedUntil,
 		IsPinned:     isPinned,
+		IsPermanent:  isPermanent,
 		User:         newUserResponse(summary.Post.User),
 		LikeCount:    summary.LikeCount,
 		CommentCount: summary.CommentCount,
@@ -120,7 +130,7 @@ func newPostListItemResponse(summary service.PostSummary, now time.Time) PostLis
 }
 
 func newPostResponse(post model.Post) PostResponse {
-	pinnedUntil, isPinned := activePin(post, time.Now())
+	pinnedUntil, isPinned, isPermanent := activePin(post, time.Now())
 	return PostResponse{
 		ID:          post.ID,
 		CreateTime:  post.CreateTime,
@@ -131,14 +141,15 @@ func newPostResponse(post model.Post) PostResponse {
 		Visible:     post.Visible,
 		PinnedUntil: pinnedUntil,
 		IsPinned:    isPinned,
+		IsPermanent: isPermanent,
 		User:        newUserResponse(post.User),
 	}
 }
 
 // activePin 将已过期的数据库时间归一化为对外的未置顶状态。
-func activePin(post model.Post, now time.Time) (*time.Time, bool) {
+func activePin(post model.Post, now time.Time) (*time.Time, bool, bool) {
 	if !post.IsPinnedAt(now) {
-		return nil, false
+		return nil, false, false
 	}
-	return post.PinnedUntil, true
+	return post.PinnedUntil, true, post.IsPermanentlyPinned()
 }

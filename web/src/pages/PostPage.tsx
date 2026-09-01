@@ -1,15 +1,16 @@
-import { ArrowLeft, Heart, LockKeyhole, MessageCircle, Pin, PinOff, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Heart, LockKeyhole, MessageCircle, Pin, RefreshCw, Send, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PostContent } from '../components/PostContent'
+import { PinControl } from '../components/PinControl'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 import { formatCount, formatDateTime, formatRelativeTime, getDisplayName } from '../lib/format'
-import { POST_VISIBILITY, type Comment, type PostDetail } from '../types'
+import { POST_VISIBILITY, type Comment, type PostDetail, type PostPinDuration } from '../types'
 
 const COMMENT_PAGE_SIZE = 20
 
@@ -140,7 +141,7 @@ export function PostPage() {
   const { id } = useParams()
   const postId = Number(id)
   const navigate = useNavigate()
-  const { token, user, isAuthenticated, handleSessionError } = useAuth()
+  const { token, user, isAuthenticated, canWrite, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, contentVersion } = useUI()
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -212,6 +213,7 @@ export function PostPage() {
       openAuth('login')
       return
     }
+    if (!canWrite) return
     setLiking(true)
     try {
       const result = await api.toggleLike(token, postId)
@@ -237,8 +239,8 @@ export function PostPage() {
     notify('error', `${action}没有完成`, getErrorMessage(actionError))
   }
 
-  const togglePin = async () => {
-    if (!token || !detail || !isAdmin) return
+  const togglePin = async (duration?: PostPinDuration) => {
+    if (!token || !detail || !isAdmin || !canWrite) return
     if (!detail.post.is_pinned && !canPin) return
     setPostAction('pin')
     try {
@@ -246,16 +248,17 @@ export function PostPage() {
         await api.unpinPost(token, postId)
         setDetail((current) => current ? {
           ...current,
-          post: { ...current.post, is_pinned: false, pinned_until: null },
+          post: { ...current.post, is_pinned: false, is_permanent: false, pinned_until: null },
         } : current)
         notify('success', '已取消置顶')
       } else {
-        const result = await api.pinPost(token, postId)
+        if (!duration) return
+        const result = await api.pinPost(token, postId, duration)
         setDetail((current) => current ? {
           ...current,
-          post: { ...current.post, is_pinned: true, pinned_until: result.pinned_until },
+          post: { ...current.post, is_pinned: true, is_permanent: result.is_permanent, pinned_until: result.pinned_until },
         } : current)
-        notify('success', '帖子已置顶', `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
+        notify('success', result.is_permanent ? '帖子已永久置顶' : '帖子已置顶', result.is_permanent ? undefined : `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
       }
     } catch (actionError) {
       handlePostActionFailure(detail.post.is_pinned ? '取消置顶' : '置顶', actionError)
@@ -265,7 +268,7 @@ export function PostPage() {
   }
 
   const deletePost = async () => {
-    if (!token || !detail || !isAdmin) return
+    if (!token || !detail || !isAdmin || !canWrite) return
     setPostAction('delete')
     try {
       await api.deletePost(token, postId)
@@ -287,6 +290,7 @@ export function PostPage() {
       openAuth('login')
       return
     }
+    if (!canWrite) return
     if (new Blob([content]).size > 65535) {
       notify('error', '评论太长了', '请将内容精简后再发布。')
       return
@@ -340,7 +344,7 @@ export function PostPage() {
   }
 
   const deleteComment = async () => {
-    if (!deleteTarget || !token || deleteTarget.id < 1) return
+    if (!deleteTarget || !token || !canWrite || deleteTarget.id < 1) return
     setDeletingComment(true)
     try {
       await api.deleteComment(token, deleteTarget.id)
@@ -382,15 +386,19 @@ export function PostPage() {
     <div className="page-wrap">
       <div className="page-header">
         <Link className="back-link" to="/"><ArrowLeft size={17} aria-hidden="true" />回到广场</Link>
-        {(isOwner || isAdmin) && (
+        {canWrite && (isOwner || isAdmin) && (
           <div className="page-header__actions" aria-label="帖子操作">
             {isOwner && <button className="button button--soft button--small" type="button" onClick={() => openComposer(detail.post)}>编辑这篇</button>}
             {isAdmin && (
               <>
-                <button className="button button--soft button--small" type="button" onClick={() => void togglePin()} disabled={Boolean(postAction) || (!detail.post.is_pinned && !canPin)} title={!detail.post.is_pinned && !canPin ? '请先将帖子设为公开' : undefined}>
-                  {detail.post.is_pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
-                  {postAction === 'pin' ? '处理中…' : detail.post.is_pinned ? '取消置顶' : canPin ? '置顶 1 天' : '仅公开帖可置顶'}
-                </button>
+                <PinControl
+                  isPinned={detail.post.is_pinned}
+                  canPin={canPin}
+                  busy={Boolean(postAction)}
+                  postTitle={detail.post.title}
+                  onPin={togglePin}
+                  onUnpin={() => togglePin()}
+                />
                 <button className="button button--danger button--small" type="button" onClick={() => setConfirmDeletePost(true)} disabled={Boolean(postAction)}>
                   <Trash2 size={14} aria-hidden="true" />删除帖子
                 </button>
@@ -414,8 +422,8 @@ export function PostPage() {
               <h1>{detail.post.title}</h1>
               <div className="article-card__badges">
                 {detail.post.is_pinned && (
-                  <span className="post-card__tag pinned" title={detail.post.pinned_until ? `置顶至 ${formatDateTime(detail.post.pinned_until)}` : '已置顶'}>
-                    <Pin size={12} aria-hidden="true" /> 置顶
+                  <span className="post-card__tag pinned" title={detail.post.is_permanent ? '永久置顶' : detail.post.pinned_until ? `置顶至 ${formatDateTime(detail.post.pinned_until)}` : '已置顶'}>
+                    <Pin size={12} aria-hidden="true" /> {detail.post.is_permanent ? '永久置顶' : '置顶'}
                   </span>
                 )}
                 {detail.post.visible === POST_VISIBILITY.PRIVATE && <span className="post-card__tag private"><LockKeyhole size={12} aria-hidden="true" /> 仅自己可见</span>}
@@ -425,7 +433,7 @@ export function PostPage() {
               <PostContent content={detail.post.content} />
             </div>
             <footer className="article-card__actions">
-              <button className={`stat-pill${detail.is_liked ? ' liked' : ''}`} type="button" onClick={() => void toggleLike()} disabled={liking || !commentsEnabled}>
+              <button className={`stat-pill${detail.is_liked ? ' liked' : ''}`} type="button" onClick={() => void toggleLike()} disabled={liking || !commentsEnabled || !canWrite} title={!canWrite && isAuthenticated ? '账号已被禁言，当前为只读模式' : undefined}>
                 <Heart size={17} fill={detail.is_liked ? 'currentColor' : 'none'} aria-hidden="true" />
                 {detail.is_liked ? '已喜欢' : '喜欢'} · {formatCount(detail.like_count)}
               </button>
@@ -450,7 +458,12 @@ export function PostPage() {
               </div>
             ) : (
               <>
-                {isAuthenticated ? (
+                {isAuthenticated && !canWrite ? (
+                  <div className="read-only-notice" role="status">
+                    <LockKeyhole size={18} aria-hidden="true" />
+                    <span>账号已被禁言，当前可以浏览内容，但不能评论或点赞。</span>
+                  </div>
+                ) : isAuthenticated ? (
                   <form className="comment-composer" onSubmit={submitComment}>
                     <Avatar user={user} size="sm" />
                     <textarea value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="写下你的回应…" aria-label="评论内容" required />
@@ -477,7 +490,7 @@ export function PostPage() {
                           <div className="comment__top">
                             <strong>{getDisplayName(comment.user)}</strong>
                             <span>{formatRelativeTime(comment.create_time)}</span>
-                            {user?.id === comment.user_id && comment.id > 0 && (
+                            {canWrite && user?.id === comment.user_id && comment.id > 0 && (
                               <button className="text-button comment__delete" type="button" onClick={() => setDeleteTarget(comment)} aria-label="删除评论">
                                 <Trash2 size={14} aria-hidden="true" />
                               </button>

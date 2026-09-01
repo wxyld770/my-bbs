@@ -19,27 +19,33 @@ type LikeToggleResult struct {
 type LikeService struct {
 	likeRepo   repository.LikeRepository
 	postRepo   repository.PostReader
+	userRepo   repository.UserReader
 	countCache *postcache.PostCountCache
 }
 
-func NewLikeService(likeRepo repository.LikeRepository, postRepo repository.PostReader) *LikeService {
-	return NewLikeServiceWithCountCache(likeRepo, postRepo, nil)
+func NewLikeService(likeRepo repository.LikeRepository, postRepo repository.PostReader, userRepo repository.UserReader) *LikeService {
+	return NewLikeServiceWithCountCache(likeRepo, postRepo, userRepo, nil)
 }
 
 func NewLikeServiceWithCountCache(
 	likeRepo repository.LikeRepository,
 	postRepo repository.PostReader,
+	userRepo repository.UserReader,
 	countCache *postcache.PostCountCache,
 ) *LikeService {
 	return &LikeService{
 		likeRepo:   likeRepo,
 		postRepo:   postRepo,
+		userRepo:   userRepo,
 		countCache: countCache,
 	}
 }
 
 // Toggle 切换点赞：已赞则取消，未赞则点赞
 func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeToggleResult, error) {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return nil, err
+	}
 	if err := s.requirePublicPost(ctx, postID); err != nil {
 		return nil, err
 	}

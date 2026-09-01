@@ -659,6 +659,54 @@ textarea:focus-visible {
   background: var(--paper-deep);
 }
 
+.pin-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pin-control__select {
+  height: 34px;
+  max-width: 9.5rem;
+  padding: 0 1.8rem 0 0.65rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--ink);
+  font: 700 0.72rem/1 "Noto Sans SC", sans-serif;
+}
+
+.pin-control__select:focus-visible {
+  outline: 3px solid rgba(184, 255, 82, 0.55);
+  outline-offset: 2px;
+}
+
+.pin-control__select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.read-only-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--lime) 45%, var(--white));
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+.read-only-notice svg {
+  flex: 0 0 auto;
+  margin-top: 0.12rem;
+}
+
+.read-only-notice--page {
+  margin-bottom: 1rem;
+}
+
 .infinite-scroll-status {
   min-height: 3.4rem;
   padding-top: 1rem;

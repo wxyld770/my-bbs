@@ -28,7 +28,7 @@ func Initialize(db *gorm.DB, redisClient redis.Cmdable, countCaches ...*postcach
 	likeRepo := gormrepo.NewLikeRepository(db)
 	postRepo := gormrepo.NewPostRepository(db)
 	userRepo := gormrepo.NewUserRepository(db)
-	svc := service.NewLikeServiceWithCountCache(likeRepo, postRepo, countCache)
+	svc := service.NewLikeServiceWithCountCache(likeRepo, postRepo, userRepo, countCache)
 	hdl := handler.NewLikeHandler(svc)
 	return &Module{Handler: hdl, userRepo: userRepo, redis: redisClient}
 }
@@ -37,6 +37,7 @@ func Initialize(db *gorm.DB, redisClient redis.Cmdable, countCaches ...*postcach
 func (m *Module) Register(r *gin.RouterGroup) {
 	auth := r.Group("/")
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
+	auth.Use(middleware.RequireActiveUser())
 	{
 		auth.POST("/posts/:id/like", m.Handler.ToggleLike)
 	}

@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestUserService_Login_RejectsMutedUser(t *testing.T) {
+func TestUserService_Login_AllowsMutedUserReadOnlySession(t *testing.T) {
 	ctx := context.Background()
 	testutil.InitJWT(t)
 	db := testutil.NewTestDB(t)
@@ -33,9 +33,12 @@ func TestUserService_Login_RejectsMutedUser(t *testing.T) {
 		t.Fatalf("mute user: %v", err)
 	}
 
-	_, err = svc.Login(ctx, "muted_user", "password1")
-	if !errors.Is(err, bizerr.ErrUserMuted) {
-		t.Fatalf("want ErrUserMuted, got %v", err)
+	token, err := svc.Login(ctx, "muted_user", "password1")
+	if err != nil {
+		t.Fatalf("muted user login: %v", err)
+	}
+	if token == "" {
+		t.Fatal("muted user login returned empty token")
 	}
 }
 

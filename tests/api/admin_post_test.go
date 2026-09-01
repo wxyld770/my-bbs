@@ -100,11 +100,21 @@ func TestAPI_AdminCanMuteAndUnmuteOrdinaryUsers(t *testing.T) {
 		t.Fatalf("admin mute status=%d body=%s", w.Code, w.Body.String())
 	}
 	w = doJSON(t, r, http.MethodGet, "/api/user/me", targetToken, nil)
-	assertAdminBizError(t, w, bizerr.ErrUserMuted)
+	if w.Code != http.StatusOK {
+		t.Fatalf("muted user should retain read access: status=%d body=%s", w.Code, w.Body.String())
+	}
+	mutedProfile := decodeResp(t, w)["data"].(map[string]any)["user"].(map[string]any)
+	if got := uint(mutedProfile["status"].(float64)); got != model.UserStatusMuted {
+		t.Fatalf("muted profile status=%d, want=%d", got, model.UserStatusMuted)
+	}
 	w = doJSON(t, r, http.MethodPost, "/api/login", "", map[string]string{
 		"username": "mutetarget",
 		"password": "password1",
 	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("muted user should be able to login: status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, r, http.MethodPost, "/api/posts/create", targetToken, map[string]string{"title": "blocked", "content": "blocked"})
 	assertAdminBizError(t, w, bizerr.ErrUserMuted)
 
 	w = doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/users/%d/unmute", targetID), adminToken, nil)
@@ -142,6 +152,12 @@ func TestAPI_AdminPostPinLifecycle(t *testing.T) {
 		pinnedUntil.After(afterPin.Add(adminPinDuration+5*time.Second)) {
 		t.Fatalf("pinned_until=%s, want about 24h after request", pinnedUntil)
 	}
+	if permanent, _ := pinData["is_permanent"].(bool); permanent {
+		t.Fatalf("legacy one-day pin must not be permanent: %v", pinData)
+	}
+	if duration, _ := pinData["duration"].(string); duration != string(model.PostPinDurationDay) {
+		t.Fatalf("legacy duration=%q, want day", duration)
+	}
 
 	posts := listAdminTestPosts(t, r)
 	if len(posts) < 2 || adminTestPostID(t, posts[0]) != olderID {
@@ -156,12 +172,65 @@ func TestAPI_AdminPostPinLifecycle(t *testing.T) {
 	detailPost := decodeResp(t, detailResponse)["data"].(map[string]any)["post"].(map[string]any)
 	assertAdminPinState(t, detailPost, true)
 
+	t.Run("selectable pin durations", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			duration  model.PostPinDuration
+			wantAfter time.Duration
+			permanent bool
+		}{
+			{name: "day", duration: model.PostPinDurationDay, wantAfter: 24 * time.Hour},
+			{name: "week", duration: model.PostPinDurationWeek, wantAfter: 7 * 24 * time.Hour},
+			{name: "month", duration: model.PostPinDurationMonth, wantAfter: 30 * 24 * time.Hour},
+			{name: "permanent", duration: model.PostPinDurationPermanent, permanent: true},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				postID := createAdminTestPost(t, r, authorToken, "pin-duration-"+tt.name)
+				before := time.Now()
+				response := doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/pin/%d/duration", postID), adminToken, map[string]string{"duration": string(tt.duration)})
+				after := time.Now()
+				if response.Code != http.StatusOK {
+					t.Fatalf("pin duration status=%d body=%s", response.Code, response.Body.String())
+				}
+				data := decodeResp(t, response)["data"].(map[string]any)
+				if data["duration"] != string(tt.duration) || data["is_permanent"] != tt.permanent {
+					t.Fatalf("pin duration response=%v", data)
+				}
+				until := parseAdminPinnedUntil(t, data["pinned_until"])
+				if tt.permanent {
+					if got := until.Format("2006-01-02 15:04:05.000"); got != "9999-12-31 23:59:59.999" {
+						t.Fatalf("permanent pinned_until=%s, want MariaDB DATETIME(3) maximum", got)
+					}
+				} else if until.Before(before.Add(tt.wantAfter-5*time.Second)) || until.After(after.Add(tt.wantAfter+5*time.Second)) {
+					t.Fatalf("pinned_until=%s, want about %s after request", until, tt.wantAfter)
+				}
+				detail := doJSON(t, r, http.MethodGet, fmt.Sprintf("/api/posts/%d", postID), "", nil)
+				post := decodeResp(t, detail)["data"].(map[string]any)["post"].(map[string]any)
+				if post["is_permanent"] != tt.permanent {
+					t.Fatalf("detail is_permanent=%v, want=%v", post["is_permanent"], tt.permanent)
+				}
+				unpin := doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/unpin/%d", postID), adminToken, nil)
+				if unpin.Code != http.StatusOK {
+					t.Fatalf("cleanup unpin status=%d body=%s", unpin.Code, unpin.Body.String())
+				}
+			})
+		}
+
+		invalid := doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/pin/%d/duration", newerID), adminToken, map[string]string{"duration": "forever-ish"})
+		if invalid.Code != http.StatusBadRequest {
+			t.Fatalf("invalid duration status=%d body=%s", invalid.Code, invalid.Body.String())
+		}
+	})
+
 	w = doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/unpin/%d", olderID), adminToken, nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("unpin status=%d body=%s", w.Code, w.Body.String())
 	}
 	posts = listAdminTestPosts(t, r)
-	if len(posts) < 2 || adminTestPostID(t, posts[0]) != newerID {
+	newerIndex := indexAdminTestPost(t, posts, newerID)
+	olderIndex := indexAdminTestPost(t, posts, olderID)
+	if newerIndex >= olderIndex {
 		t.Fatalf("unpin must restore chronological order: %v", posts)
 	}
 	assertAdminPinState(t, findAdminTestPost(t, posts, olderID), false)

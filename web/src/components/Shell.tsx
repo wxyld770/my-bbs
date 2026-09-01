@@ -6,12 +6,16 @@ import { getDisplayName } from '../lib/format'
 import { Avatar } from './Avatar'
 
 export function Shell() {
-  const { user, isAuthenticated } = useAuth()
-  const { openAuth, openComposer } = useUI()
+  const { user, isAuthenticated, canWrite } = useAuth()
+  const { openAuth, openComposer, notify } = useUI()
 
   const compose = () => {
     if (!isAuthenticated) {
       openAuth('login')
+      return
+    }
+    if (!canWrite) {
+      notify('info', '当前为只读模式', '账号已被禁言，仍可登录、查询和浏览内容。')
       return
     }
     openComposer()
@@ -58,7 +62,7 @@ export function Shell() {
                 登录
               </button>
             )}
-            <button className="button button--primary" type="button" onClick={compose}>
+            <button className="button button--primary" type="button" onClick={compose} disabled={isAuthenticated && !canWrite} title={isAuthenticated && !canWrite ? '账号已被禁言，当前为只读模式' : undefined}>
               <PenLine size={17} aria-hidden="true" />
               <span>写点什么</span>
             </button>
@@ -79,7 +83,7 @@ export function Shell() {
           <Search size={17} aria-hidden="true" />
           搜索
         </NavLink>
-        <button className="nav-link" type="button" onClick={compose}>
+        <button className="nav-link" type="button" onClick={compose} disabled={isAuthenticated && !canWrite} title={isAuthenticated && !canWrite ? '账号已被禁言，当前为只读模式' : undefined}>
           <PenLine size={17} aria-hidden="true" />
           发布
         </button>

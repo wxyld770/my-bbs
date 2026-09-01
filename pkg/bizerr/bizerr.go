@@ -85,5 +85,6 @@ var (
 	ErrInvitationRequired             = New(http.StatusBadRequest, 40005, "请输入邀请码")
 	ErrInvitationUnavailable          = New(http.StatusBadRequest, 40006, "邀请码无效或已使用")
 	ErrInvalidAvatarURL               = New(http.StatusBadRequest, 40007, "头像链接必须是有效的 HTTPS 地址")
+	ErrInvalidPostPinDuration         = New(http.StatusBadRequest, 40008, "置顶期限无效")
 	ErrAvatarUpdateTooFrequent        = New(http.StatusTooManyRequests, 42901, "头像每 24 小时只能修改一次")
 )

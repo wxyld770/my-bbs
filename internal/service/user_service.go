@@ -217,7 +217,7 @@ func newInvitationCode() (string, error) {
 	return string(code), nil
 }
 
-// Login 登录，验证密码与账号状态，生成 JWT
+// Login 登录并生成 JWT。禁言账号可以登录并浏览，但写操作会被统一限制。
 func (s *UserService) Login(ctx context.Context, username, password string) (string, error) {
 	username = strings.TrimSpace(username)
 	user, err := s.userRepo.FindUserByUsername(ctx, username)
@@ -230,10 +230,6 @@ func (s *UserService) Login(ctx context.Context, username, password string) (str
 
 	if !bcrypt.CheckPassword(password, user.Password) {
 		return "", bizerr.ErrLoginFailed
-	}
-
-	if !user.IsActive() {
-		return "", bizerr.ErrUserMuted
 	}
 
 	token, err := jwt.GenerateToken(user.ID)
@@ -275,14 +271,10 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uint, nickname, 
 	if err := validateRuneLength(introduction, "个人介绍", 0, 1024); err != nil {
 		return err
 	}
-
-	user, err := s.userRepo.FindUserByID(ctx, userID)
-	if err != nil {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
 		return err
 	}
-	if user == nil {
-		return bizerr.ErrUserNotFound
-	}
+
 	if err := s.userRepo.UpdateProfile(ctx, userID, nickname, introduction); err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			return bizerr.ErrUserNotFound
@@ -302,14 +294,11 @@ func (s *UserService) UpdateAvatar(ctx context.Context, userID uint, rawAvatarUR
 	if err != nil {
 		return err
 	}
-
-	user, err := s.userRepo.FindUserByID(ctx, userID)
+	user, err := requireActiveActor(ctx, s.userRepo, userID)
 	if err != nil {
 		return err
 	}
-	if user == nil {
-		return bizerr.ErrUserNotFound
-	}
+
 	if user.AvatarURL == avatarURL {
 		return nil
 	}

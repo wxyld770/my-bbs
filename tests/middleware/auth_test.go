@@ -28,6 +28,46 @@ func (activeUserLookup) FindUserByID(_ context.Context, id uint) (*model.User, e
 	}, nil
 }
 
+type mutedUserLookup struct{}
+
+func (mutedUserLookup) FindUserByID(_ context.Context, id uint) (*model.User, error) {
+	return &model.User{
+		BaseModel: model.BaseModel{ID: id},
+		Status:    model.UserStatusMuted,
+	}, nil
+}
+
+func TestAuthAllowsMutedReadsAndActiveGuardRejectsWrites(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtpkg.Init("muted-read-only-middleware-secret")
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	token, err := jwtpkg.GenerateToken(15)
+	if err != nil {
+		t.Fatalf("GenerateToken() error = %v", err)
+	}
+
+	router := gin.New()
+	router.Use(middleware.ErrorHandler(), middleware.Auth(mutedUserLookup{}, client))
+	router.GET("/read", func(c *gin.Context) { c.Status(http.StatusOK) })
+	router.POST("/write", middleware.RequireActiveUser(), func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	readRequest := httptest.NewRequest(http.MethodGet, "/read", nil)
+	readRequest.Header.Set("Authorization", "Bearer "+token)
+	readResponse := httptest.NewRecorder()
+	router.ServeHTTP(readResponse, readRequest)
+	if readResponse.Code != http.StatusOK {
+		t.Fatalf("muted read status = %d, want 200; body=%s", readResponse.Code, readResponse.Body.String())
+	}
+
+	writeRequest := httptest.NewRequest(http.MethodPost, "/write", nil)
+	writeRequest.Header.Set("Authorization", "Bearer "+token)
+	writeResponse := httptest.NewRecorder()
+	router.ServeHTTP(writeResponse, writeRequest)
+	assertBusinessError(t, writeResponse, bizerr.ErrUserMuted)
+}
+
 func TestAuthPublishesTokenClaimsAndRejectsRevokedToken(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtpkg.Init("auth-middleware-public-contract-secret")

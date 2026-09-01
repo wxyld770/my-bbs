@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, KeyRound, LogIn, LogOut, PenLine, RefreshCw } from 'lucide-react'
+import { ArrowRight, CalendarDays, KeyRound, LockKeyhole, LogIn, LogOut, PenLine, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Avatar } from '../components/Avatar'
 import { InvitationDialog } from '../components/InvitationDialog'
@@ -13,7 +13,7 @@ import type { PostListItem } from '../types'
 const PAGE_SIZE = 10
 
 export function MePage() {
-  const { token, user, isAuthenticated, isBootstrapping, refreshUser, logout, handleSessionError } = useAuth()
+  const { token, user, isAuthenticated, isBootstrapping, canWrite, refreshUser, logout, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, contentVersion } = useUI()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [pageNo, setPageNo] = useState(1)
@@ -43,6 +43,7 @@ export function MePage() {
     : Number.NaN
   const avatarCoolingDown = Number.isFinite(avatarAvailableAt) && avatarAvailableAt > avatarClock
   const avatarChanged = avatarURL.trim() !== (user?.avatar_url ?? '')
+  const isReadOnly = Boolean(user) && !canWrite
 
   useEffect(() => {
     if (!Number.isFinite(avatarAvailableAt) || avatarAvailableAt <= Date.now()) return
@@ -109,7 +110,7 @@ export function MePage() {
 
   const saveAvatar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!token || savingAvatar || avatarCoolingDown || !avatarChanged) return
+    if (!token || !canWrite || savingAvatar || avatarCoolingDown || !avatarChanged) return
     setSavingAvatar(true)
     setAvatarError('')
     try {
@@ -143,7 +144,7 @@ export function MePage() {
   }
 
   const generateInvitation = async () => {
-    if (!token || generatingInvitation || invitationCode) return
+    if (!token || !canWrite || generatingInvitation || invitationCode) return
     setGeneratingInvitation(true)
     try {
       const invitation = await api.createInvitation(token)
@@ -180,6 +181,12 @@ export function MePage() {
   return (
     <>
       <div className="page-wrap">
+        {isReadOnly && (
+          <div className="read-only-notice read-only-notice--page" role="status">
+            <LockKeyhole size={19} aria-hidden="true" />
+            <span><strong>当前为只读模式。</strong> 账号已被禁言，仍可登录、浏览和查询内容，但不能发布、编辑、评论、点赞、修改资料或生成邀请码。</span>
+          </div>
+        )}
         <section className="profile-card" aria-labelledby="profile-name">
           <Avatar user={user} size="lg" />
           <div>
@@ -193,7 +200,7 @@ export function MePage() {
               className="button button--dark"
               type="button"
               onClick={() => void generateInvitation()}
-              disabled={generatingInvitation || Boolean(invitationCode)}
+              disabled={!canWrite || generatingInvitation || Boolean(invitationCode)}
               aria-busy={generatingInvitation}
             >
               <KeyRound size={16} aria-hidden="true" />
@@ -220,7 +227,7 @@ export function MePage() {
                 <h2 id="my-posts-heading">我写下的</h2>
                 <p>公开与私密内容都会显示在这里。</p>
               </div>
-              <button className="button button--primary button--small" type="button" onClick={() => openComposer()}><PenLine size={14} aria-hidden="true" />新帖子</button>
+              <button className="button button--primary button--small" type="button" onClick={() => openComposer()} disabled={!canWrite} title={!canWrite ? '账号已被禁言，当前为只读模式' : undefined}><PenLine size={14} aria-hidden="true" />新帖子</button>
             </div>
 
             {loadingPosts ? (
@@ -237,7 +244,7 @@ export function MePage() {
                 <div className="empty-state__icon"><PenLine size={23} aria-hidden="true" /></div>
                 <h3>还没有写过帖子</h3>
                 <p>第一篇不必完美，只要是真实的。</p>
-                <button className="button button--primary" type="button" onClick={() => openComposer()}>开始写</button>
+                <button className="button button--primary" type="button" onClick={() => openComposer()} disabled={!canWrite}>开始写</button>
               </div>
             ) : (
               <>
@@ -268,7 +275,7 @@ export function MePage() {
                   onChange={(event) => setAvatarURL(event.target.value)}
                   maxLength={2048}
                   placeholder="https://example.com/avatar.jpg"
-                  disabled={savingAvatar || avatarCoolingDown}
+                  disabled={!canWrite || savingAvatar || avatarCoolingDown}
                   aria-describedby="profile-avatar-help"
                 />
               </div>
@@ -279,7 +286,7 @@ export function MePage() {
               </p>
               {avatarError && <p className="form-error" role="alert">{avatarError}</p>}
               <div className="form-actions">
-                <button className="button button--soft button--wide" type="submit" disabled={savingAvatar || avatarCoolingDown || !avatarChanged}>
+                <button className="button button--soft button--wide" type="submit" disabled={!canWrite || savingAvatar || avatarCoolingDown || !avatarChanged}>
                   {savingAvatar ? '更新中…' : '更新头像'}
                 </button>
               </div>
@@ -288,15 +295,15 @@ export function MePage() {
             <form onSubmit={saveProfile}>
               <div className="field">
                 <label htmlFor="profile-nickname">昵称 <span>{Array.from(nickname).length}/64</span></label>
-                <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" />
+                <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" disabled={!canWrite} />
               </div>
               <div className="field">
                 <label htmlFor="profile-introduction">个人介绍 <span>{Array.from(introduction).length}/1024</span></label>
-                <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" />
+                <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" disabled={!canWrite} />
               </div>
               {profileError && <p className="form-error" role="alert">{profileError}</p>}
               <div className="form-actions">
-                <button className="button button--dark button--wide" type="submit" disabled={savingProfile}>{savingProfile ? '保存中…' : '保存资料'}</button>
+                <button className="button button--dark button--wide" type="submit" disabled={!canWrite || savingProfile}>{savingProfile ? '保存中…' : '保存资料'}</button>
               </div>
             </form>
           </aside>

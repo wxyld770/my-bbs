@@ -14,8 +14,11 @@ import (
 	"my-bbs/pkg/set"
 )
 
-// DefaultPostPinDuration 是管理员置顶帖子的默认有效期。
-const DefaultPostPinDuration = 24 * time.Hour
+const (
+	DefaultPostPinDuration = 24 * time.Hour
+	PostPinWeekDuration    = 7 * 24 * time.Hour
+	PostPinMonthDuration   = 30 * 24 * time.Hour
+)
 
 type PostService struct {
 	postRepo    repository.PostRepository
@@ -91,6 +94,9 @@ func (s *PostService) CreatePost(ctx context.Context, userID uint, title, conten
 		return err
 	}
 	if err := validateByteLength(content, "帖子内容", maxTextFieldBytes); err != nil {
+		return err
+	}
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
 		return err
 	}
 
@@ -226,11 +232,17 @@ func (s *PostService) UpdatePost(ctx context.Context, postID uint, userID uint, 
 		}
 		post.Content = trimmedContent
 	}
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return err
+	}
 	return mapPostMutationError(s.postRepo.UpdatePost(ctx, post))
 }
 
 // DeletePost 删除帖子，作者和管理员均可操作。
 func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) error {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return err
+	}
 	if _, err := s.requireAuthorOrAdmin(ctx, postID, userID); err != nil {
 		return err
 	}
@@ -244,8 +256,8 @@ func (s *PostService) DeletePost(ctx context.Context, postID uint, userID uint) 
 	return nil
 }
 
-// PinPost 将公开帖子置顶默认时长，仅管理员可操作。
-func (s *PostService) PinPost(ctx context.Context, postID uint, userID uint) (time.Time, error) {
+// PinPost 按指定期限置顶公开帖子，仅管理员可操作。
+func (s *PostService) PinPost(ctx context.Context, postID uint, userID uint, duration model.PostPinDuration) (time.Time, error) {
 	if err := s.requireAdmin(ctx, userID); err != nil {
 		return time.Time{}, err
 	}
@@ -261,8 +273,11 @@ func (s *PostService) PinPost(ctx context.Context, postID uint, userID uint) (ti
 		return time.Time{}, bizerr.ErrPrivatePostCannotPin
 	}
 
-	// 统一到数据库常用的毫秒精度，避免幂等更新因纳秒被截断而误判。
-	pinnedUntil := time.Now().Add(DefaultPostPinDuration).Truncate(time.Millisecond)
+	now := time.Now().Truncate(time.Millisecond)
+	pinnedUntil, err := postPinnedUntil(now, duration)
+	if err != nil {
+		return time.Time{}, err
+	}
 	if err := mapPostMutationError(s.postRepo.SetPostPinnedUntil(ctx, postID, &pinnedUntil)); err != nil {
 		return time.Time{}, err
 	}
@@ -286,6 +301,9 @@ func (s *PostService) UnpinPost(ctx context.Context, postID uint, userID uint) e
 
 // SetPostVisible 设置帖子可见性，需验证当前用户是否为作者
 func (s *PostService) SetPostVisible(ctx context.Context, postID uint, userID uint, visible uint8) error {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return err
+	}
 	if !model.IsValidVisible(visible) {
 		return bizerr.ErrInvalidVisible
 	}
@@ -337,17 +355,29 @@ func (s *PostService) requireAuthorOrAdmin(ctx context.Context, postID, userID u
 }
 
 func (s *PostService) requireAdmin(ctx context.Context, userID uint) error {
-	user, err := s.userRepo.FindUserByID(ctx, userID)
+	user, err := requireActiveActor(ctx, s.userRepo, userID)
 	if err != nil {
 		return err
-	}
-	if user == nil {
-		return bizerr.ErrUserNotFound
 	}
 	if !authorization.IsAdmin(s.admins, user.Username) {
 		return bizerr.ErrForbidden
 	}
 	return nil
+}
+
+func postPinnedUntil(now time.Time, duration model.PostPinDuration) (time.Time, error) {
+	switch duration {
+	case model.PostPinDurationDay:
+		return now.Add(DefaultPostPinDuration), nil
+	case model.PostPinDurationWeek:
+		return now.Add(PostPinWeekDuration), nil
+	case model.PostPinDurationMonth:
+		return now.Add(PostPinMonthDuration), nil
+	case model.PostPinDurationPermanent:
+		return model.PermanentPostPinnedUntil, nil
+	default:
+		return time.Time{}, bizerr.ErrInvalidPostPinDuration
+	}
 }
 
 func mapPostMutationError(err error) error {

@@ -8,12 +8,13 @@ import {
   type ReactNode,
 } from 'react'
 import { api, shouldClearToken, tokenStore } from '../lib/api'
-import type { LoginRequest, RegisterRequest, User } from '../types'
+import { USER_STATUS, type LoginRequest, type RegisterRequest, type User } from '../types'
 
 interface AuthContextValue {
   token: string | null
   user: User | null
   isAuthenticated: boolean
+  canWrite: boolean
   isBootstrapping: boolean
   login: (input: LoginRequest) => Promise<User>
   register: (input: RegisterRequest) => Promise<User | null>
@@ -123,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       user,
       isAuthenticated: Boolean(token && user),
+      canWrite: user?.status === USER_STATUS.NORMAL,
       isBootstrapping,
       login,
       register,

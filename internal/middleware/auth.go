@@ -19,6 +19,7 @@ import (
 
 const (
 	userIDContextKey         = "userID"
+	userStatusContextKey     = "userStatus"
 	tokenIDContextKey        = "tokenID"
 	tokenExpiresAtContextKey = "tokenExpiresAt"
 )
@@ -28,7 +29,8 @@ type UserLookup interface {
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
 }
 
-// Auth 中间件：验证 JWT Token，校验 Token 未被撤销、用户存在且未禁言。
+// Auth 中间件：验证 JWT Token，校验 Token 未被撤销且用户存在。
+// 禁言用户仍可登录和读取；业务写操作由 RequireActiveUser 单独拦截。
 // Redis 是撤销校验的必需依赖；缺失或查询失败时请求按 fail-closed 处理。
 func Auth(users UserLookup, commands redis.Cmdable) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -77,13 +79,27 @@ func Auth(users UserLookup, commands redis.Cmdable) gin.HandlerFunc {
 			response.ReportError(c, bizerr.ErrUserNotFound)
 			return
 		}
-		if !user.IsActive() {
+		logger.Info("authentication succeeded | request_id=%s | user_id=%d", GetRequestID(c), claims.UserID)
+		setTokenContext(c, claims)
+		c.Set(userStatusContextKey, user.Status)
+		c.Next()
+	}
+}
+
+// RequireActiveUser 将已认证但被禁言的账号限制为只读。
+// 必须放在 Auth 之后；上下文缺少状态时按未授权失败，避免误放行。
+func RequireActiveUser() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		value, exists := c.Get(userStatusContextKey)
+		status, ok := value.(uint)
+		if !exists || !ok {
+			response.ReportError(c, bizerr.ErrUnauthorized)
+			return
+		}
+		if status != model.UserStatusNormal {
 			response.ReportError(c, bizerr.ErrUserMuted)
 			return
 		}
-
-		logger.Info("authentication succeeded | request_id=%s | user_id=%d", GetRequestID(c), claims.UserID)
-		setTokenContext(c, claims)
 		c.Next()
 	}
 }

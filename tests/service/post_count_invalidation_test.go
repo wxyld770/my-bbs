@@ -31,7 +31,7 @@ func TestInteractionServices_RefreshOrInvalidatePostCountCache(t *testing.T) {
 	}
 
 	countCache.SetLikeCounts(ctx, map[uint]int64{post.ID: 99})
-	likeService := service.NewLikeServiceWithCountCache(likeRepo, postRepo, countCache)
+	likeService := service.NewLikeServiceWithCountCache(likeRepo, postRepo, userRepo, countCache)
 	result, err := likeService.Toggle(ctx, post.ID, user.ID)
 	if err != nil {
 		t.Fatalf("Toggle: %v", err)

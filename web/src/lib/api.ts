@@ -13,6 +13,7 @@ import type {
   PageData,
   PageQuery,
   PinPostData,
+  PostPinDuration,
   PostDetail,
   PostListItem,
   PostVisibility,
@@ -367,10 +368,11 @@ export const api = {
     })
   },
 
-  pinPost(token: string, postId: number): Promise<PinPostData> {
-    return requestData(`/posts/pin/${encodeId(postId)}`, {
+  pinPost(token: string, postId: number, duration: PostPinDuration): Promise<PinPostData> {
+    return requestData(`/posts/pin/${encodeId(postId)}/duration`, {
       method: 'POST',
       token,
+      body: { duration },
     })
   },
 

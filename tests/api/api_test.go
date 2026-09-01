@@ -478,7 +478,7 @@ func TestAPI_LogoutRevokesOnlyCurrentToken(t *testing.T) {
 	}
 }
 
-func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
+func TestAPI_MutedUserCanLoginAndReadButAllBusinessWritesAreBlocked(t *testing.T) {
 	r, db := setupTestRouter(t)
 	userRepo := gormrepo.NewUserRepository(db)
 
@@ -493,7 +493,20 @@ func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
 	})
 	loginResp := decodeResp(t, w)
 	data, _ := loginResp["data"].(map[string]any)
-	token, _ := data["token"].(string)
+	oldToken, _ := data["token"].(string)
+
+	w = doJSON(t, r, http.MethodPost, "/api/posts/create", oldToken, map[string]string{
+		"title": "created-before-mute", "content": "readable after mute",
+	})
+	if w.Code != http.StatusOK {
+		t.Fatalf("create before mute: %d %s", w.Code, w.Body.String())
+	}
+	postsResponse := doJSON(t, r, http.MethodPost, "/api/user/posts?pageNo=1&pageSize=10", oldToken, nil)
+	if postsResponse.Code != http.StatusOK {
+		t.Fatalf("list before mute: %d %s", postsResponse.Code, postsResponse.Body.String())
+	}
+	postList := decodeResp(t, postsResponse)["data"].(map[string]any)["list"].([]any)
+	postID := uint(postList[0].(map[string]any)["id"].(float64))
 
 	user, err := userRepo.FindUserByUsername(context.Background(), "mutedapi")
 	if err != nil || user == nil {
@@ -507,17 +520,69 @@ func TestAPI_MutedUser_LoginAndAuthBlocked(t *testing.T) {
 		"username": "mutedapi",
 		"password": "password1",
 	})
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("muted login want 403, got %d body=%s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("muted login want 200, got %d body=%s", w.Code, w.Body.String())
 	}
-	resp := decodeResp(t, w)
-	if int(resp["code"].(float64)) != bizerr.ErrUserMuted.Code {
-		t.Fatalf("want muted code, got %v", resp)
+	mutedLogin := decodeResp(t, w)
+	mutedToken := mutedLogin["data"].(map[string]any)["token"].(string)
+	if mutedToken == "" {
+		t.Fatal("muted login returned empty token")
 	}
 
-	w = doJSON(t, r, http.MethodGet, "/api/user/me", token, nil)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("muted auth want 403, got %d body=%s", w.Code, w.Body.String())
+	for _, read := range []struct {
+		method string
+		path   string
+		token  string
+	}{
+		{http.MethodGet, "/api/user/me", oldToken},
+		{http.MethodGet, "/api/user/me", mutedToken},
+		{http.MethodPost, "/api/user/posts?pageNo=1&pageSize=10", mutedToken},
+		{http.MethodGet, fmt.Sprintf("/api/posts/%d", postID), mutedToken},
+		{http.MethodGet, "/api/posts?pageNo=1&pageSize=10", ""},
+	} {
+		response := doJSON(t, r, read.method, read.path, read.token, nil)
+		if response.Code != http.StatusOK {
+			t.Fatalf("muted read %s %s status=%d body=%s", read.method, read.path, response.Code, response.Body.String())
+		}
+	}
+
+	writes := []struct {
+		path string
+		body any
+	}{
+		{"/api/posts/create", map[string]string{"title": "blocked", "content": "blocked"}},
+		{fmt.Sprintf("/api/posts/update/%d", postID), map[string]string{"title": "blocked update"}},
+		{fmt.Sprintf("/api/posts/del/%d", postID), nil},
+		{fmt.Sprintf("/api/posts/pin/%d", postID), nil},
+		{fmt.Sprintf("/api/posts/pin/%d/duration", postID), map[string]string{"duration": string(model.PostPinDurationPermanent)}},
+		{fmt.Sprintf("/api/posts/unpin/%d", postID), nil},
+		{fmt.Sprintf("/api/posts/visible/%d", postID), map[string]any{"visible": model.VisiblePrivate}},
+		{fmt.Sprintf("/api/posts/%d/comments/create", postID), map[string]string{"content": "blocked comment"}},
+		{fmt.Sprintf("/api/posts/%d/like", postID), nil},
+		{"/api/invitations", nil},
+		{"/api/user/profile", map[string]string{"nickname": "blocked", "introduction": "blocked"}},
+		{"/api/user/avatar", map[string]string{"avatar_url": "https://example.com/blocked.png"}},
+		{fmt.Sprintf("/api/users/%d/mute", user.ID), nil},
+		{fmt.Sprintf("/api/users/%d/unmute", user.ID), nil},
+	}
+	for _, write := range writes {
+		response := doJSON(t, r, http.MethodPost, write.path, mutedToken, write.body)
+		if response.Code != bizerr.ErrUserMuted.HTTPStatus {
+			t.Fatalf("muted write %s status=%d body=%s", write.path, response.Code, response.Body.String())
+		}
+		resp := decodeResp(t, response)
+		if int(resp["code"].(float64)) != bizerr.ErrUserMuted.Code {
+			t.Fatalf("muted write %s code=%v, want=%d", write.path, resp["code"], bizerr.ErrUserMuted.Code)
+		}
+	}
+
+	w = doJSON(t, r, http.MethodPost, "/api/logout", mutedToken, nil)
+	if w.Code != http.StatusOK {
+		t.Fatalf("muted logout status=%d body=%s", w.Code, w.Body.String())
+	}
+	w = doJSON(t, r, http.MethodGet, "/api/user/me", mutedToken, nil)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("revoked muted token status=%d, want 401 body=%s", w.Code, w.Body.String())
 	}
 }
 

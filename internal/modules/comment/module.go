@@ -39,6 +39,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 
 	auth := r.Group("/")
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
+	auth.Use(middleware.RequireActiveUser())
 	{
 		auth.POST("/posts/:id/comments/create", m.Handler.CreateComment)
 		auth.POST("/comments/del/:id", m.Handler.DeleteComment)

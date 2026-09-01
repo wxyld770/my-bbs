@@ -16,6 +16,16 @@ export const POST_VISIBILITY = {
 export type PostVisibility =
   (typeof POST_VISIBILITY)[keyof typeof POST_VISIBILITY]
 
+export const POST_PIN_DURATION = {
+  DAY: 'day',
+  WEEK: 'week',
+  MONTH: 'month',
+  PERMANENT: 'permanent',
+} as const
+
+export type PostPinDuration =
+  (typeof POST_PIN_DURATION)[keyof typeof POST_PIN_DURATION]
+
 export interface User {
   id: number
   create_time: ISODateTime
@@ -43,6 +53,7 @@ export interface Post {
   visible: PostVisibility
   pinned_until: ISODateTime | null
   is_pinned: boolean
+  is_permanent: boolean
   user: User | null
 }
 
@@ -103,6 +114,8 @@ export interface LikeToggleData {
 export interface PinPostData {
   pinned_until: ISODateTime
   is_pinned: boolean
+  is_permanent: boolean
+  duration: PostPinDuration
 }
 
 /** The JSON envelope used by every endpoint except /livez and /readyz. */
@@ -169,6 +182,7 @@ export interface SearchPost {
   excerpt: string
   pinned_until: ISODateTime | null
   is_pinned: boolean
+  is_permanent: boolean
   user: SearchPostAuthor | null
   like_count: number
   comment_count: number

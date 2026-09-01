@@ -12,8 +12,8 @@ import { PostCard } from '../components/PostCard'
 const PAGE_SIZE = 10
 
 export function HomePage() {
-  const { isAuthenticated } = useAuth()
-  const { openAuth, openComposer, contentVersion } = useUI()
+  const { isAuthenticated, canWrite } = useAuth()
+  const { openAuth, openComposer, notify, contentVersion } = useUI()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [pageNo, setPageNo] = useState(1)
   const [hasMore, setHasMore] = useState(false)
@@ -169,8 +169,15 @@ export function HomePage() {
   }
 
   const startWriting = () => {
-    if (isAuthenticated) openComposer()
-    else openAuth('register')
+    if (!isAuthenticated) {
+      openAuth('register')
+      return
+    }
+    if (!canWrite) {
+      notify('info', '当前为只读模式', '账号已被禁言，仍可继续浏览内容。')
+      return
+    }
+    openComposer()
   }
 
   return (
@@ -189,9 +196,9 @@ export function HomePage() {
           </ul>
         </div>
         <div className="home-intro__action">
-          <button className="button button--soft" type="button" onClick={startWriting}>
+          <button className="button button--soft" type="button" onClick={startWriting} disabled={isAuthenticated && !canWrite} title={isAuthenticated && !canWrite ? '账号已被禁言，当前为只读模式' : undefined}>
             <Feather size={17} aria-hidden="true" />
-            {isAuthenticated ? '写一篇' : '开始表达'}
+            {isAuthenticated ? canWrite ? '写一篇' : '只读浏览' : '开始表达'}
           </button>
         </div>
       </section>

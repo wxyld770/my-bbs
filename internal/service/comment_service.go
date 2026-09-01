@@ -51,6 +51,9 @@ func (s *CommentService) CreateComment(ctx context.Context, postID, userID uint,
 	if err := validateByteLength(content, "评论内容", maxTextFieldBytes); err != nil {
 		return err
 	}
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return err
+	}
 	if err := s.requirePublicPost(ctx, postID); err != nil {
 		return err
 	}
@@ -86,6 +89,9 @@ func (s *CommentService) ListComments(ctx context.Context, postID uint, q pagina
 
 // DeleteComment 删除评论（仅评论作者）
 func (s *CommentService) DeleteComment(ctx context.Context, commentID, userID uint) error {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return err
+	}
 	comment, err := s.commentRepo.FindByID(ctx, commentID)
 	if err != nil {
 		return err

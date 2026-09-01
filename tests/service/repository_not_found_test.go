@@ -34,7 +34,7 @@ func TestPostService_MapsMutationNotFound(t *testing.T) {
 		Content:   "content",
 		Visible:   model.VisiblePublic,
 	}}
-	svc := service.NewPostService(repo, nil, nil, nil)
+	svc := service.NewPostService(repo, &activeUserReader{}, nil, nil)
 	title := "new title"
 
 	tests := []struct {
@@ -66,7 +66,7 @@ func TestCommentService_MapsMutationNotFound(t *testing.T) {
 	svc := service.NewCommentService(&mutationNotFoundCommentRepository{comment: &model.Comment{
 		BaseModel: model.BaseModel{ID: 11},
 		UserID:    userID,
-	}}, nil, nil)
+	}}, nil, &activeUserReader{})
 
 	err := svc.DeleteComment(context.Background(), 11, userID)
 	if !errors.Is(err, bizerr.ErrCommentNotFound) {
@@ -82,6 +82,7 @@ func TestLikeService_TreatsConcurrentMissingLikeAsUnliked(t *testing.T) {
 	svc := service.NewLikeService(
 		&concurrentlyDeletedLikeRepository{like: &model.PostLike{PostID: postID, UserID: userID}},
 		&publicPostReader{post: &model.Post{BaseModel: model.BaseModel{ID: postID}, Visible: model.VisiblePublic}},
+		&activeUserReader{},
 	)
 
 	result, err := svc.Toggle(context.Background(), postID, userID)
@@ -100,7 +101,7 @@ func (*mutationNotFoundUserRepository) FindUserByUsername(context.Context, strin
 	return nil, nil
 }
 func (*mutationNotFoundUserRepository) FindUserByID(_ context.Context, id uint) (*model.User, error) {
-	return &model.User{BaseModel: model.BaseModel{ID: id}}, nil
+	return &model.User{BaseModel: model.BaseModel{ID: id}, Status: model.UserStatusNormal}, nil
 }
 func (*mutationNotFoundUserRepository) UpdateUserStatus(context.Context, uint, uint) error {
 	return repository.ErrNotFound
@@ -186,6 +187,20 @@ func (*concurrentlyDeletedLikeRepository) DeleteByUserAndPost(context.Context, u
 
 type publicPostReader struct {
 	post *model.Post
+}
+
+type activeUserReader struct{}
+
+func (*activeUserReader) FindUserByID(_ context.Context, id uint) (*model.User, error) {
+	return &model.User{BaseModel: model.BaseModel{ID: id}, Status: model.UserStatusNormal}, nil
+}
+
+func (*activeUserReader) FindUsersByIDs(_ context.Context, ids []uint) ([]model.User, error) {
+	users := make([]model.User, len(ids))
+	for i, id := range ids {
+		users[i] = model.User{BaseModel: model.BaseModel{ID: id}, Status: model.UserStatusNormal}
+	}
+	return users, nil
 }
 
 func (r *publicPostReader) FindPostByID(context.Context, uint) (*model.Post, error) {

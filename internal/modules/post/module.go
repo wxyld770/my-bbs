@@ -53,12 +53,19 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	auth := r.Group("/")
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	{
-		auth.POST("/posts/create", m.Handler.CreatePost)
-		auth.POST("/posts/update/:id", m.Handler.UpdatePost)
-		auth.POST("/posts/del/:id", m.Handler.DeletePost)
-		auth.POST("/posts/pin/:id", m.Handler.PinPost)
-		auth.POST("/posts/unpin/:id", m.Handler.UnpinPost)
-		auth.POST("/posts/visible/:id", m.Handler.SetVisible)
 		auth.POST("/user/posts", m.Handler.GetMyPosts)
+
+		write := auth.Group("/")
+		write.Use(middleware.RequireActiveUser())
+		{
+			write.POST("/posts/create", m.Handler.CreatePost)
+			write.POST("/posts/update/:id", m.Handler.UpdatePost)
+			write.POST("/posts/del/:id", m.Handler.DeletePost)
+			// 旧接口无请求体，继续默认置顶一天；新前端使用 duration 接口选择期限。
+			write.POST("/posts/pin/:id", m.Handler.PinPost)
+			write.POST("/posts/pin/:id/duration", m.Handler.PinPostWithDuration)
+			write.POST("/posts/unpin/:id", m.Handler.UnpinPost)
+			write.POST("/posts/visible/:id", m.Handler.SetVisible)
+		}
 	}
 }

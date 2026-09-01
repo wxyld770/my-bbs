@@ -24,7 +24,7 @@ type User struct {
 	InviteCode *string `gorm:"column:invite_code;type:char(6);uniqueIndex;comment:注册时使用的邀请码" json:"-"`
 }
 
-// IsActive 是否可登录 / 访问需登录接口
+// IsActive 是否允许执行业务写操作；禁言账号仍可登录和读取。
 func (u *User) IsActive() bool {
 	return u != nil && u.Status == UserStatusNormal
 }

@@ -46,6 +46,7 @@ type SearchPostResponse struct {
 	Excerpt      string                     `json:"excerpt"`
 	PinnedUntil  *time.Time                 `json:"pinned_until"`
 	IsPinned     bool                       `json:"is_pinned"`
+	IsPermanent  bool                       `json:"is_permanent"`
 	User         *SearchUserCompactResponse `json:"user"`
 	LikeCount    int64                      `json:"like_count"`
 	CommentCount int64                      `json:"comment_count"`
@@ -84,7 +85,7 @@ func newSearchUserResponse(user model.User) SearchUserResponse {
 }
 
 func newSearchPostResponse(result service.SearchPost) SearchPostResponse {
-	pinnedUntil, isPinned := activePin(result.Post, time.Now())
+	pinnedUntil, isPinned, isPermanent := activePin(result.Post, time.Now())
 	return SearchPostResponse{
 		ID:           result.Post.ID,
 		CreateTime:   result.Post.CreateTime,
@@ -93,6 +94,7 @@ func newSearchPostResponse(result service.SearchPost) SearchPostResponse {
 		Excerpt:      result.Excerpt,
 		PinnedUntil:  pinnedUntil,
 		IsPinned:     isPinned,
+		IsPermanent:  isPermanent,
 		User:         newSearchUserCompactResponse(result.Post.User),
 		LikeCount:    result.LikeCount,
 		CommentCount: result.CommentCount,

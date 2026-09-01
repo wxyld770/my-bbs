@@ -6,6 +6,7 @@ import (
 	httpreq "my-bbs/internal/handler/httprequest"
 	httpresp "my-bbs/internal/handler/httpresponse"
 	"my-bbs/internal/middleware"
+	"my-bbs/internal/model"
 	"my-bbs/internal/service"
 	"my-bbs/pkg/bizerr"
 	"my-bbs/pkg/response"
@@ -176,6 +177,20 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 }
 
 func (h *PostHandler) PinPost(c *gin.Context) {
+	h.pinPost(c, model.PostPinDurationDay)
+}
+
+// PinPostWithDuration 使用新接口严格读取管理员选择的置顶期限。
+func (h *PostHandler) PinPostWithDuration(c *gin.Context) {
+	var req httpreq.PinPostRequest
+	if err := httpreq.BindJSON(c, &req); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+	h.pinPost(c, req.Duration)
+}
+
+func (h *PostHandler) pinPost(c *gin.Context, duration model.PostPinDuration) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil || id <= 0 {
 		response.ReportError(c, bizerr.ErrInvalidPostID)
@@ -188,13 +203,13 @@ func (h *PostHandler) PinPost(c *gin.Context) {
 		return
 	}
 
-	pinnedUntil, err := h.postService.PinPost(c.Request.Context(), uint(id), userID)
+	pinnedUntil, err := h.postService.PinPost(c.Request.Context(), uint(id), userID, duration)
 	if err != nil {
 		response.ReportError(c, err)
 		return
 	}
 
-	response.OK(c, httpresp.NewPinPostResponse(pinnedUntil))
+	response.OK(c, httpresp.NewPinPostResponse(pinnedUntil, duration))
 }
 
 func (h *PostHandler) UnpinPost(c *gin.Context) {

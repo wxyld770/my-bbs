@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Heart, MessageCircle, Pencil, Pin, PinOff, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Heart, MessageCircle, Pencil, Pin, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
@@ -6,9 +6,10 @@ import { useUI } from '../context/UIContext'
 import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 import { formatCount, formatDateTime, formatRelativeTime, getDisplayName } from '../lib/format'
-import { POST_VISIBILITY, type PostListItem } from '../types'
+import { POST_VISIBILITY, type PostListItem, type PostPinDuration } from '../types'
 import { Avatar } from './Avatar'
 import { ConfirmDialog } from './ConfirmDialog'
+import { PinControl } from './PinControl'
 
 interface PostCardProps {
   post: PostListItem
@@ -17,12 +18,12 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, manageable = false, onChanged }: PostCardProps) {
-  const { token, user, handleSessionError } = useAuth()
+  const { token, user, canWrite, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, refreshContent } = useUI()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busyAction, setBusyAction] = useState<'delete' | 'edit' | 'pin' | 'visibility' | null>(null)
   const isAdmin = user?.is_admin === true
-  const hasActions = manageable || isAdmin
+  const hasActions = canWrite && (manageable || isAdmin)
   const hasTags = manageable || post.is_pinned
   const canPin = post.visible === POST_VISIBILITY.PUBLIC
   const hasLikeCount = Number.isFinite(post.like_count)
@@ -94,7 +95,7 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
     }
   }
 
-  const togglePin = async () => {
+  const togglePin = async (duration?: PostPinDuration) => {
     if (!token) {
       openAuth('login')
       return
@@ -107,8 +108,9 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
         await api.unpinPost(token, post.id)
         notify('success', '已取消置顶')
       } else {
-        const result = await api.pinPost(token, post.id)
-        notify('success', '帖子已置顶', `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
+        if (!duration) return
+        const result = await api.pinPost(token, post.id, duration)
+        notify('success', result.is_permanent ? '帖子已永久置顶' : '帖子已置顶', result.is_permanent ? undefined : `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
       }
       refreshContent()
       onChanged?.()
@@ -138,8 +140,8 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
           {hasTags && (
             <span className="post-card__tags">
               {post.is_pinned && (
-                <span className="post-card__tag pinned" title={post.pinned_until ? `置顶至 ${formatDateTime(post.pinned_until)}` : '已置顶'}>
-                  <Pin size={12} aria-hidden="true" />置顶
+                <span className="post-card__tag pinned" title={post.is_permanent ? '永久置顶' : post.pinned_until ? `置顶至 ${formatDateTime(post.pinned_until)}` : '已置顶'}>
+                  <Pin size={12} aria-hidden="true" />{post.is_permanent ? '永久置顶' : '置顶'}
                 </span>
               )}
               {manageable && (
@@ -165,10 +167,14 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
               </>
             )}
             {isAdmin && (
-              <button className="button button--soft button--small" type="button" onClick={() => void togglePin()} disabled={Boolean(busyAction) || (!post.is_pinned && !canPin)} aria-label={`${post.is_pinned ? '取消置顶' : canPin ? '置顶一天' : '仅公开帖子可置顶'}《${post.title}》`} title={!post.is_pinned && !canPin ? '请先将帖子设为公开' : undefined}>
-                {post.is_pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
-                {busyAction === 'pin' ? '处理中…' : post.is_pinned ? '取消置顶' : canPin ? '置顶 1 天' : '仅公开帖可置顶'}
-              </button>
+              <PinControl
+                isPinned={post.is_pinned}
+                canPin={canPin}
+                busy={Boolean(busyAction)}
+                postTitle={post.title}
+                onPin={togglePin}
+                onUnpin={() => togglePin()}
+              />
             )}
             {(manageable || isAdmin) && (
               <button className="button button--danger button--small" type="button" onClick={() => setConfirmDelete(true)} disabled={Boolean(busyAction)} aria-label={`删除《${post.title}》`}>

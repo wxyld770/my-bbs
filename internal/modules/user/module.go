@@ -38,11 +38,16 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	{
 		auth.POST("/logout", m.Handler.Logout)
-		auth.POST("/invitations", m.Handler.GenerateInvitation)
 		auth.GET("/user/me", m.Handler.GetMe)
-		auth.POST("/user/profile", m.Handler.UpdateProfile)
-		auth.POST("/user/avatar", m.Handler.UpdateAvatar)
-		auth.POST("/users/:id/mute", m.Handler.MuteUser)
-		auth.POST("/users/:id/unmute", m.Handler.UnmuteUser)
+
+		write := auth.Group("/")
+		write.Use(middleware.RequireActiveUser())
+		{
+			write.POST("/invitations", m.Handler.GenerateInvitation)
+			write.POST("/user/profile", m.Handler.UpdateProfile)
+			write.POST("/user/avatar", m.Handler.UpdateAvatar)
+			write.POST("/users/:id/mute", m.Handler.MuteUser)
+			write.POST("/users/:id/unmute", m.Handler.UnmuteUser)
+		}
 	}
 }

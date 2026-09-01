@@ -351,8 +351,8 @@ function SearchPostsSection({ posts }: { posts: SearchPost[] }) {
                 <span aria-hidden="true">·</span>
                 <time dateTime={post.create_time}>{formatRelativeTime(post.create_time)}</time>
                 {post.is_pinned && (
-                  <span className="search-post-card__pin" title={post.pinned_until ? `置顶至 ${formatDateTime(post.pinned_until)}` : '已置顶'}>
-                    <Pin size={12} aria-hidden="true" />置顶
+                  <span className="search-post-card__pin" title={post.is_permanent ? '永久置顶' : post.pinned_until ? `置顶至 ${formatDateTime(post.pinned_until)}` : '已置顶'}>
+                    <Pin size={12} aria-hidden="true" />{post.is_permanent ? '永久置顶' : '置顶'}
                   </span>
                 )}
               </span>

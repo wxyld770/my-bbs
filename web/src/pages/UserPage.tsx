@@ -15,7 +15,7 @@ const PAGE_SIZE = 10
 export function UserPage() {
   const { id } = useParams()
   const userId = Number(id)
-  const { token, user: currentUser, handleSessionError } = useAuth()
+  const { token, user: currentUser, canWrite, handleSessionError } = useAuth()
   const { notify } = useUI()
   const [profile, setProfile] = useState<User | null>(null)
   const [posts, setPosts] = useState<PostListItem[]>([])
@@ -117,7 +117,7 @@ export function UserPage() {
         <div className="profile-card__admin-actions">
           {profile.is_admin && <span className="post-card__tag pinned"><ShieldCheck size={13} aria-hidden="true" />管理员</span>}
           {profile.status === USER_STATUS.MUTED && <span className="post-card__tag private">已禁言</span>}
-          {currentUser?.is_admin === true && !profile.is_admin && (
+          {canWrite && currentUser?.is_admin === true && !profile.is_admin && (
             <button className={`button button--small ${profile.status === USER_STATUS.NORMAL ? 'button--danger' : 'button--soft'}`} type="button" onClick={() => void toggleMuted()} disabled={managingUser}>
               {profile.status === USER_STATUS.NORMAL ? <UserRoundX size={14} aria-hidden="true" /> : <UserRoundCheck size={14} aria-hidden="true" />}
               {managingUser ? '处理中…' : profile.status === USER_STATUS.NORMAL ? '禁言用户' : '解除禁言'}

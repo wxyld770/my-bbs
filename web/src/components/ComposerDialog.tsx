@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 
 export function ComposerDialog() {
-  const { token, handleSessionError } = useAuth()
+  const { token, canWrite, handleSessionError } = useAuth()
   const { composer, closeComposer, openAuth, notify, refreshContent } = useUI()
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -53,6 +53,10 @@ export function ComposerDialog() {
       openAuth('login')
       return
     }
+    if (!canWrite) {
+      setError('账号已被禁言，当前为只读模式，不能发布或修改帖子。')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -95,16 +99,16 @@ export function ComposerDialog() {
           <form onSubmit={onSubmit}>
             <div className="field">
               <label htmlFor="post-title">标题 <span>{Array.from(title).length}/255</span></label>
-              <input id="post-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="一句话说清你想聊什么" maxLength={255} required autoFocus />
+              <input id="post-title" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="一句话说清你想聊什么" maxLength={255} required autoFocus disabled={!canWrite} />
             </div>
             <div className="field">
               <label htmlFor="post-content">正文 <span>{new Blob([content]).size}/65,535 bytes</span></label>
-              <textarea id="post-content" style={{ minHeight: 260 }} value={content} onChange={(event) => setContent(event.target.value)} placeholder="慢慢写，认真说。这里支持换行。" required />
+              <textarea id="post-content" style={{ minHeight: 260 }} value={content} onChange={(event) => setContent(event.target.value)} placeholder="慢慢写，认真说。这里支持换行。" required disabled={!canWrite} />
             </div>
             {error && <p className="form-error" role="alert">{error}</p>}
             <div className="form-actions">
               <button className="button button--soft" type="button" onClick={closeComposer} disabled={submitting}>先不写了</button>
-              <button className="button button--primary" type="submit" disabled={submitting || new Blob([content]).size > 65535}>
+              <button className="button button--primary" type="submit" disabled={!canWrite || submitting || new Blob([content]).size > 65535}>
                 {submitting ? '正在保存…' : composer.mode === 'edit' ? '保存修改' : '发布到广场'}
               </button>
             </div>
