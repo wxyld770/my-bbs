@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarDays, KeyRound, LockKeyhole, LogIn, LogOut, PenLine, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { Avatar } from '../components/Avatar'
+import { ChangePasswordDialog } from '../components/ChangePasswordDialog'
 import { InvitationDialog } from '../components/InvitationDialog'
 import { PostCard } from '../components/PostCard'
 import { useAuth } from '../context/AuthContext'
@@ -11,21 +12,6 @@ import { formatDateTime, getDisplayName } from '../lib/format'
 import type { PostListItem } from '../types'
 
 const PAGE_SIZE = 10
-const PASSWORD_MIN_RUNES = 6
-const PASSWORD_MAX_RUNES = 64
-const PASSWORD_MAX_BYTES = 72
-
-type PasswordField = 'old' | 'new' | 'confirm' | 'form'
-
-interface PasswordFormError {
-  field: PasswordField
-  message: string
-}
-
-interface PasswordRequest {
-  controller: AbortController
-  sessionIdentity: string
-}
 
 interface PostsRequest {
   controller: AbortController
@@ -34,7 +20,7 @@ interface PostsRequest {
 }
 
 export function MePage() {
-  const { token, user, isAuthenticated, isBootstrapping, canWrite, refreshUser, logout, isCurrentSession, clearSession, handleSessionError } = useAuth()
+  const { token, user, isAuthenticated, isBootstrapping, canWrite, refreshUser, logout, isCurrentSession, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, contentVersion } = useUI()
   const [posts, setPosts] = useState<PostListItem[]>([])
   const [pageNo, setPageNo] = useState(1)
@@ -52,28 +38,13 @@ export function MePage() {
   const [invitationCode, setInvitationCode] = useState<string | null>(null)
   const [generatingInvitation, setGeneratingInvitation] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-  const [oldPassword, setOldPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [passwordError, setPasswordError] = useState<PasswordFormError | null>(null)
-  const [changingPassword, setChangingPassword] = useState(false)
-  const oldPasswordRef = useRef<HTMLInputElement>(null)
-  const newPasswordRef = useRef<HTMLInputElement>(null)
-  const confirmPasswordRef = useRef<HTMLInputElement>(null)
-  const passwordRequestRef = useRef<PasswordRequest | null>(null)
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const firstPageRequestRef = useRef<PostsRequest | null>(null)
   const loadMoreRequestRef = useRef<PostsRequest | null>(null)
   const postsGenerationRef = useRef(0)
   const sessionIdentity = token && user ? `${user.id}:${token}` : ''
   const latestSessionIdentityRef = useRef(sessionIdentity)
   latestSessionIdentityRef.current = sessionIdentity
-
-  const resetPasswordFields = useCallback(() => {
-    setOldPassword('')
-    setNewPassword('')
-    setConfirmPassword('')
-    setPasswordError(null)
-  }, [])
 
   useEffect(() => {
     setNickname(user?.nickname ?? '')
@@ -92,15 +63,7 @@ export function MePage() {
     setHasMore(false)
     setPostError('')
     setLoadingPosts(Boolean(sessionIdentity))
-
-    const request = passwordRequestRef.current
-    if (request && request.sessionIdentity !== sessionIdentity) {
-      request.controller.abort()
-      passwordRequestRef.current = null
-    }
-    setChangingPassword(false)
-    resetPasswordFields()
-  }, [resetPasswordFields, sessionIdentity])
+  }, [sessionIdentity])
 
   useEffect(() => () => {
     postsGenerationRef.current += 1
@@ -108,8 +71,6 @@ export function MePage() {
     firstPageRequestRef.current = null
     loadMoreRequestRef.current?.controller.abort()
     loadMoreRequestRef.current = null
-    passwordRequestRef.current?.controller.abort()
-    passwordRequestRef.current = null
   }, [])
 
   const avatarAvailableAt = user?.avatar_updated_at
@@ -118,7 +79,6 @@ export function MePage() {
   const avatarCoolingDown = Number.isFinite(avatarAvailableAt) && avatarAvailableAt > avatarClock
   const avatarChanged = avatarURL.trim() !== (user?.avatar_url ?? '')
   const isReadOnly = Boolean(user) && !canWrite
-  const passwordFormDisabled = changingPassword || signingOut || savingProfile || savingAvatar || generatingInvitation
 
   useEffect(() => {
     if (!Number.isFinite(avatarAvailableAt) || avatarAvailableAt <= Date.now()) return
@@ -246,7 +206,7 @@ export function MePage() {
 
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!token || !canWrite || savingProfile || changingPassword) return
+    if (!token || !canWrite || savingProfile) return
     const submittedToken = token
     setSavingProfile(true)
     setProfileError('')
@@ -267,7 +227,7 @@ export function MePage() {
 
   const saveAvatar = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!token || !canWrite || savingAvatar || changingPassword || avatarCoolingDown || !avatarChanged) return
+    if (!token || !canWrite || savingAvatar || avatarCoolingDown || !avatarChanged) return
     const submittedToken = token
     setSavingAvatar(true)
     setAvatarError('')
@@ -287,103 +247,8 @@ export function MePage() {
     }
   }
 
-  const reportPasswordError = (field: PasswordField, message: string) => {
-    setPasswordError({ field, message })
-    if (field === 'old') oldPasswordRef.current?.focus()
-    if (field === 'new') newPasswordRef.current?.focus()
-    if (field === 'confirm') confirmPasswordRef.current?.focus()
-  }
-
-  const changePassword = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (
-      !token ||
-      !user ||
-      changingPassword ||
-      passwordRequestRef.current ||
-      signingOut ||
-      savingProfile ||
-      savingAvatar ||
-      generatingInvitation
-    ) return
-
-    if (!oldPassword) {
-      reportPasswordError('old', '请输入旧密码。')
-      return
-    }
-    const newPasswordRunes = Array.from(newPassword).length
-    if (newPasswordRunes < PASSWORD_MIN_RUNES || newPasswordRunes > PASSWORD_MAX_RUNES) {
-      reportPasswordError('new', `新密码必须为 ${PASSWORD_MIN_RUNES}–${PASSWORD_MAX_RUNES} 个字符。`)
-      return
-    }
-    if (new TextEncoder().encode(newPassword).length > PASSWORD_MAX_BYTES) {
-      reportPasswordError('new', `新密码 UTF-8 编码后不能超过 ${PASSWORD_MAX_BYTES} 字节，请减少中文、表情等多字节字符。`)
-      return
-    }
-    if (newPassword === oldPassword) {
-      reportPasswordError('new', '新密码不能与旧密码相同。')
-      return
-    }
-    if (confirmPassword !== newPassword) {
-      reportPasswordError('confirm', '两次输入的新密码不一致。')
-      return
-    }
-
-    const submittedToken = token
-    const submittedSessionIdentity = sessionIdentity
-    const controller = new AbortController()
-    const request: PasswordRequest = {
-      controller,
-      sessionIdentity: submittedSessionIdentity,
-    }
-    passwordRequestRef.current = request
-    setChangingPassword(true)
-    setPasswordError(null)
-
-    const requestIsCurrent = () => (
-      !controller.signal.aborted &&
-      passwordRequestRef.current === request &&
-      isCurrentSession(submittedToken) &&
-      latestSessionIdentityRef.current === submittedSessionIdentity
-    )
-
-    try {
-      await api.changePassword(
-        submittedToken,
-        { old_password: oldPassword, new_password: newPassword },
-        controller.signal,
-      )
-      if (!requestIsCurrent()) return
-
-      // The server has already invalidated every old session. Clear this browser
-      // only if it still owns the token that initiated the password change.
-      if (!clearSession(submittedToken)) return
-
-      passwordRequestRef.current = null
-      setChangingPassword(false)
-      resetPasswordFields()
-      openAuth('login')
-      notify('success', '密码已修改', '请使用新密码重新登录。')
-    } catch (changeError) {
-      if (!requestIsCurrent()) return
-      if (handleSessionError(changeError, submittedToken)) {
-        resetPasswordFields()
-        openAuth('login')
-      } else if (!shouldClearToken(changeError)) {
-        setPasswordError({ field: 'form', message: getErrorMessage(changeError) })
-      }
-    } finally {
-      if (passwordRequestRef.current === request) {
-        passwordRequestRef.current = null
-        if (latestSessionIdentityRef.current === submittedSessionIdentity) {
-          setChangingPassword(false)
-        }
-      }
-    }
-  }
-
   const signOut = async () => {
-    if (!token || signingOut || changingPassword) return
+    if (!token || signingOut) return
     const submittedToken = token
     setSigningOut(true)
     try {
@@ -403,7 +268,7 @@ export function MePage() {
   }
 
   const generateInvitation = async () => {
-    if (!token || !canWrite || generatingInvitation || changingPassword || invitationCode) return
+    if (!token || !canWrite || generatingInvitation || invitationCode) return
     const submittedToken = token
     setGeneratingInvitation(true)
     try {
@@ -421,6 +286,10 @@ export function MePage() {
 
   const closeInvitation = useCallback(() => {
     setInvitationCode(null)
+  }, [])
+
+  const closePasswordDialog = useCallback(() => {
+    setPasswordDialogOpen(false)
   }, [])
 
   if (isBootstrapping) {
@@ -462,7 +331,7 @@ export function MePage() {
               className="button button--dark"
               type="button"
               onClick={() => void generateInvitation()}
-              disabled={!canWrite || generatingInvitation || changingPassword || Boolean(invitationCode)}
+              disabled={!canWrite || generatingInvitation || Boolean(invitationCode)}
               aria-busy={generatingInvitation}
             >
               <KeyRound size={16} aria-hidden="true" />
@@ -472,7 +341,7 @@ export function MePage() {
               className="button button--soft"
               type="button"
               onClick={() => void signOut()}
-              disabled={signingOut || changingPassword}
+              disabled={signingOut}
               aria-busy={signingOut}
             >
               <LogOut size={16} aria-hidden="true" />
@@ -537,7 +406,7 @@ export function MePage() {
                   onChange={(event) => setAvatarURL(event.target.value)}
                   maxLength={2048}
                   placeholder="https://example.com/avatar.jpg"
-                  disabled={!canWrite || savingAvatar || changingPassword || avatarCoolingDown}
+                  disabled={!canWrite || savingAvatar || avatarCoolingDown}
                   aria-describedby="profile-avatar-help"
                 />
               </div>
@@ -548,7 +417,7 @@ export function MePage() {
               </p>
               {avatarError && <p className="form-error" role="alert">{avatarError}</p>}
               <div className="form-actions">
-                <button className="button button--soft button--wide" type="submit" disabled={!canWrite || savingAvatar || changingPassword || avatarCoolingDown || !avatarChanged}>
+                <button className="button button--soft button--wide" type="submit" disabled={!canWrite || savingAvatar || avatarCoolingDown || !avatarChanged}>
                   {savingAvatar ? '更新中…' : '更新头像'}
                 </button>
               </div>
@@ -557,100 +426,34 @@ export function MePage() {
             <form onSubmit={saveProfile}>
               <div className="field">
                 <label htmlFor="profile-nickname">昵称 <span>{Array.from(nickname).length}/64</span></label>
-                <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" disabled={!canWrite || changingPassword} />
+                <input id="profile-nickname" value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={64} placeholder="大家怎么称呼你" disabled={!canWrite} />
               </div>
               <div className="field">
                 <label htmlFor="profile-introduction">个人介绍 <span>{Array.from(introduction).length}/1024</span></label>
-                <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" disabled={!canWrite || changingPassword} />
+                <textarea id="profile-introduction" value={introduction} onChange={(event) => setIntroduction(event.target.value)} maxLength={1024} placeholder="写几句关于自己" disabled={!canWrite} />
               </div>
               {profileError && <p className="form-error" role="alert">{profileError}</p>}
               <div className="form-actions">
-                <button className="button button--dark button--wide" type="submit" disabled={!canWrite || savingProfile || changingPassword}>{savingProfile ? '保存中…' : '保存资料'}</button>
+                <button className="button button--dark button--wide" type="submit" disabled={!canWrite || savingProfile}>{savingProfile ? '保存中…' : '保存资料'}</button>
               </div>
             </form>
             <div className="form-card__divider" aria-hidden="true" />
-            <h3 id="change-password-heading">修改密码</h3>
-            <form
-              onSubmit={changePassword}
-              noValidate
-              aria-labelledby="change-password-heading"
-              aria-busy={changingPassword}
-            >
-              <div className="field">
-                <label htmlFor="account-old-password">旧密码</label>
-                <input
-                  ref={oldPasswordRef}
-                  id="account-old-password"
-                  name="old_password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={oldPassword}
-                  onChange={(event) => {
-                    setOldPassword(event.target.value)
-                    setPasswordError(null)
-                  }}
-                  disabled={passwordFormDisabled}
-                  required
-                  aria-invalid={passwordError?.field === 'old'}
-                  aria-describedby={`change-password-help${passwordError?.field === 'old' ? ' change-password-error' : ''}`}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="account-new-password">新密码 <span>6–64 字符</span></label>
-                <input
-                  ref={newPasswordRef}
-                  id="account-new-password"
-                  name="new_password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(event) => {
-                    setNewPassword(event.target.value)
-                    setPasswordError(null)
-                  }}
-                  disabled={passwordFormDisabled}
-                  required
-                  aria-invalid={passwordError?.field === 'new'}
-                  aria-describedby={`change-password-help${passwordError?.field === 'new' ? ' change-password-error' : ''}`}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="account-confirm-password">确认新密码</label>
-                <input
-                  ref={confirmPasswordRef}
-                  id="account-confirm-password"
-                  name="confirm_password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={confirmPassword}
-                  onChange={(event) => {
-                    setConfirmPassword(event.target.value)
-                    setPasswordError(null)
-                  }}
-                  disabled={passwordFormDisabled}
-                  required
-                  aria-invalid={passwordError?.field === 'confirm'}
-                  aria-describedby={`change-password-help${passwordError?.field === 'confirm' ? ' change-password-error' : ''}`}
-                />
-              </div>
-              <p className="field-help" id="change-password-help">
-                密码不要与旧密码相同，且 UTF-8 编码后不能超过 72 字节。修改成功后，所有设备都需要重新登录。
-              </p>
-              {passwordError && (
-                <p className="form-error" id="change-password-error" role="alert">
-                  {passwordError.message}
-                </p>
-              )}
-              <div className="form-actions">
-                <button className="button button--soft button--wide" type="submit" disabled={passwordFormDisabled}>
-                  {changingPassword ? '修改中…' : '修改密码'}
-                </button>
-              </div>
-            </form>
+            <div className="form-actions">
+              <button
+                className="button button--soft button--wide"
+                type="button"
+                onClick={() => setPasswordDialogOpen(true)}
+                disabled={signingOut}
+              >
+                <KeyRound size={16} aria-hidden="true" />
+                修改密码
+              </button>
+            </div>
           </aside>
         </div>
       </div>
       <InvitationDialog code={invitationCode} onClose={closeInvitation} />
+      <ChangePasswordDialog open={passwordDialogOpen} onClose={closePasswordDialog} />
     </>
   )
 }
