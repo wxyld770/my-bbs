@@ -1,0 +1,24 @@
+web/src/components/ChangePasswordDialog.tsx
+  s_8464988174a9d2::t_27ef9951c61bf0 76,106-107
+  s_8464988174a9d2::t_5934dacb104586 1-75,77-105,108-333
+web/src/pages/MePage.tsx
+  s_8464988174a9d2::t_27ef9951c61bf0 291-294,334,344,409,420,429,433,437,441-451,456
+  s_8464988174a9d2::t_a4324968eac9ff 209,230,251,271
+  s_8464988174a9d2::t_f1dd0afce1d459 4,23,41,66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a4dc8bf10594ddb53b0b76b80a85d675a6f32424",
+  "prompts": {},
+  "sessions": {
+    "s_8464988174a9d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0288d-5eda-7e72-97e5-67ada8f400b3",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
