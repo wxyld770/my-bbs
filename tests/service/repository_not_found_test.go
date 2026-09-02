@@ -106,6 +106,9 @@ func (*mutationNotFoundUserRepository) FindUserByID(_ context.Context, id uint) 
 func (*mutationNotFoundUserRepository) UpdateUserStatus(context.Context, uint, uint) error {
 	return repository.ErrNotFound
 }
+func (*mutationNotFoundUserRepository) UpdatePasswordHash(context.Context, uint, uint64, string) error {
+	return repository.ErrNotFound
+}
 func (*mutationNotFoundUserRepository) UpdateProfile(context.Context, uint, string, string) error {
 	return repository.ErrNotFound
 }

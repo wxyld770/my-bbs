@@ -7,6 +7,7 @@ var (
 	_ repository.UserRepository       = (*UserRepository)(nil)
 	_ repository.UserReader           = (*UserRepository)(nil)
 	_ repository.InvitationRepository = (*InvitationRepository)(nil)
+	_ repository.MessageRepository    = (*MessageRepository)(nil)
 	_ repository.PostRepository       = (*PostRepository)(nil)
 	_ repository.PostReader           = (*PostRepository)(nil)
 	_ repository.HotPostReader        = (*HotPostReader)(nil)

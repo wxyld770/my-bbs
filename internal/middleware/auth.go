@@ -20,6 +20,7 @@ import (
 const (
 	userIDContextKey         = "userID"
 	userStatusContextKey     = "userStatus"
+	sessionVersionContextKey = "sessionVersion"
 	tokenIDContextKey        = "tokenID"
 	tokenExpiresAtContextKey = "tokenExpiresAt"
 )
@@ -79,6 +80,10 @@ func Auth(users UserLookup, commands redis.Cmdable) gin.HandlerFunc {
 			response.ReportError(c, bizerr.ErrUserNotFound)
 			return
 		}
+		if claims.SessionVersion != user.SessionVersion {
+			response.ReportError(c, bizerr.ErrInvalidToken)
+			return
+		}
 		logger.Info("authentication succeeded | request_id=%s | user_id=%d", GetRequestID(c), claims.UserID)
 		setTokenContext(c, claims)
 		c.Set(userStatusContextKey, user.Status)
@@ -106,7 +111,7 @@ func RequireActiveUser() gin.HandlerFunc {
 
 // OptionalAuth 可选认证中间件：如果有 Token 则解析，没有则继续。
 // 不校验禁言状态（仅用于公开读接口附带 is_liked 等）。
-func OptionalAuth(commands redis.Cmdable) gin.HandlerFunc {
+func OptionalAuth(users UserLookup, commands redis.Cmdable) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -134,6 +139,15 @@ func OptionalAuth(commands redis.Cmdable) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		user, err := users.FindUserByID(c.Request.Context(), claims.UserID)
+		if err != nil {
+			response.ReportError(c, err)
+			return
+		}
+		if user == nil || claims.SessionVersion != user.SessionVersion {
+			c.Next()
+			return
+		}
 		setTokenContext(c, claims)
 		c.Next()
 	}
@@ -147,6 +161,18 @@ func GetUserID(c *gin.Context) (uint, bool) {
 	}
 	userID, ok := val.(uint)
 	return userID, ok
+}
+
+// GetSessionVersion 获取当前 JWT 绑定的会话版本。
+// 密码更新等安全敏感操作必须把该版本传给 Repository 做 CAS，防止认证后
+// 到写入前发生的并发密码变更被覆盖。
+func GetSessionVersion(c *gin.Context) (uint64, bool) {
+	val, exists := c.Get(sessionVersionContextKey)
+	if !exists {
+		return 0, false
+	}
+	sessionVersion, ok := val.(uint64)
+	return sessionVersion, ok
 }
 
 // GetTokenID 从上下文中获取当前 JWT 的 JTI。
@@ -171,6 +197,7 @@ func GetTokenExpiresAt(c *gin.Context) (time.Time, bool) {
 
 func setTokenContext(c *gin.Context, claims *jwt.Claims) {
 	c.Set(userIDContextKey, claims.UserID)
+	c.Set(sessionVersionContextKey, claims.SessionVersion)
 	c.Set(tokenIDContextKey, claims.ID)
 	c.Set(tokenExpiresAtContextKey, claims.ExpiresAt.Time)
 }

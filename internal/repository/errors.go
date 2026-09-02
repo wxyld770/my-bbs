@@ -12,6 +12,7 @@ var (
 	ErrFieldRequired           = errors.New("repository field is required")
 	ErrTableNotFound           = errors.New("repository table does not exist")
 	ErrAvatarUpdateTooFrequent = errors.New("repository avatar update too frequent")
+	ErrPasswordUpdateConflict  = errors.New("repository password update conflict")
 	// ErrInvitationUnavailable 同时表示邀请码不存在或已经被使用，避免调用方
 	// 通过错误差异枚举邀请码。
 	ErrInvitationUnavailable = errors.New("repository invitation unavailable")

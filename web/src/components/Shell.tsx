@@ -1,4 +1,4 @@
-import { Home, LogIn, PenLine, Search, UserRound } from 'lucide-react'
+import { Home, LogIn, MessageSquareText, PenLine, Search, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useUI } from '../context/UIContext'
@@ -43,10 +43,16 @@ export function Shell() {
               搜索
             </NavLink>
             {isAuthenticated && (
-              <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/me">
-                <UserRound size={16} aria-hidden="true" />
-                我的
-              </NavLink>
+              <>
+                <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/messages">
+                  <MessageSquareText size={16} aria-hidden="true" />
+                  留言
+                </NavLink>
+                <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/me">
+                  <UserRound size={16} aria-hidden="true" />
+                  我的
+                </NavLink>
+              </>
             )}
           </nav>
 
@@ -74,7 +80,7 @@ export function Shell() {
         <Outlet />
       </main>
 
-      <nav className="mobile-nav" aria-label="移动端导航">
+      <nav className={`mobile-nav${isAuthenticated ? ' mobile-nav--authenticated' : ''}`} aria-label="移动端导航">
         <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/" end>
           <Home size={17} aria-hidden="true" />
           广场
@@ -87,6 +93,12 @@ export function Shell() {
           <PenLine size={17} aria-hidden="true" />
           发布
         </button>
+        {isAuthenticated && (
+          <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/messages">
+            <MessageSquareText size={17} aria-hidden="true" />
+            留言
+          </NavLink>
+        )}
         {isAuthenticated ? (
           <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} to="/me">
             <UserRound size={17} aria-hidden="true" />

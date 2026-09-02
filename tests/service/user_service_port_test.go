@@ -111,6 +111,24 @@ func (r *memoryUserRepository) UpdateUserStatus(_ context.Context, id uint, stat
 	return nil
 }
 
+func (r *memoryUserRepository) UpdatePasswordHash(
+	_ context.Context,
+	id uint,
+	expectedSessionVersion uint64,
+	passwordHash string,
+) error {
+	user := r.byID[id]
+	if user == nil {
+		return repository.ErrNotFound
+	}
+	if user.SessionVersion != expectedSessionVersion {
+		return repository.ErrPasswordUpdateConflict
+	}
+	user.Password = passwordHash
+	user.SessionVersion++
+	return nil
+}
+
 func (r *memoryUserRepository) UpdateProfile(_ context.Context, id uint, nickname, introduction string) error {
 	user := r.byID[id]
 	if user != nil {

@@ -78,11 +78,7 @@ func (s *UserService) Register(
 	if err := validateRuneLength(username, "用户名", 3, 64); err != nil {
 		return err
 	}
-	if err := validateRuneLength(password, "密码", 6, 64); err != nil {
-		return err
-	}
-	// bcrypt 只接受最多 72 字节；字符数校验无法覆盖多字节密码。
-	if err := validateByteLength(password, "密码", 72); err != nil {
+	if err := validatePassword(password); err != nil {
 		return err
 	}
 	if err := validateRuneLength(nickname, "昵称", 0, 64); err != nil {
@@ -232,11 +228,61 @@ func (s *UserService) Login(ctx context.Context, username, password string) (str
 		return "", bizerr.ErrLoginFailed
 	}
 
-	token, err := jwt.GenerateToken(user.ID)
+	token, err := jwt.GenerateTokenWithSessionVersion(user.ID, user.SessionVersion)
 	if err != nil {
 		return "", err
 	}
 	return token, nil
+}
+
+// ChangePassword 使用当前密码确认用户身份，并把新密码写入与会话版本递增
+// 原子完成。expectedSessionVersion 必须来自已经通过 Auth 的 JWT，而不是再次
+// 查询到的最新版本；这样并发改密或管理员重置不能被过期请求覆盖。
+func (s *UserService) ChangePassword(
+	ctx context.Context,
+	userID uint,
+	expectedSessionVersion uint64,
+	oldPassword, newPassword string,
+) error {
+	if userID == 0 {
+		return bizerr.ErrUnauthorized
+	}
+
+	user, err := s.userRepo.FindUserByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return bizerr.ErrUserNotFound
+	}
+	if user.SessionVersion != expectedSessionVersion {
+		return bizerr.ErrInvalidToken
+	}
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+	if !bcrypt.CheckPassword(oldPassword, user.Password) {
+		return bizerr.ErrCurrentPasswordIncorrect
+	}
+	if oldPassword == newPassword {
+		return bizerr.ErrNewPasswordSameAsCurrent
+	}
+
+	hashed, err := bcrypt.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	if err := s.userRepo.UpdatePasswordHash(ctx, userID, expectedSessionVersion, hashed); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			return bizerr.ErrUserNotFound
+		case errors.Is(err, repository.ErrPasswordUpdateConflict):
+			return bizerr.ErrInvalidToken
+		default:
+			return err
+		}
+	}
+	return nil
 }
 
 // Logout 撤销当前 JWT，撤销记录只保留到 Token 原始到期时间。
@@ -379,6 +425,71 @@ func (s *UserService) SetUserStatus(ctx context.Context, actorID, targetID uint,
 		return err
 	}
 	return nil
+}
+
+// ResetUserPassword 允许活动状态的配置管理员把普通用户密码重置为该用户的用户名。
+// 配置管理员账号不允许通过此人工找回入口重置，避免公开管理员名成为可预测凭据。
+func (s *UserService) ResetUserPassword(ctx context.Context, actorID, targetID uint) error {
+	if actorID == 0 {
+		return bizerr.ErrUnauthorized
+	}
+
+	actor, err := s.userRepo.FindUserByID(ctx, actorID)
+	if err != nil {
+		return err
+	}
+	if actor == nil {
+		return bizerr.ErrUserNotFound
+	}
+	if !actor.IsActive() {
+		return bizerr.ErrUserMuted
+	}
+	if !authorization.IsAdmin(s.admins, actor.Username) {
+		return bizerr.ErrForbidden
+	}
+
+	target, err := s.userRepo.FindUserByID(ctx, targetID)
+	if err != nil {
+		return err
+	}
+	if target == nil {
+		return bizerr.ErrUserNotFound
+	}
+	if authorization.IsAdmin(s.admins, target.Username) {
+		return bizerr.ErrAdminCannotManageAdmin
+	}
+	if target.Username == "" {
+		return bizerr.ErrConflict.WithMessage("用户名为空，无法重置为用户名密码")
+	}
+	// bcrypt 拒绝超过 72 字节的输入。用户名按字符数校验，合法的多字节
+	// 用户名仍可能超过该上限；这里显式拒绝，不能静默截断或生成不可登录密码。
+	if len(target.Username) > 72 {
+		return bizerr.ErrConflict.WithMessage("用户名超过密码重置支持的72字节限制")
+	}
+
+	hashed, err := bcrypt.HashPassword(target.Username)
+	if err != nil {
+		return err
+	}
+	if err := s.userRepo.UpdatePasswordHash(ctx, targetID, target.SessionVersion, hashed); err != nil {
+		switch {
+		case errors.Is(err, repository.ErrNotFound):
+			return bizerr.ErrUserNotFound
+		case errors.Is(err, repository.ErrPasswordUpdateConflict):
+			return bizerr.ErrConflict.WithMessage("密码已被其他操作修改，请重试")
+		default:
+			return err
+		}
+	}
+	return nil
+}
+
+func validatePassword(password string) error {
+	if err := validateRuneLength(password, "密码", 6, 64); err != nil {
+		return err
+	}
+	// bcrypt 只接受最多 72 字节；字符数校验无法覆盖多字节密码。
+	return validateByteLength(password, "密码", 72)
 }
 
 func (s *UserService) IsAdminUsername(username string) bool {

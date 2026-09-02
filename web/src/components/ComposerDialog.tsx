@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import { getErrorMessage } from '../lib/errors'
 
 export function ComposerDialog() {
-  const { token, canWrite, handleSessionError } = useAuth()
+  const { token, canWrite, isCurrentSession, handleSessionError } = useAuth()
   const { composer, closeComposer, openAuth, notify, refreshContent } = useUI()
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
@@ -57,19 +57,22 @@ export function ComposerDialog() {
       setError('账号已被禁言，当前为只读模式，不能发布或修改帖子。')
       return
     }
+    const submittedToken = token
 
     setSubmitting(true)
     try {
       if (composer.mode === 'edit') {
-        await api.updatePost(token, composer.post.id, { title: cleanTitle, content: cleanContent })
+        await api.updatePost(submittedToken, composer.post.id, { title: cleanTitle, content: cleanContent })
       } else {
-        await api.createPost(token, { title: cleanTitle, content: cleanContent })
+        await api.createPost(submittedToken, { title: cleanTitle, content: cleanContent })
       }
+      if (!isCurrentSession(submittedToken)) return
       closeComposer()
       refreshContent()
       notify('success', composer.mode === 'edit' ? '内容已更新' : '发布成功', composer.mode === 'edit' ? '修改已经保存。' : '你的话已经出现在广场上。')
     } catch (submitError) {
-      if (handleSessionError(submitError)) {
+      if (!isCurrentSession(submittedToken)) return
+      if (handleSessionError(submitError, submittedToken)) {
         closeComposer()
         openAuth('login')
         notify('info', '登录状态已失效', '请重新登录后继续。')

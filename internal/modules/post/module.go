@@ -46,7 +46,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	// 公开路由（详情：公开帖所有人可读，私密帖仅作者可读；可选 Token 用于 is_liked）
 	r.GET("/posts/hot", m.Handler.GetHotPosts)
 	r.GET("/posts", m.Handler.GetAllPosts)
-	r.GET("/posts/:id", middleware.OptionalAuth(m.redis), m.Handler.GetPost)
+	r.GET("/posts/:id", middleware.OptionalAuth(m.userRepo, m.redis), m.Handler.GetPost)
 	r.GET("/users/:id/posts", m.Handler.GetUserPublicPosts)
 
 	// 需要认证的路由

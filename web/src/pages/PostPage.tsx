@@ -141,7 +141,7 @@ export function PostPage() {
   const { id } = useParams()
   const postId = Number(id)
   const navigate = useNavigate()
-  const { token, user, isAuthenticated, canWrite, handleSessionError } = useAuth()
+  const { token, user, isAuthenticated, canWrite, isCurrentSession, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, contentVersion } = useUI()
   const [detail, setDetail] = useState<PostDetail | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
@@ -170,13 +170,16 @@ export function PostPage() {
       setLoading(false)
       return
     }
+    const submittedToken = token
     setLoading(true)
     setError('')
     try {
-      const postDetail = await api.getPost(postId, token)
+      const postDetail = await api.getPost(postId, submittedToken)
+      if (submittedToken && !isCurrentSession(submittedToken)) return
       setDetail(postDetail)
       if (postDetail.post.visible === POST_VISIBILITY.PUBLIC) {
         const page = await api.listComments(postId, { pageNo: 1, pageSize: COMMENT_PAGE_SIZE })
+        if (submittedToken && !isCurrentSession(submittedToken)) return
         setComments(page.list)
         setCommentPage(1)
         setHasMoreComments(page.hasMore && page.list.length > 0)
@@ -185,14 +188,15 @@ export function PostPage() {
         setHasMoreComments(false)
       }
     } catch (loadError) {
-      if (handleSessionError(loadError)) {
+      if (submittedToken && !isCurrentSession(submittedToken)) return
+      if (submittedToken && handleSessionError(loadError, submittedToken)) {
         notify('info', '登录状态已失效', '已按访客身份重新加载。')
       }
       setError(getErrorMessage(loadError))
     } finally {
-      setLoading(false)
+      if (!submittedToken || isCurrentSession(submittedToken)) setLoading(false)
     }
-  }, [handleSessionError, notify, postId, token, validId])
+  }, [handleSessionError, isCurrentSession, notify, postId, token, validId])
 
   useEffect(() => {
     void loadPost()
@@ -214,12 +218,15 @@ export function PostPage() {
       return
     }
     if (!canWrite) return
+    const submittedToken = token
     setLiking(true)
     try {
-      const result = await api.toggleLike(token, postId)
+      const result = await api.toggleLike(submittedToken, postId)
+      if (!isCurrentSession(submittedToken)) return
       setDetail((current) => current ? { ...current, is_liked: result.liked, like_count: result.like_count } : current)
     } catch (likeError) {
-      if (handleSessionError(likeError)) {
+      if (!isCurrentSession(submittedToken)) return
+      if (handleSessionError(likeError, submittedToken)) {
         openAuth('login')
         notify('info', '请重新登录后点赞')
       } else {
@@ -230,8 +237,9 @@ export function PostPage() {
     }
   }
 
-  const handlePostActionFailure = (action: string, actionError: unknown) => {
-    if (handleSessionError(actionError)) {
+  const handlePostActionFailure = (action: string, actionError: unknown, submittedToken: string) => {
+    if (!isCurrentSession(submittedToken)) return
+    if (handleSessionError(actionError, submittedToken)) {
       openAuth('login')
       notify('info', '登录状态已失效', '请重新登录后继续。')
       return
@@ -242,10 +250,12 @@ export function PostPage() {
   const togglePin = async (duration?: PostPinDuration) => {
     if (!token || !detail || !isAdmin || !canWrite) return
     if (!detail.post.is_pinned && !canPin) return
+    const submittedToken = token
     setPostAction('pin')
     try {
       if (detail.post.is_pinned) {
-        await api.unpinPost(token, postId)
+        await api.unpinPost(submittedToken, postId)
+        if (!isCurrentSession(submittedToken)) return
         setDetail((current) => current ? {
           ...current,
           post: { ...current.post, is_pinned: false, is_permanent: false, pinned_until: null },
@@ -253,7 +263,8 @@ export function PostPage() {
         notify('success', '已取消置顶')
       } else {
         if (!duration) return
-        const result = await api.pinPost(token, postId, duration)
+        const result = await api.pinPost(submittedToken, postId, duration)
+        if (!isCurrentSession(submittedToken)) return
         setDetail((current) => current ? {
           ...current,
           post: { ...current.post, is_pinned: true, is_permanent: result.is_permanent, pinned_until: result.pinned_until },
@@ -261,7 +272,7 @@ export function PostPage() {
         notify('success', result.is_permanent ? '帖子已永久置顶' : '帖子已置顶', result.is_permanent ? undefined : `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
       }
     } catch (actionError) {
-      handlePostActionFailure(detail.post.is_pinned ? '取消置顶' : '置顶', actionError)
+      handlePostActionFailure(detail.post.is_pinned ? '取消置顶' : '置顶', actionError, submittedToken)
     } finally {
       setPostAction(null)
     }
@@ -269,14 +280,16 @@ export function PostPage() {
 
   const deletePost = async () => {
     if (!token || !detail || !isAdmin || !canWrite) return
+    const submittedToken = token
     setPostAction('delete')
     try {
-      await api.deletePost(token, postId)
+      await api.deletePost(submittedToken, postId)
+      if (!isCurrentSession(submittedToken)) return
       setConfirmDeletePost(false)
       notify('success', '帖子已删除')
       navigate('/', { replace: true })
     } catch (actionError) {
-      handlePostActionFailure('删除', actionError)
+      handlePostActionFailure('删除', actionError, submittedToken)
     } finally {
       setPostAction(null)
     }
@@ -295,10 +308,12 @@ export function PostPage() {
       notify('error', '评论太长了', '请将内容精简后再发布。')
       return
     }
+    const submittedToken = token
 
     setSubmittingComment(true)
     try {
-      await api.createComment(token, postId, { content })
+      await api.createComment(submittedToken, postId, { content })
+      if (!isCurrentSession(submittedToken)) return
       const now = new Date().toISOString()
       const optimisticComment: Comment = {
         id: -Date.now(),
@@ -314,7 +329,8 @@ export function PostPage() {
       setCommentText('')
       notify('success', '评论已发布')
     } catch (commentError) {
-      if (handleSessionError(commentError)) {
+      if (!isCurrentSession(submittedToken)) return
+      if (handleSessionError(commentError, submittedToken)) {
         openAuth('login')
         notify('info', '登录状态已失效', '请重新登录后评论。')
       } else {
@@ -345,15 +361,18 @@ export function PostPage() {
 
   const deleteComment = async () => {
     if (!deleteTarget || !token || !canWrite || deleteTarget.id < 1) return
+    const submittedToken = token
     setDeletingComment(true)
     try {
-      await api.deleteComment(token, deleteTarget.id)
+      await api.deleteComment(submittedToken, deleteTarget.id)
+      if (!isCurrentSession(submittedToken)) return
       setComments((current) => current.filter((comment) => comment.id !== deleteTarget.id))
       setDetail((current) => current ? { ...current, comment_count: Math.max(0, current.comment_count - 1) } : current)
       setDeleteTarget(null)
       notify('success', '评论已删除')
     } catch (deleteError) {
-      if (handleSessionError(deleteError)) openAuth('login')
+      if (!isCurrentSession(submittedToken)) return
+      if (handleSessionError(deleteError, submittedToken)) openAuth('login')
       else notify('error', '删除失败', getErrorMessage(deleteError))
     } finally {
       setDeletingComment(false)

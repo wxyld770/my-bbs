@@ -37,6 +37,18 @@ func (mutedUserLookup) FindUserByID(_ context.Context, id uint) (*model.User, er
 	}, nil
 }
 
+type versionedUserLookup struct {
+	version uint64
+}
+
+func (lookup versionedUserLookup) FindUserByID(_ context.Context, id uint) (*model.User, error) {
+	return &model.User{
+		BaseModel:      model.BaseModel{ID: id},
+		Status:         model.UserStatusNormal,
+		SessionVersion: lookup.version,
+	}, nil
+}
+
 func TestAuthAllowsMutedReadsAndActiveGuardRejectsWrites(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	jwtpkg.Init("muted-read-only-middleware-secret")
@@ -125,7 +137,7 @@ func TestAuthAndOptionalAuthFailClosedWhenRedisFails(t *testing.T) {
 	assertBusinessError(t, authResponse, bizerr.ErrServiceUnavailable)
 
 	optionalRouter := gin.New()
-	optionalRouter.Use(middleware.ErrorHandler(), middleware.OptionalAuth(client))
+	optionalRouter.Use(middleware.ErrorHandler(), middleware.OptionalAuth(activeUserLookup{}, client))
 	optionalRouter.GET("/private", func(c *gin.Context) { c.Status(http.StatusOK) })
 	optionalResponse := performAuthenticatedRequest(optionalRouter, token)
 	assertBusinessError(t, optionalResponse, bizerr.ErrServiceUnavailable)
@@ -150,7 +162,7 @@ func TestOptionalAuthTreatsRevokedTokenAsAnonymous(t *testing.T) {
 	}
 
 	router := gin.New()
-	router.Use(middleware.ErrorHandler(), middleware.OptionalAuth(client))
+	router.Use(middleware.ErrorHandler(), middleware.OptionalAuth(activeUserLookup{}, client))
 	router.GET("/private", func(c *gin.Context) {
 		_, authenticated := middleware.GetUserID(c)
 		c.JSON(http.StatusOK, gin.H{"authenticated": authenticated})
@@ -158,6 +170,34 @@ func TestOptionalAuthTreatsRevokedTokenAsAnonymous(t *testing.T) {
 	response := performAuthenticatedRequest(router, token)
 	if response.Code != http.StatusOK || response.Body.String() != "{\"authenticated\":false}" {
 		t.Fatalf("optional auth response = %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestAuthRejectsStaleSessionVersionAndOptionalAuthTreatsItAsAnonymous(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	jwtpkg.Init("auth-session-version-public-contract-secret")
+	server := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: server.Addr()})
+	t.Cleanup(func() { _ = client.Close() })
+	token, err := jwtpkg.GenerateTokenWithSessionVersion(23, 4)
+	if err != nil {
+		t.Fatalf("GenerateTokenWithSessionVersion() error = %v", err)
+	}
+
+	authRouter := gin.New()
+	authRouter.Use(middleware.ErrorHandler(), middleware.Auth(versionedUserLookup{version: 5}, client))
+	authRouter.GET("/private", func(c *gin.Context) { c.Status(http.StatusOK) })
+	assertBusinessError(t, performAuthenticatedRequest(authRouter, token), bizerr.ErrInvalidToken)
+
+	optionalRouter := gin.New()
+	optionalRouter.Use(middleware.ErrorHandler(), middleware.OptionalAuth(versionedUserLookup{version: 5}, client))
+	optionalRouter.GET("/private", func(c *gin.Context) {
+		_, authenticated := middleware.GetUserID(c)
+		c.JSON(http.StatusOK, gin.H{"authenticated": authenticated})
+	})
+	response := performAuthenticatedRequest(optionalRouter, token)
+	if response.Code != http.StatusOK || response.Body.String() != "{\"authenticated\":false}" {
+		t.Fatalf("stale optional auth response = %d %s", response.Code, response.Body.String())
 	}
 }
 

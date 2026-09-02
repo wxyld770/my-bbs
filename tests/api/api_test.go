@@ -564,6 +564,7 @@ func TestAPI_MutedUserCanLoginAndReadButAllBusinessWritesAreBlocked(t *testing.T
 		{"/api/user/avatar", map[string]string{"avatar_url": "https://example.com/blocked.png"}},
 		{fmt.Sprintf("/api/users/%d/mute", user.ID), nil},
 		{fmt.Sprintf("/api/users/%d/unmute", user.ID), nil},
+		{fmt.Sprintf("/api/users/%d/reset-password", user.ID), nil},
 	}
 	for _, write := range writes {
 		response := doJSON(t, r, http.MethodPost, write.path, mutedToken, write.body)

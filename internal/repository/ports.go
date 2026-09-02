@@ -12,6 +12,14 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user *model.User) error
 	FindUserByUsername(ctx context.Context, username string) (*model.User, error)
 	FindUserByID(ctx context.Context, id uint) (*model.User, error)
+	// UpdatePasswordHash 必须以 expectedSessionVersion 做 CAS，并将密码哈希更新
+	// 与 session_version 递增组成原子操作。
+	UpdatePasswordHash(
+		ctx context.Context,
+		id uint,
+		expectedSessionVersion uint64,
+		passwordHash string,
+	) error
 	UpdateUserStatus(ctx context.Context, id uint, status uint) error
 	UpdateProfile(ctx context.Context, id uint, nickname, introduction string) error
 	UpdateAvatar(ctx context.Context, id uint, avatarURL string, changedAt, eligibleBefore time.Time) error
@@ -24,6 +32,14 @@ type InvitationRepository interface {
 	CreateInvitation(ctx context.Context, invitation *model.Invitation) error
 	HasCreatorEverPublishedPost(ctx context.Context, creatorID uint) (bool, error)
 	RegisterUserWithInvitation(ctx context.Context, user *model.User, code string) error
+}
+
+// MessageRepository 是留言用例所需的持久化端口。
+// FindByUserID 必须始终带 userID 条件，作为普通用户数据隔离的最后一道边界。
+type MessageRepository interface {
+	CreateMessage(ctx context.Context, message *model.Message) error
+	FindMessagesByUserID(ctx context.Context, userID uint, offset, limit int) ([]model.Message, error)
+	FindAllMessages(ctx context.Context, offset, limit int) ([]model.Message, error)
 }
 
 // UserReader 是帖子和评论用例所需的用户只读端口。

@@ -21,7 +21,8 @@ var (
 const tokenIssuer = "my-bbs"
 
 type Claims struct {
-	UserID uint `json:"user_id"`
+	UserID         uint   `json:"user_id"`
+	SessionVersion uint64 `json:"session_version"`
 	jwt.RegisteredClaims
 }
 
@@ -44,6 +45,12 @@ func getSecretKey() ([]byte, error) {
 // GenerateToken 生成 JWT，有效期 24 小时。每个 Token 都有独立的随机 JTI，
 // 用于精确撤销当前 Token，而不影响同一用户的其他登录会话。
 func GenerateToken(userID uint) (string, error) {
+	return GenerateTokenWithSessionVersion(userID, 0)
+}
+
+// GenerateTokenWithSessionVersion 生成绑定用户当前会话版本的 JWT。
+// 密码变更递增版本后，此前签发的 Token 会在认证边界被统一拒绝。
+func GenerateTokenWithSessionVersion(userID uint, sessionVersion uint64) (string, error) {
 	key, err := getSecretKey()
 	if err != nil {
 		return "", err
@@ -55,7 +62,8 @@ func GenerateToken(userID uint) (string, error) {
 
 	now := time.Now()
 	claims := Claims{
-		UserID: userID,
+		UserID:         userID,
+		SessionVersion: sessionVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        tokenID,
 			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),

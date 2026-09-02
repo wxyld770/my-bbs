@@ -2,8 +2,10 @@ import type {
   ApiEnvelope,
   ApiMessage,
   ApiResponse,
+  ChangePasswordRequest,
   Comment,
   CreateCommentRequest,
+  CreateMessageRequest,
   CreatePostRequest,
   HotPostData,
   InvitationData,
@@ -20,6 +22,7 @@ import type {
   RegisterRequest,
   SearchData,
   SearchQuery,
+  SiteMessage,
   UpdatePostRequest,
   UpdateAvatarRequest,
   UpdateProfileRequest,
@@ -99,8 +102,14 @@ export const tokenStore = {
     }
   },
 
-  clear(): void {
+  clear(expectedToken?: string): void {
     try {
+      if (
+        expectedToken !== undefined &&
+        globalThis.localStorage?.getItem(TOKEN_STORAGE_KEY) !== expectedToken
+      ) {
+        return
+      }
       globalThis.localStorage?.removeItem(TOKEN_STORAGE_KEY)
     } catch {
       // Clearing an unavailable store is already the desired effective state.
@@ -254,6 +263,19 @@ export const api = {
     return requestData(`/users/${encodeId(userId)}`)
   },
 
+  changePassword(
+    token: string,
+    input: ChangePasswordRequest,
+    signal?: AbortSignal,
+  ): Promise<ApiMessage> {
+    return requestMessage('/user/password', {
+      method: 'POST',
+      token,
+      body: input,
+      signal,
+    })
+  },
+
   updateProfile(
     token: string,
     input: UpdateProfileRequest,
@@ -297,6 +319,50 @@ export const api = {
     })
   },
 
+  resetUserPassword(token: string, userId: number): Promise<ApiMessage> {
+    return requestMessage(`/users/${encodeId(userId)}/reset-password`, {
+      method: 'POST',
+      token,
+    })
+  },
+
+  createMessage(
+    token: string,
+    input: CreateMessageRequest,
+    signal?: AbortSignal,
+  ): Promise<ApiMessage> {
+    return requestMessage('/messages', {
+      method: 'POST',
+      token,
+      body: input,
+      signal,
+    })
+  },
+
+  listMyMessages(
+    token: string,
+    query: PageQuery = {},
+    signal?: AbortSignal,
+  ): Promise<PageData<SiteMessage>> {
+    return requestData('/messages', {
+      token,
+      query: pageQuery(query),
+      signal,
+    })
+  },
+
+  listAdminMessages(
+    token: string,
+    query: PageQuery = {},
+    signal?: AbortSignal,
+  ): Promise<PageData<SiteMessage>> {
+    return requestData('/admin/messages', {
+      token,
+      query: pageQuery(query),
+      signal,
+    })
+  },
+
   search(query: SearchQuery, signal?: AbortSignal): Promise<SearchData> {
     return requestData('/search', {
       signal,
@@ -320,11 +386,13 @@ export const api = {
   listMyPosts(
     token: string,
     query: PageQuery = {},
+    signal?: AbortSignal,
   ): Promise<PageData<PostListItem>> {
     return requestData('/user/posts', {
       method: 'POST',
       token,
       query: pageQuery(query),
+      signal,
     })
   },
 

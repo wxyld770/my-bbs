@@ -18,6 +18,7 @@ import (
 	"my-bbs/internal/middleware"
 	"my-bbs/internal/modules/comment"
 	"my-bbs/internal/modules/like"
+	"my-bbs/internal/modules/message"
 	"my-bbs/internal/modules/post"
 	"my-bbs/internal/modules/search"
 	"my-bbs/internal/modules/user"
@@ -112,6 +113,7 @@ func main() {
 	postMod := post.Initialize(db, redisStores.Persist, adminUsers, postCountCache)
 	commentMod := comment.Initialize(db, redisStores.Persist, postCountCache)
 	likeMod := like.Initialize(db, redisStores.Persist, postCountCache)
+	messageMod := message.Initialize(db, redisStores.Persist, adminUsers)
 	searchMod := search.Initialize(db, cfg.SearchTimeout)
 	rateLimiter, err := middleware.NewTieredRateLimiter(middleware.TieredRateLimitConfig{
 		Login: middleware.RateLimitPolicy{
@@ -153,6 +155,7 @@ func main() {
 			postMod,
 			commentMod,
 			likeMod,
+			messageMod,
 			searchMod,
 		},
 		// LRU 缓存允许短暂不可用；readyz 只依赖数据库和不可淘汰的 Persist Redis。

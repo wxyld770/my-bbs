@@ -18,7 +18,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, manageable = false, onChanged }: PostCardProps) {
-  const { token, user, canWrite, handleSessionError } = useAuth()
+  const { token, user, canWrite, isCurrentSession, handleSessionError } = useAuth()
   const { openAuth, openComposer, notify, refreshContent } = useUI()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [busyAction, setBusyAction] = useState<'delete' | 'edit' | 'pin' | 'visibility' | null>(null)
@@ -31,8 +31,9 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
   const likeCount = hasLikeCount ? formatCount(post.like_count) : '—'
   const commentCount = hasCommentCount ? formatCount(post.comment_count) : '—'
 
-  const handleFailure = (error: unknown) => {
-    if (handleSessionError(error)) {
+  const handleFailure = (error: unknown, submittedToken: string) => {
+    if (!isCurrentSession(submittedToken)) return
+    if (handleSessionError(error, submittedToken)) {
       openAuth('login')
       notify('info', '登录状态已失效', '请重新登录后继续。')
       return
@@ -45,15 +46,17 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
       openAuth('login')
       return
     }
+    const submittedToken = token
     setBusyAction('visibility')
     try {
       const next = post.visible === POST_VISIBILITY.PUBLIC ? POST_VISIBILITY.PRIVATE : POST_VISIBILITY.PUBLIC
-      await api.setPostVisibility(token, post.id, next)
+      await api.setPostVisibility(submittedToken, post.id, next)
+      if (!isCurrentSession(submittedToken)) return
       notify('success', next === POST_VISIBILITY.PUBLIC ? '已公开' : '已设为仅自己可见')
       refreshContent()
       onChanged?.()
     } catch (error) {
-      handleFailure(error)
+      handleFailure(error, submittedToken)
     } finally {
       setBusyAction(null)
     }
@@ -64,12 +67,14 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
       openAuth('login')
       return
     }
+    const submittedToken = token
     setBusyAction('edit')
     try {
-      const detail = await api.getPost(post.id, token)
+      const detail = await api.getPost(post.id, submittedToken)
+      if (!isCurrentSession(submittedToken)) return
       openComposer(detail.post)
     } catch (error) {
-      handleFailure(error)
+      handleFailure(error, submittedToken)
     } finally {
       setBusyAction(null)
     }
@@ -81,15 +86,17 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
       openAuth('login')
       return
     }
+    const submittedToken = token
     setBusyAction('delete')
     try {
-      await api.deletePost(token, post.id)
+      await api.deletePost(submittedToken, post.id)
+      if (!isCurrentSession(submittedToken)) return
       setConfirmDelete(false)
       notify('success', '帖子已删除')
       refreshContent()
       onChanged?.()
     } catch (error) {
-      handleFailure(error)
+      handleFailure(error, submittedToken)
     } finally {
       setBusyAction(null)
     }
@@ -102,20 +109,23 @@ export function PostCard({ post, manageable = false, onChanged }: PostCardProps)
     }
     if (!isAdmin) return
     if (!post.is_pinned && !canPin) return
+    const submittedToken = token
     setBusyAction('pin')
     try {
       if (post.is_pinned) {
-        await api.unpinPost(token, post.id)
+        await api.unpinPost(submittedToken, post.id)
+        if (!isCurrentSession(submittedToken)) return
         notify('success', '已取消置顶')
       } else {
         if (!duration) return
-        const result = await api.pinPost(token, post.id, duration)
+        const result = await api.pinPost(submittedToken, post.id, duration)
+        if (!isCurrentSession(submittedToken)) return
         notify('success', result.is_permanent ? '帖子已永久置顶' : '帖子已置顶', result.is_permanent ? undefined : `将在 ${formatDateTime(result.pinned_until)} 自动取消置顶。`)
       }
       refreshContent()
       onChanged?.()
     } catch (error) {
-      handleFailure(error)
+      handleFailure(error, submittedToken)
     } finally {
       setBusyAction(null)
     }

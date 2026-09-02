@@ -6,6 +6,7 @@ import { Shell } from './components/Shell'
 import { ToastRegion } from './components/ToastRegion'
 import { HomePage } from './pages/HomePage'
 import { MePage } from './pages/MePage'
+import { MessagesPage } from './pages/MessagesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PostPage } from './pages/PostPage'
 import { SearchPage } from './pages/SearchPage'
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="search" element={<SearchPage />} />
           <Route path="post/:id" element={<PostPage />} />
           <Route path="me" element={<MePage />} />
+          <Route path="messages" element={<MessagesPage />} />
           <Route path="u/:id" element={<UserPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

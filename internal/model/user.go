@@ -11,11 +11,13 @@ const (
 // User 用户模型
 type User struct {
 	BaseModel
-	Username     string `gorm:"type:varchar(64);not null;uniqueIndex;comment:用户名" json:"username"`
-	Password     string `gorm:"type:varchar(255);not null" json:"-"` // 不返回给前端
-	Nickname     string `gorm:"type:varchar(64);comment:用户昵称" json:"nickname"`
-	Status       uint   `gorm:"type:tinyint(4);default:1;comment:用户状态，1:正常，0禁言" json:"status"`
-	Introduction string `gorm:"type:varchar(1024);comment:个人介绍" json:"introduction"`
+	Username string `gorm:"type:varchar(64);not null;uniqueIndex;comment:用户名" json:"username"`
+	Password string `gorm:"type:varchar(255);not null" json:"-"` // 不返回给前端
+	// SessionVersion 在密码变更时递增，并与 JWT 中的版本比对，使旧会话立即失效。
+	SessionVersion uint64 `gorm:"column:session_version;not null;default:0;comment:会话版本" json:"-"`
+	Nickname       string `gorm:"type:varchar(64);comment:用户昵称" json:"nickname"`
+	Status         uint   `gorm:"type:tinyint(4);default:1;comment:用户状态，1:正常，0禁言" json:"status"`
+	Introduction   string `gorm:"type:varchar(1024);comment:个人介绍" json:"introduction"`
 	// AvatarURL 在生产 full_ddl.sql 中使用 utf8mb4_bin，保留 URL 路径的大小写语义。
 	AvatarURL string `gorm:"column:avatar_url;type:varchar(2048);comment:头像图片链接" json:"avatar_url"`
 	// AvatarUpdatedAt 独立记录头像修改时间，避免昵称/简介更新占用头像修改额度。

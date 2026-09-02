@@ -76,6 +76,35 @@ func (h *UserHandler) Login(c *gin.Context) {
 	response.OK(c, httpresp.NewLoginResponse(token))
 }
 
+// ChangePassword 校验原密码并修改当前账号密码。成功后不签发新 Token；
+// session_version 已递增，调用方必须清除旧 Token 并重新登录。
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	userID, userIDOK := middleware.GetUserID(c)
+	sessionVersion, sessionVersionOK := middleware.GetSessionVersion(c)
+	if !userIDOK || !sessionVersionOK {
+		response.ReportError(c, bizerr.ErrInvalidToken)
+		return
+	}
+
+	var req httpreq.ChangePasswordRequest
+	if err := httpreq.BindJSON(c, &req); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+	if err := h.userService.ChangePassword(
+		c.Request.Context(),
+		userID,
+		sessionVersion,
+		req.OldPassword,
+		req.NewPassword,
+	); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+
+	response.OKMsg(c, "密码修改成功，请重新登录")
+}
+
 // Logout 使当前请求使用的 Token 立即失效。
 func (h *UserHandler) Logout(c *gin.Context) {
 	tokenID, tokenIDOK := middleware.GetTokenID(c)
@@ -173,6 +202,24 @@ func (h *UserHandler) MuteUser(c *gin.Context) {
 
 func (h *UserHandler) UnmuteUser(c *gin.Context) {
 	h.setUserStatus(c, model.UserStatusNormal, "用户已解除禁言")
+}
+
+func (h *UserHandler) ResetUserPassword(c *gin.Context) {
+	targetID, err := strconv.Atoi(c.Param("id"))
+	if err != nil || targetID <= 0 {
+		response.ReportError(c, bizerr.ErrInvalidUserID)
+		return
+	}
+	actorID, ok := middleware.GetUserID(c)
+	if !ok {
+		response.ReportError(c, bizerr.ErrUnauthorized)
+		return
+	}
+	if err := h.userService.ResetUserPassword(c.Request.Context(), actorID, uint(targetID)); err != nil {
+		response.ReportError(c, err)
+		return
+	}
+	response.OKMsg(c, "密码已重置为用户名")
 }
 
 func (h *UserHandler) setUserStatus(c *gin.Context, status uint, successMessage string) {

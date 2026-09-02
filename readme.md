@@ -38,7 +38,7 @@ my-bbs/
 │   ├── cache/                  # 可回源的 LRU 帖子互动计数缓存
 │   ├── authsession/            # Token 撤销的 Redis 语义
 │   ├── logger/                 # 异步日志
-│   ├── model/                  # User / Post / Comment / PostLike / BaseModel
+│   ├── model/                  # User / Invitation / Message / Post / Comment / PostLike
 │   ├── repository/             # Repository Port 接口与通用错误
 │   │   └── gormrepo/           # GORM Repository Adapter
 │   ├── service/                # 业务逻辑，只依赖必要的抽象契约
@@ -46,7 +46,7 @@ my-bbs/
 │   │   ├── httprequest/        # 独立请求模型、严格 JSON 绑定与验证错误转换
 │   │   └── httpresponse/       # 独立对外响应模型及边界转换
 │   ├── middleware/             # Auth / OptionalAuth / 日志 / Recovery / ErrorHandler
-│   ├── modules/                # 模块 DI + 路由注册（user/post/comment/like）
+│   ├── modules/                # 模块 DI + 路由注册（user/message/post/comment/like/search）
 │   └── router/                 # 路由组装
 ├── pkg/
 │   ├── bizerr/                 # 业务异常
@@ -65,9 +65,10 @@ my-bbs/
 - ✅ 登录用户注册满 7 天，或曾成功发布过帖子后可生成邀请码；明文仅在创建响应中展示一次
 - ✅ 用户名唯一索引，密码 bcrypt
 - ✅ 登录（返回带独立 JTI 的 JWT）
+- ✅ 登录用户使用原密码修改自己的密码；成功后全部既有 JWT 立即失效并要求重新登录
 - ✅ 管理员账号由 `ADMIN_USERNAMES` 配置（逗号分隔，仅授权已有账号）
-- ✅ 管理员可禁言和解除禁言普通用户
-- ✅ 禁言账号仍可登录、退出、查询和浏览；发帖、编辑、评论、点赞、资料修改和邀请码等业务写操作统一禁用
+- ✅ 管理员可禁言、解除禁言普通用户，并可将普通用户密码重置为其用户名
+- ✅ 禁言账号仍可登录、退出、查询、浏览、修改密码和提交留言申诉；其他业务写操作统一禁用
 - ✅ 当前用户资料 `GET /user/me`
 - ✅ 修改昵称 / 个人介绍
 - ✅ 使用 HTTPS 图片链接设置头像（每 24 小时最多修改一次，清空恢复默认头像）
@@ -85,6 +86,7 @@ my-bbs/
 ### 互动
 - ✅ 评论（发表 / 分页列表 / 作者删除）
 - ✅ 点赞（切换；返回 `liked` + `like_count`）
+- ✅ 用户留言（提交 / 查看自己的历史；管理员查看全部）
 
 ### 工程能力
 - ✅ 统一响应 `{code,message,data}` + `bizerr`
@@ -289,9 +291,10 @@ MariaDB 10.3 上重复执行。CI 会在与当前生产一致的 MariaDB 10.3.28
 升级以及升级后再次执行。正式发布包会记录 SQL 的 SHA-256，服务器在切换新版本前
 校验并执行它；执行失败时不会激活新应用版本。
 
-这个自动脚本只允许向后兼容的扩展：新增表、新增可空列和新增索引。`DROP`、
-`TRUNCATE`、`RENAME`、缩窄类型、改为 `NOT NULL` 等破坏性 DDL 必须使用独立的
-维护脚本，在备份、恢复演练和维护窗口中人工执行。MariaDB 的 DDL 可能隐式提交，
+这个自动脚本只允许向后兼容的扩展：新增表、新增可空列、新增带确定默认值的
+非空列和新增索引。`DROP`、`TRUNCATE`、`RENAME`、缩窄类型、将已有列改为
+`NOT NULL` 等破坏性 DDL 必须使用独立的维护脚本，在备份、恢复演练和维护窗口中人工执行。
+MariaDB 的 DDL 可能隐式提交，
 所以应用版本回滚不会撤销已经成功执行的数据库变更。
 
 文件前部的完整建表语句作为已经审计的线上基线保留，不再因后续功能重写。以后新增
@@ -405,6 +408,7 @@ Persist Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Tok
 | POST | `/api/register` | 否 | 使用 6 位邀请码注册 |
 | POST | `/api/login` | 否 | 登录，返回带独立 JTI 的 Token |
 | POST | `/api/logout` | 是 | 立即撤销当前 Token |
+| POST | `/api/user/password` | 是 | 使用原密码修改自己的密码；禁言账号也可使用，成功后全部既有 JWT 失效 |
 | POST | `/api/invitations` | 是 | 注册满 7 天或曾成功发布过帖子后，生成一个单次使用邀请码；帖子后续转私密或删除不收回资格 |
 | GET | `/api/user/me` | 是 | 当前登录用户资料 |
 | POST | `/api/user/profile` | 是 | 修改昵称/介绍 |
@@ -422,6 +426,10 @@ Persist Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Tok
 | POST | `/api/posts/visible/:id` | 是 | 设置可见性 |
 | POST | `/api/users/:id/mute` | 管理员 | 禁言普通用户 |
 | POST | `/api/users/:id/unmute` | 管理员 | 解除普通用户禁言 |
+| POST | `/api/users/:id/reset-password` | 管理员 | 将普通用户密码重置为其用户名；管理员账号不可重置 |
+| POST | `/api/messages` | 是 | 向管理员提交留言；禁言账号也可用于申诉 |
+| GET | `/api/messages` | 是 | 分页查看当前用户自己的历史留言 |
+| GET | `/api/admin/messages` | 管理员 | 分页查看全部用户留言 |
 | POST | `/api/user/posts` | 是 | 我的帖子（支持 `pageNo`/`pageSize`） |
 | GET | `/api/posts/:id/comments` | 否 | 评论列表（公开帖，分页） |
 | POST | `/api/posts/:id/comments/create` | 是 | 发表评论 |
@@ -470,9 +478,23 @@ POST /api/user/posts?pageNo=1&pageSize=10
 `false`、`null`、`false`；永久置顶可由管理员主动取消。
 
 禁言是只读限制，不是封号：密码正确时仍可登录，既有 Token 也可继续用于读取
-`/api/user/me`、`/api/user/posts` 和公开内容，并可正常退出。所有业务写接口统一返回
+`/api/user/me`、`/api/user/posts`、`/api/messages` 和公开内容，并可正常退出。留言是
+禁言用户的申诉通道，因此仍可调用 `POST /api/messages`；修改密码属于账号安全操作，
+禁言用户也可调用 `POST /api/user/password`。其他业务写接口统一返回
 `40303`，包括帖子发布/修改/删除/可见性/置顶、评论、点赞、邀请码、头像和资料修改，
 以及管理员操作。
+
+自助修改密码提交 `{ "old_password": "原密码", "new_password": "新密码" }`。密码按原样
+比较，不自动去除首尾空格；新密码必须为 6～64 个字符且 UTF-8 编码不超过 72 字节，
+并且不能与原密码相同。修改成功不签发替代 Token，而是递增用户会话版本，使该账号
+此前签发的全部 JWT（包括发起修改的当前 Token）立即失效，用户需要使用新密码重新登录。
+
+留言提交 body 为 `{ "content": "..." }`，去除首尾空白后必须为 1～2000 个字符。
+用户只能按时间倒序查看自己的留言；只有配置中的活动管理员可分页查看全部留言。
+
+管理员重置密码是临时人工恢复能力：目标用户的新密码会变为公开用户名，重置会递增
+用户会话版本，使此前签发的 JWT 全部失效。由于用户名本身公开，它仍不应作为长期
+生产级账号恢复方案；上线环境应继续演进为高熵一次性凭据和首次登录强制改密。
 
 今日最热从应用本地时区的昨日 00:00 到明日 00:00 之间发布的公开帖子中选取，
 服务端按 `评论数 × 0.600 + 点赞数 × 0.400` 计算三位小数热度。排序依次为热度、

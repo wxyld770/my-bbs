@@ -59,6 +59,35 @@ func (r *UserRepository) FindUsersByIDs(ctx context.Context, ids []uint) ([]mode
 	return users, nil
 }
 
+// UpdatePasswordHash 只接收已经在应用层生成的密码哈希，并以调用方认证时
+// 看到的会话版本做 CAS。更新密码与递增会话版本在同一条 SQL 中完成。
+func (r *UserRepository) UpdatePasswordHash(
+	ctx context.Context,
+	id uint,
+	expectedSessionVersion uint64,
+	passwordHash string,
+) error {
+	result := r.db.WithContext(ctx).Model(&model.User{}).
+		Where("id = ? AND session_version = ?", id, expectedSessionVersion).
+		Updates(map[string]any{
+			"password":        passwordHash,
+			"session_version": gorm.Expr("session_version + ?", 1),
+		})
+	if result.Error != nil {
+		return translateError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		// 记录仍存在说明认证/读取之后发生了另一笔密码更新，调用方不得覆盖。
+		// 这里回读仅用于把真正的用户不存在与 CAS 冲突区分开。
+		var user model.User
+		if err := r.db.WithContext(ctx).Select("id").First(&user, id).Error; err != nil {
+			return translateError(err)
+		}
+		return repository.ErrPasswordUpdateConflict
+	}
+	return nil
+}
+
 func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error {
 	return translateError(r.db.WithContext(ctx).Updates(user).Error)
 }

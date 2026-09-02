@@ -12,6 +12,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6,max=64"`
+}
+
 type UpdateProfileRequest struct {
 	Nickname     string `json:"nickname" binding:"max=64"`
 	Introduction string `json:"introduction" binding:"max=1024"`

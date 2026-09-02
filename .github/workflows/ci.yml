@@ -150,7 +150,7 @@ jobs:
               --raw \
               --skip-column-names \
               --execute='SELECT CONCAT(
-                (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME IN ("comments", "post_likes", "posts", "users", "invitations") AND TABLE_TYPE = "BASE TABLE"),
+                (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME IN ("comments", "post_likes", "posts", "users", "invitations", "messages") AND TABLE_TYPE = "BASE TABLE"),
                 ":",
                 (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "invite_code" AND LOWER(COLUMN_TYPE) = "char(6)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_unicode_ci" AND COLUMN_COMMENT = "注册时使用的邀请码"),
                 ":",
@@ -158,7 +158,11 @@ jobs:
                 ":",
                 (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "avatar_updated_at" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "头像最后修改时间"),
                 ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "session_version" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "NO" AND CAST(COLUMN_DEFAULT AS CHAR) = "0" AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "会话版本"),
+                ":",
                 (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations" AND UPPER(ENGINE) = "INNODB" AND LOWER(TABLE_COLLATION) = "utf8mb4_unicode_ci"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "messages" AND UPPER(ENGINE) = "INNODB" AND LOWER(TABLE_COLLATION) = "utf8mb4_unicode_ci"),
                 ":",
                 (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "invitations"),
                 ":",
@@ -172,20 +176,42 @@ jobs:
                   (COLUMN_NAME = "used_at" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "使用时间")
                 )),
                 ":",
-                (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND SUB_PART IS NULL AND UPPER(INDEX_TYPE) = "BTREE" AND SEQ_IN_INDEX = 1 AND (
-                  (TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code" AND NON_UNIQUE = 0 AND COLUMN_NAME = "invite_code") OR
-                  (TABLE_NAME = "invitations" AND INDEX_NAME = "PRIMARY" AND NON_UNIQUE = 0 AND COLUMN_NAME = "id") OR
-                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_code" AND NON_UNIQUE = 0 AND COLUMN_NAME = "code") OR
-                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_creator_id" AND NON_UNIQUE = 1 AND COLUMN_NAME = "creator_id") OR
-                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_used_by" AND NON_UNIQUE = 0 AND COLUMN_NAME = "used_by")
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "messages"),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "messages" AND (
+                  (COLUMN_NAME = "id" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND LOWER(EXTRA) = "auto_increment" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "主键ID") OR
+                  (COLUMN_NAME = "create_time" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "创建时间") OR
+                  (COLUMN_NAME = "update_time" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "更新时间") OR
+                  (COLUMN_NAME = "deleted" AND LOWER(COLUMN_TYPE) = "datetime(3)" AND IS_NULLABLE = "YES" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "删除时间，空表示未删除") OR
+                  (COLUMN_NAME = "user_id" AND LOWER(COLUMN_TYPE) = "bigint(20) unsigned" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND CHARACTER_SET_NAME IS NULL AND COLUMN_COMMENT = "留言用户ID") OR
+                  (COLUMN_NAME = "content" AND LOWER(COLUMN_TYPE) = "text" AND IS_NULLABLE = "NO" AND (COLUMN_DEFAULT IS NULL OR CAST(COLUMN_DEFAULT AS CHAR) = "NULL") AND COALESCE(EXTRA, "") = "" AND LOWER(CHARACTER_SET_NAME) = "utf8mb4" AND LOWER(COLLATION_NAME) = "utf8mb4_unicode_ci" AND COLUMN_COMMENT = "留言内容")
+                )),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND SUB_PART IS NULL AND UPPER(INDEX_TYPE) = "BTREE" AND (
+                  (TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code" AND NON_UNIQUE = 0 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "invite_code") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "PRIMARY" AND NON_UNIQUE = 0 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "id") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_code" AND NON_UNIQUE = 0 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "code") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_creator_id" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "creator_id") OR
+                  (TABLE_NAME = "invitations" AND INDEX_NAME = "idx_invitations_used_by" AND NON_UNIQUE = 0 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "used_by") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "PRIMARY" AND NON_UNIQUE = 0 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "id") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_user_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "user_id") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_user_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 2 AND COLUMN_NAME = "deleted") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_user_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 3 AND COLUMN_NAME = "create_time") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_user_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 4 AND COLUMN_NAME = "id") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 1 AND COLUMN_NAME = "deleted") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 2 AND COLUMN_NAME = "create_time") OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME = "idx_messages_deleted_created" AND NON_UNIQUE = 1 AND SEQ_IN_INDEX = 3 AND COLUMN_NAME = "id")
                 )),
                 ":",
                 (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND (
                   (TABLE_NAME = "users" AND INDEX_NAME = "idx_users_invite_code") OR
-                  (TABLE_NAME = "invitations" AND INDEX_NAME IN ("PRIMARY", "idx_invitations_code", "idx_invitations_creator_id", "idx_invitations_used_by"))
-                ))
+                  (TABLE_NAME = "invitations" AND INDEX_NAME IN ("PRIMARY", "idx_invitations_code", "idx_invitations_creator_id", "idx_invitations_used_by")) OR
+                  (TABLE_NAME = "messages" AND INDEX_NAME IN ("PRIMARY", "idx_messages_user_deleted_created", "idx_messages_deleted_created"))
+                )),
+                ":",
+                (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "messages")
               );')"
-            if [[ "${state}" != "5:1:1:1:1:7:7:5:5" ]]; then
+            if [[ "${state}" != "6:1:1:1:1:1:1:7:7:6:6:13:13:8" ]]; then
               printf 'unexpected schema contract state: %q\n' "${state}" >&2
               return 1
             fi
@@ -218,7 +244,10 @@ jobs:
                   COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
                   COALESCE(DATE_FORMAT(`deleted`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
                   HEX(`username`), HEX(`password`), COALESCE(HEX(`nickname`), "<NULL>"),
-                  COALESCE(CAST(`status` AS CHAR), "<NULL>"), COALESCE(HEX(`introduction`), "<NULL>")
+                  COALESCE(CAST(`status` AS CHAR), "<NULL>"), COALESCE(HEX(`introduction`), "<NULL>"),
+                  COALESCE(HEX(`avatar_url`), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`avatar_updated_at`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(HEX(`invite_code`), "<NULL>")
                 ) AS `payload` FROM `users`
                 UNION ALL
                 SELECT "posts", `id`, CONCAT_WS("|",
@@ -241,8 +270,32 @@ jobs:
                   COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
                   CAST(`post_id` AS CHAR), CAST(`user_id` AS CHAR)
                 ) FROM `post_likes`
+                UNION ALL
+                SELECT "invitations", `id`, CONCAT_WS("|",
+                  COALESCE(DATE_FORMAT(`create_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`update_time`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>"),
+                  HEX(`code`), CAST(`creator_id` AS CHAR),
+                  COALESCE(CAST(`used_by` AS CHAR), "<NULL>"),
+                  COALESCE(DATE_FORMAT(`used_at`, "%Y-%m-%d %H:%i:%s.%f"), "<NULL>")
+                ) FROM `invitations`
               ) AS `production_rows`
               ORDER BY `table_name`, `id`;'
+          }
+
+          stable_production_schema_snapshot() {
+            docker exec "${container}" mysqldump \
+              --user=root \
+              --password="${db_password}" \
+              --default-character-set=utf8mb4 \
+              --no-data \
+              --skip-comments \
+              --skip-add-drop-table \
+              --skip-lock-tables \
+              my_bbs \
+              comments \
+              post_likes \
+              posts \
+              invitations
           }
 
           # A clean database and a fully provisioned database must both converge.
@@ -266,7 +319,8 @@ jobs:
               (SELECT COUNT(*) FROM `posts`) +
               (SELECT COUNT(*) FROM `comments`) +
               (SELECT COUNT(*) FROM `post_likes`) +
-              (SELECT COUNT(*) FROM `invitations`);')"
+              (SELECT COUNT(*) FROM `invitations`) +
+              (SELECT COUNT(*) FROM `messages`);')"
           [[ "${empty_rows}" == "0" ]]
 
           reset_database() {
@@ -331,12 +385,33 @@ jobs:
                   `nickname` VARCHAR(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT "用户昵称",
                   `status` TINYINT(4) DEFAULT 1 COMMENT "用户状态，1:正常，0禁言",
                   `introduction` VARCHAR(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT "个人介绍",
+                  `avatar_url` VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT "头像图片链接",
+                  `avatar_updated_at` DATETIME(3) DEFAULT NULL COMMENT "头像最后修改时间",
+                  `invite_code` CHAR(6) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT "注册时使用的邀请码",
                   PRIMARY KEY (`id`),
                   UNIQUE KEY `idx_users_username` (`username`),
-                  KEY `idx_users_deleted` (`deleted`)
+                  KEY `idx_users_deleted` (`deleted`),
+                  UNIQUE KEY `idx_users_invite_code` (`invite_code`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                INSERT INTO `users` (`id`, `create_time`, `username`, `password`, `nickname`, `status`, `introduction`)
-                VALUES (101, "2026-01-02 03:04:05.123", "legacy-user", "legacy-password", "Legacy", 1, "existing row");
+                CREATE TABLE `invitations` (
+                  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT "主键ID",
+                  `create_time` DATETIME(3) DEFAULT NULL COMMENT "创建时间",
+                  `update_time` DATETIME(3) DEFAULT NULL COMMENT "更新时间",
+                  `code` CHAR(6) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT "邀请码",
+                  `creator_id` BIGINT(20) UNSIGNED NOT NULL COMMENT "创建用户ID",
+                  `used_by` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT "使用用户ID",
+                  `used_at` DATETIME(3) DEFAULT NULL COMMENT "使用时间",
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `idx_invitations_code` (`code`),
+                  KEY `idx_invitations_creator_id` (`creator_id`),
+                  UNIQUE KEY `idx_invitations_used_by` (`used_by`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+                INSERT INTO `users` (`id`, `create_time`, `update_time`, `username`, `password`, `nickname`, `status`, `introduction`, `avatar_url`, `avatar_updated_at`, `invite_code`)
+                VALUES
+                  (101, "2026-01-02 03:04:05.123", "2026-02-02 03:04:05.456", "legacy-user", "legacy-password", "Legacy", 1, "existing row", "https://example.com/legacy-avatar.png", "2026-02-02 03:04:05.456", "ABC123"),
+                  (102, "2025-12-01 01:02:03.004", "2026-01-01 01:02:03.005", "inviter", "inviter-password", "Inviter", 1, "invitation creator", NULL, NULL, NULL);
+                INSERT INTO `invitations` (`id`, `create_time`, `update_time`, `code`, `creator_id`, `used_by`, `used_at`)
+                VALUES (501, "2026-01-01 02:03:04.005", "2026-01-02 03:04:05.123", "ABC123", 102, 101, "2026-01-02 03:04:05.123");
                 INSERT INTO `posts` (`id`, `create_time`, `user_id`, `title`, `content`, `visible`, `pinned_until`)
                 VALUES (201, "2026-01-03 03:04:05.123", 101, "legacy title", "legacy content", 1, "2026-09-01 00:00:00.000");
                 INSERT INTO `comments` (`id`, `create_time`, `post_id`, `user_id`, `content`)
@@ -402,15 +477,7 @@ jobs:
           # update this fixture only after that schema is already the production base.
           reset_database
           load_production_baseline
-          production_before="$(production_data_snapshot)"
-          apply_ddl
-          assert_schema_contract
-          apply_ddl
-          assert_schema_contract
-          production_after="$(production_data_snapshot)"
-          [[ "${production_before}" == "${production_after}" ]]
-
-          legacy_state="$(docker exec "${container}" mysql \
+          baseline_state="$(docker exec "${container}" mysql \
             --user=root \
             --password="${db_password}" \
             --database=my_bbs \
@@ -418,13 +485,46 @@ jobs:
             --raw \
             --skip-column-names \
             --execute='SELECT CONCAT(
-              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `invite_code` IS NULL),
+              (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_TYPE = "BASE TABLE"),
               ":",
-              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `avatar_url` IS NULL AND `avatar_updated_at` IS NULL),
+              (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "messages"),
               ":",
-              (SELECT COUNT(*) FROM `invitations`)
+              (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_NAME = "users" AND COLUMN_NAME = "session_version")
             );')"
-          [[ "${legacy_state}" == "1:1:0" ]]
+          [[ "${baseline_state}" == "5:0:0" ]]
+
+          production_before="$(production_data_snapshot)"
+          stable_schema_before="$(stable_production_schema_snapshot)"
+          apply_ddl
+          assert_schema_contract
+          apply_ddl
+          assert_schema_contract
+          production_after="$(production_data_snapshot)"
+          stable_schema_after="$(stable_production_schema_snapshot)"
+          [[ "${production_before}" == "${production_after}" ]]
+          [[ "${stable_schema_before}" == "${stable_schema_after}" ]]
+
+          upgraded_state="$(docker exec "${container}" mysql \
+            --user=root \
+            --password="${db_password}" \
+            --database=my_bbs \
+            --batch \
+            --raw \
+            --skip-column-names \
+            --execute='SELECT CONCAT(
+              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `invite_code` = "ABC123"),
+              ":",
+              (SELECT COUNT(*) FROM `users` WHERE `username` = "legacy-user" AND `avatar_url` = "https://example.com/legacy-avatar.png" AND `avatar_updated_at` = "2026-02-02 03:04:05.456"),
+              ":",
+              (SELECT COUNT(*) FROM `invitations` WHERE `id` = 501 AND `code` = "ABC123" AND `creator_id` = 102 AND `used_by` = 101 AND `used_at` = "2026-01-02 03:04:05.123"),
+              ":",
+              (SELECT COUNT(*) FROM `users` WHERE `session_version` = 0),
+              ":",
+              (SELECT COUNT(*) FROM `messages`),
+              ":",
+              (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "my_bbs" AND TABLE_TYPE = "BASE TABLE")
+            );')"
+          [[ "${upgraded_state}" == "1:1:1:2:0:6" ]]
 
       - name: Build production binary
         env:

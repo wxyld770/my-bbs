@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -18,10 +19,11 @@ interface AuthContextValue {
   isBootstrapping: boolean
   login: (input: LoginRequest) => Promise<User>
   register: (input: RegisterRequest) => Promise<User | null>
-  logout: () => Promise<void>
+  logout: () => Promise<boolean>
   refreshUser: () => Promise<User | null>
-  clearSession: () => void
-  handleSessionError: (error: unknown) => boolean
+  isCurrentSession: (expectedToken: string) => boolean
+  clearSession: (expectedToken?: string) => boolean
+  handleSessionError: (error: unknown, expectedToken: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -30,19 +32,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => tokenStore.get())
   const [user, setUser] = useState<User | null>(null)
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(token))
+  const tokenRef = useRef(token)
 
-  const clearSession = useCallback(() => {
-    tokenStore.clear()
+  const isCurrentSession = useCallback(
+    (expectedToken: string) => tokenRef.current === expectedToken,
+    [],
+  )
+
+  const clearSession = useCallback((expectedToken?: string) => {
+    if (expectedToken !== undefined && !isCurrentSession(expectedToken)) {
+      return false
+    }
+    tokenStore.clear(expectedToken)
+    tokenRef.current = null
     setToken(null)
     setUser(null)
     setIsBootstrapping(false)
-  }, [])
+    return true
+  }, [isCurrentSession])
 
   const handleSessionError = useCallback(
-    (error: unknown) => {
+    (error: unknown, expectedToken: string) => {
       if (!shouldClearToken(error)) return false
-      clearSession()
-      return true
+      return clearSession(expectedToken)
     },
     [clearSession],
   )
@@ -55,13 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       const data = await api.getMe(token)
+      if (!isCurrentSession(token)) return null
       setUser(data.user)
       return data.user
     } catch (error) {
-      handleSessionError(error)
+      handleSessionError(error, token)
       throw error
     }
-  }, [handleSessionError, token])
+  }, [handleSessionError, isCurrentSession, token])
 
   useEffect(() => {
     if (!token) {
@@ -74,23 +87,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api
       .getMe(token)
       .then((data) => {
-        if (!cancelled) setUser(data.user)
+        if (!cancelled && isCurrentSession(token)) setUser(data.user)
       })
       .catch((error: unknown) => {
-        if (!cancelled && shouldClearToken(error)) clearSession()
+        if (!cancelled && shouldClearToken(error)) clearSession(token)
       })
       .finally(() => {
-        if (!cancelled) setIsBootstrapping(false)
+        if (!cancelled && isCurrentSession(token)) setIsBootstrapping(false)
       })
 
     return () => {
       cancelled = true
     }
-  }, [clearSession, token])
+  }, [clearSession, isCurrentSession, token])
 
   const login = useCallback(async (input: LoginRequest) => {
     const data = await api.login(input)
     tokenStore.set(data.token)
+    tokenRef.current = data.token
     setToken(data.token)
     const profile = await api.getMe(data.token)
     setUser(profile.user)
@@ -114,9 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const currentToken = token
-    if (!currentToken) return
+    if (!currentToken) return false
     await api.logout(currentToken)
-    clearSession()
+    return clearSession(currentToken)
   }, [clearSession, token])
 
   const value = useMemo<AuthContextValue>(
@@ -130,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refreshUser,
+      isCurrentSession,
       clearSession,
       handleSessionError,
     }),
@@ -137,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearSession,
       handleSessionError,
       isBootstrapping,
+      isCurrentSession,
       login,
       logout,
       refreshUser,

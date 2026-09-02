@@ -106,6 +106,21 @@ export interface InvitationData {
   code: string
 }
 
+export interface SiteMessageAuthor {
+  id: number
+  username: string
+  nickname: string
+  avatar_url: string
+}
+
+export interface SiteMessage {
+  id: number
+  user_id: number
+  content: string
+  create_time: ISODateTime
+  user: SiteMessageAuthor | null
+}
+
 export interface LikeToggleData {
   liked: boolean
   like_count: number
@@ -207,6 +222,11 @@ export interface LoginRequest {
   password: string
 }
 
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
 /**
  * The backend overwrites both profile columns on every update. Keeping both
  * properties required here prevents a partial form submission from erasing the
@@ -236,6 +256,10 @@ export interface SetPostVisibilityRequest {
 }
 
 export interface CreateCommentRequest {
+  content: string
+}
+
+export interface CreateMessageRequest {
   content: string
 }
 

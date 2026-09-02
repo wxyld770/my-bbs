@@ -82,6 +82,22 @@ ALTER TABLE `users` ADD UNIQUE INDEX IF NOT EXISTS `idx_users_invite_code` (`inv
 ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatar_url` VARCHAR(2048) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL COMMENT '头像图片链接' AFTER `introduction`;
 ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `avatar_updated_at` DATETIME(3) NULL COMMENT '头像最后修改时间' AFTER `avatar_url`;
 
+-- 密码重置时递增会话版本，使旧 JWT 立即失效
+ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `session_version` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT '会话版本' AFTER `password`;
+
+-- 用户留言表
+CREATE TABLE IF NOT EXISTS `messages` (
+  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `create_time` DATETIME(3) DEFAULT NULL COMMENT '创建时间',
+  `update_time` DATETIME(3) DEFAULT NULL COMMENT '更新时间',
+  `deleted` DATETIME(3) DEFAULT NULL COMMENT '删除时间，空表示未删除',
+  `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT '留言用户ID',
+  `content` TEXT COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '留言内容',
+  PRIMARY KEY (`id`),
+  KEY `idx_messages_user_deleted_created` (`user_id`, `deleted`, `create_time`, `id`),
+  KEY `idx_messages_deleted_created` (`deleted`, `create_time`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 -- end check
 SELECT 'FULL_DDL_OK' AS status;

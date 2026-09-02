@@ -39,6 +39,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	{
 		auth.POST("/logout", m.Handler.Logout)
 		auth.GET("/user/me", m.Handler.GetMe)
+		auth.POST("/user/password", m.Handler.ChangePassword)
 
 		write := auth.Group("/")
 		write.Use(middleware.RequireActiveUser())
@@ -48,6 +49,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 			write.POST("/user/avatar", m.Handler.UpdateAvatar)
 			write.POST("/users/:id/mute", m.Handler.MuteUser)
 			write.POST("/users/:id/unmute", m.Handler.UnmuteUser)
+			write.POST("/users/:id/reset-password", m.Handler.ResetUserPassword)
 		}
 	}
 }
