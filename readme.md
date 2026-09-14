@@ -85,7 +85,7 @@ my-bbs/
 
 ### 互动
 - ✅ 评论（发表 / 分页列表 / 作者删除）
-- ✅ 点赞（切换；返回 `liked` + `like_count`）
+- ✅ 点赞 / 取消点赞（幂等目标状态；返回 `liked` + `like_count`）
 - ✅ 用户留言（提交 / 查看自己的历史；管理员查看全部）
 
 ### 工程能力
@@ -100,6 +100,8 @@ my-bbs/
 - ✅ 优雅启停（SIGINT/SIGTERM）
 - ✅ 请求 `context.Context` 全链路传递与数据库取消
 - ✅ HTTP 超时、数据库连接池与启动连通性检查
+- ✅ 前端 API 统一 20 秒超时，并区分网络失败、超时和主动取消
+- ✅ 登录会话原子提交、退出优先清理本地凭据，关键前端契约纳入 CI 测试
 - ✅ 存活检查 `/livez`、仅本机可访问的 MySQL + Persist Redis 就绪检查 `/readyz`
 - ✅ 登录、注册、读接口和写接口的分级限流（429 + `Retry-After`）
 - ✅ JWT 当前 Token 撤销（Redis 记录保留到 Token 原始过期时间）
@@ -434,7 +436,11 @@ Persist Redis 不可用时认证请求返回 503；旧版本签发的无 JTI Tok
 | GET | `/api/posts/:id/comments` | 否 | 评论列表（公开帖，分页） |
 | POST | `/api/posts/:id/comments/create` | 是 | 发表评论 |
 | POST | `/api/comments/del/:id` | 是 | 删除评论（评论作者） |
-| POST | `/api/posts/:id/like` | 是 | 切换点赞 |
+| PUT | `/api/posts/:id/like` | 是 | 确保当前用户已点赞（幂等） |
+| DELETE | `/api/posts/:id/like` | 是 | 确保当前用户未点赞（幂等） |
+
+点赞接口使用目标状态语义：重复 `PUT` 或重复 `DELETE` 均不会反转当前状态；旧的
+`POST /api/posts/:id/like` 已移除并返回 `405 Method Not Allowed`。
 
 认证 Header：`Authorization: Bearer <token>`
 
@@ -543,7 +549,7 @@ GET /api/search?q=Go&scope=all&pageNo=1&pageSize=10
 { "content": "说得对" }
 ```
 
-点赞切换响应 `data`：
+点赞与取消点赞响应 `data`：
 
 ```json
 { "liked": true, "like_count": 4 }

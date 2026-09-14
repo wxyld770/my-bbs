@@ -32,15 +32,15 @@ func TestInteractionServices_RefreshOrInvalidatePostCountCache(t *testing.T) {
 
 	countCache.SetLikeCounts(ctx, map[uint]int64{post.ID: 99})
 	likeService := service.NewLikeServiceWithCountCache(likeRepo, postRepo, userRepo, countCache)
-	result, err := likeService.Toggle(ctx, post.ID, user.ID)
+	result, err := likeService.Like(ctx, post.ID, user.ID)
 	if err != nil {
-		t.Fatalf("Toggle: %v", err)
+		t.Fatalf("Like: %v", err)
 	}
 	if result.LikeCount != 1 {
-		t.Fatalf("Toggle count=%d, want 1", result.LikeCount)
+		t.Fatalf("Like count=%d, want 1", result.LikeCount)
 	}
-	if got := countCache.GetLikeCounts(ctx, []uint{post.ID})[post.ID]; got != 1 {
-		t.Fatalf("cached like count=%d, want exact post-write count 1", got)
+	if got := countCache.GetLikeCounts(ctx, []uint{post.ID}); len(got) != 0 {
+		t.Fatalf("like count cache after create=%v, want invalidated", got)
 	}
 
 	countCache.SetCommentCounts(ctx, map[uint]int64{post.ID: 99})

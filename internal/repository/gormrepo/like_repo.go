@@ -2,7 +2,6 @@ package gormrepo
 
 import (
 	"context"
-	"errors"
 
 	"my-bbs/internal/model"
 
@@ -19,18 +18,6 @@ func NewLikeRepository(db *gorm.DB) *LikeRepository {
 
 func (r *LikeRepository) Create(ctx context.Context, like *model.PostLike) error {
 	return translateError(r.db.WithContext(ctx).Create(like).Error)
-}
-
-func (r *LikeRepository) FindByUserAndPost(ctx context.Context, userID, postID uint) (*model.PostLike, error) {
-	var like model.PostLike
-	result := r.db.WithContext(ctx).Where("user_id = ? AND post_id = ?", userID, postID).First(&like)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, translateError(result.Error)
-	}
-	return &like, nil
 }
 
 func (r *LikeRepository) DeleteByUserAndPost(ctx context.Context, userID, postID uint) error {

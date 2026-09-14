@@ -74,23 +74,23 @@ func TestCommentService_MapsMutationNotFound(t *testing.T) {
 	}
 }
 
-func TestLikeService_TreatsConcurrentMissingLikeAsUnliked(t *testing.T) {
+func TestLikeService_TreatsMissingLikeAsIdempotentUnlike(t *testing.T) {
 	const (
 		postID = 9
 		userID = 7
 	)
 	svc := service.NewLikeService(
-		&concurrentlyDeletedLikeRepository{like: &model.PostLike{PostID: postID, UserID: userID}},
+		&concurrentlyDeletedLikeRepository{},
 		&publicPostReader{post: &model.Post{BaseModel: model.BaseModel{ID: postID}, Visible: model.VisiblePublic}},
 		&activeUserReader{},
 	)
 
-	result, err := svc.Toggle(context.Background(), postID, userID)
+	result, err := svc.Unlike(context.Background(), postID, userID)
 	if err != nil {
-		t.Fatalf("Toggle() error = %v", err)
+		t.Fatalf("Unlike() error = %v", err)
 	}
 	if result.Liked || result.LikeCount != 0 {
-		t.Fatalf("Toggle() result = %+v, want unliked with zero count", result)
+		t.Fatalf("Unlike() result = %+v, want unliked with zero count", result)
 	}
 }
 
@@ -167,9 +167,7 @@ func (*mutationNotFoundCommentRepository) SoftDelete(context.Context, uint) erro
 	return repository.ErrNotFound
 }
 
-type concurrentlyDeletedLikeRepository struct {
-	like *model.PostLike
-}
+type concurrentlyDeletedLikeRepository struct{}
 
 func (*concurrentlyDeletedLikeRepository) CountByPostID(context.Context, uint) (int64, error) {
 	return 0, nil
@@ -181,9 +179,6 @@ func (*concurrentlyDeletedLikeRepository) ExistsByUserAndPost(context.Context, u
 	return false, nil
 }
 func (*concurrentlyDeletedLikeRepository) Create(context.Context, *model.PostLike) error { return nil }
-func (r *concurrentlyDeletedLikeRepository) FindByUserAndPost(context.Context, uint, uint) (*model.PostLike, error) {
-	return r.like, nil
-}
 func (*concurrentlyDeletedLikeRepository) DeleteByUserAndPost(context.Context, uint, uint) error {
 	return repository.ErrNotFound
 }

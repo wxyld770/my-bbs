@@ -2,16 +2,16 @@ package httpresponse
 
 import "my-bbs/internal/service"
 
-type LikeToggleResponse struct {
+type LikeResponse struct {
 	Liked     bool  `json:"liked"`
 	LikeCount int64 `json:"like_count"`
 }
 
-func NewLikeToggleResponse(result *service.LikeToggleResult) LikeToggleResponse {
+func NewLikeResponse(result *service.LikeResult) LikeResponse {
 	if result == nil {
-		return LikeToggleResponse{}
+		return LikeResponse{}
 	}
-	return LikeToggleResponse{
+	return LikeResponse{
 		Liked:     result.Liked,
 		LikeCount: result.LikeCount,
 	}

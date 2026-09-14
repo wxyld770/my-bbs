@@ -9,7 +9,7 @@ import type {
   CreatePostRequest,
   HotPostData,
   InvitationData,
-  LikeToggleData,
+  LikeData,
   LoginData,
   LoginRequest,
   PageData,
@@ -32,6 +32,14 @@ import type {
 export const API_BASE_PATH = '/api'
 export const TOKEN_STORAGE_KEY = 'my-bbs.token'
 export const REQUEST_ID_HEADER = 'X-Request-ID'
+export const DEFAULT_API_TIMEOUT_MS = 20_000
+
+const API_ERROR_CODE = {
+  NETWORK: -1,
+  RESPONSE: -2,
+  CANCELLED: -3,
+  TIMEOUT: -4,
+} as const
 
 const SESSION_AUTH_CODES = new Set([40100, 40101, 40102, 40103, 40104])
 
@@ -51,6 +59,8 @@ export interface ApiRequestOptions
   token?: string | null
   query?: Record<string, QueryValue>
   headers?: HeadersInit
+  /** Override the shared request timeout. Primarily useful for long-running endpoints. */
+  timeoutMs?: number
   /** Reject a code=0 response when its data field is absent. */
   requireData?: boolean
 }
@@ -77,7 +87,15 @@ export class ApiError extends Error {
   }
 
   get isNetworkError(): boolean {
-    return this.status === 0
+    return this.status === 0 && this.code === API_ERROR_CODE.NETWORK
+  }
+
+  get isTimeoutError(): boolean {
+    return this.status === 0 && this.code === API_ERROR_CODE.TIMEOUT
+  }
+
+  get isCancelledError(): boolean {
+    return this.status === 0 && this.code === API_ERROR_CODE.CANCELLED
   }
 
   get isSessionAuthError(): boolean {
@@ -157,6 +175,11 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResponse<T>> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_API_TIMEOUT_MS
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    throw new TypeError('请求超时时间必须是正数')
+  }
+
   const requestId = createRequestId()
   const url = buildApiUrl(path, options.query)
   const headers = new Headers(options.headers)
@@ -174,51 +197,78 @@ export async function apiRequest<T>(
     body = JSON.stringify(options.body)
   }
 
-  let response: Response
+  const requestAbort = createRequestAbort(options.signal, timeoutMs)
   try {
-    response = await fetch(url, {
-      ...options,
+    const {
+      body: _body,
+      headers: _headers,
+      method: _method,
+      query: _query,
+      requireData: _requireData,
+      signal: _signal,
+      timeoutMs: _timeoutMs,
+      token: _token,
+      ...requestInit
+    } = options
+    const response = await fetch(url, {
+      ...requestInit,
       method: options.method ?? 'GET',
       headers,
       body,
       credentials: options.credentials ?? 'same-origin',
-      query: undefined,
-      token: undefined,
-      requireData: undefined,
-    } as RequestInit)
+      signal: requestAbort.signal,
+    })
+
+    const responseRequestId = response.headers.get(REQUEST_ID_HEADER) || requestId
+    const envelope = await readEnvelope<T>(response, responseRequestId)
+
+    if (!response.ok || envelope.code !== 0) {
+      throw new ApiError(envelope.message || defaultHttpMessage(response.status), {
+        status: response.status,
+        code: envelope.code,
+        requestId: responseRequestId,
+      })
+    }
+
+    if (options.requireData && !Object.hasOwn(envelope, 'data')) {
+      throw new ApiError('服务器响应缺少 data 字段', {
+        status: response.status,
+        code: API_ERROR_CODE.RESPONSE,
+        requestId: responseRequestId,
+      })
+    }
+
+    return {
+      data: envelope.data as T,
+      message: envelope.message,
+      requestId: responseRequestId,
+    }
   } catch (cause) {
-    const aborted = cause instanceof DOMException && cause.name === 'AbortError'
-    throw new ApiError(aborted ? '请求已取消' : '网络连接失败，请稍后重试', {
+    if (requestAbort.reason === 'timeout') {
+      throw new ApiError('请求超时，请稍后重试', {
+        status: 0,
+        code: API_ERROR_CODE.TIMEOUT,
+        requestId,
+        cause,
+      })
+    }
+    if (requestAbort.reason === 'caller') {
+      throw new ApiError('请求已取消', {
+        status: 0,
+        code: API_ERROR_CODE.CANCELLED,
+        requestId,
+        cause,
+      })
+    }
+    if (cause instanceof ApiError) throw cause
+    throw new ApiError('网络连接失败，请稍后重试', {
       status: 0,
-      code: aborted ? -3 : -1,
+      code: API_ERROR_CODE.NETWORK,
       requestId,
       cause,
     })
-  }
-
-  const responseRequestId = response.headers.get(REQUEST_ID_HEADER) || requestId
-  const envelope = await readEnvelope<T>(response, responseRequestId)
-
-  if (!response.ok || envelope.code !== 0) {
-    throw new ApiError(envelope.message || defaultHttpMessage(response.status), {
-      status: response.status,
-      code: envelope.code,
-      requestId: responseRequestId,
-    })
-  }
-
-  if (options.requireData && !Object.hasOwn(envelope, 'data')) {
-    throw new ApiError('服务器响应缺少 data 字段', {
-      status: response.status,
-      code: -2,
-      requestId: responseRequestId,
-    })
-  }
-
-  return {
-    data: envelope.data as T,
-    message: envelope.message,
-    requestId: responseRequestId,
+  } finally {
+    requestAbort.cleanup()
   }
 }
 
@@ -491,12 +541,61 @@ export const api = {
     })
   },
 
-  toggleLike(token: string, postId: number): Promise<LikeToggleData> {
+  likePost(token: string, postId: number): Promise<LikeData> {
     return requestData(`/posts/${encodeId(postId)}/like`, {
-      method: 'POST',
+      method: 'PUT',
       token,
     })
   },
+
+  unlikePost(token: string, postId: number): Promise<LikeData> {
+    return requestData(`/posts/${encodeId(postId)}/like`, {
+      method: 'DELETE',
+      token,
+    })
+  },
+}
+
+type RequestAbortReason = 'caller' | 'timeout'
+
+interface RequestAbort {
+  signal: AbortSignal
+  readonly reason: RequestAbortReason | null
+  cleanup: () => void
+}
+
+function createRequestAbort(
+  callerSignal: AbortSignal | null | undefined,
+  timeoutMs: number,
+): RequestAbort {
+  const controller = new AbortController()
+  let reason: RequestAbortReason | null = null
+
+  const abort = (nextReason: RequestAbortReason) => {
+    if (controller.signal.aborted) return
+    reason = nextReason
+    controller.abort()
+  }
+  const handleCallerAbort = () => abort('caller')
+
+  if (callerSignal?.aborted) {
+    abort('caller')
+  } else {
+    callerSignal?.addEventListener('abort', handleCallerAbort, { once: true })
+  }
+
+  const timeoutId = globalThis.setTimeout(() => abort('timeout'), timeoutMs)
+
+  return {
+    signal: controller.signal,
+    get reason() {
+      return reason
+    },
+    cleanup() {
+      globalThis.clearTimeout(timeoutId)
+      callerSignal?.removeEventListener('abort', handleCallerAbort)
+    },
+  }
 }
 
 function buildApiUrl(

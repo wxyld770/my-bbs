@@ -385,7 +385,7 @@ func TestAPI_CorePath_RegisterLoginPostLikeComment(t *testing.T) {
 	}
 	postID := uint(postObj["id"].(float64))
 
-	w = doJSON(t, r, http.MethodPost, fmt.Sprintf("/api/posts/%d/like", postID), token, nil)
+	w = doJSON(t, r, http.MethodPut, fmt.Sprintf("/api/posts/%d/like", postID), token, nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("like status=%d body=%s", w.Code, w.Body.String())
 	}
@@ -558,7 +558,6 @@ func TestAPI_MutedUserCanLoginAndReadButAllBusinessWritesAreBlocked(t *testing.T
 		{fmt.Sprintf("/api/posts/unpin/%d", postID), nil},
 		{fmt.Sprintf("/api/posts/visible/%d", postID), map[string]any{"visible": model.VisiblePrivate}},
 		{fmt.Sprintf("/api/posts/%d/comments/create", postID), map[string]string{"content": "blocked comment"}},
-		{fmt.Sprintf("/api/posts/%d/like", postID), nil},
 		{"/api/invitations", nil},
 		{"/api/user/profile", map[string]string{"nickname": "blocked", "introduction": "blocked"}},
 		{"/api/user/avatar", map[string]string{"avatar_url": "https://example.com/blocked.png"}},
@@ -574,6 +573,17 @@ func TestAPI_MutedUserCanLoginAndReadButAllBusinessWritesAreBlocked(t *testing.T
 		resp := decodeResp(t, response)
 		if int(resp["code"].(float64)) != bizerr.ErrUserMuted.Code {
 			t.Fatalf("muted write %s code=%v, want=%d", write.path, resp["code"], bizerr.ErrUserMuted.Code)
+		}
+	}
+	for _, method := range []string{http.MethodPut, http.MethodDelete} {
+		path := fmt.Sprintf("/api/posts/%d/like", postID)
+		response := doJSON(t, r, method, path, mutedToken, nil)
+		if response.Code != bizerr.ErrUserMuted.HTTPStatus {
+			t.Fatalf("muted write %s %s status=%d body=%s", method, path, response.Code, response.Body.String())
+		}
+		resp := decodeResp(t, response)
+		if int(resp["code"].(float64)) != bizerr.ErrUserMuted.Code {
+			t.Fatalf("muted write %s %s code=%v, want=%d", method, path, resp["code"], bizerr.ErrUserMuted.Code)
 		}
 	}
 

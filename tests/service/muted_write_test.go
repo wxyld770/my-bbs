@@ -59,8 +59,8 @@ func TestMutedActorCannotWriteThroughServices(t *testing.T) {
 		{name: "set visibility", call: func() error { return postService.SetPostVisible(ctx, post.ID, muted.ID, model.VisiblePrivate) }},
 		{name: "create comment", call: func() error { return commentService.CreateComment(ctx, post.ID, muted.ID, "blocked") }},
 		{name: "delete comment", call: func() error { return commentService.DeleteComment(ctx, comment.ID, muted.ID) }},
-		{name: "toggle like", call: func() error {
-			_, err := likeService.Toggle(ctx, post.ID, muted.ID)
+		{name: "like post", call: func() error {
+			_, err := likeService.Like(ctx, post.ID, muted.ID)
 			return err
 		}},
 		{name: "update profile", call: func() error { return userService.UpdateProfile(ctx, muted.ID, "blocked", "blocked") }},

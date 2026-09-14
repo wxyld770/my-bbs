@@ -39,6 +39,7 @@ func (m *Module) Register(r *gin.RouterGroup) {
 	auth.Use(middleware.Auth(m.userRepo, m.redis))
 	auth.Use(middleware.RequireActiveUser())
 	{
-		auth.POST("/posts/:id/like", m.Handler.ToggleLike)
+		auth.PUT("/posts/:id/like", m.Handler.Like)
+		auth.DELETE("/posts/:id/like", m.Handler.Unlike)
 	}
 }

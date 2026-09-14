@@ -121,7 +121,7 @@ export interface SiteMessage {
   user: SiteMessageAuthor | null
 }
 
-export interface LikeToggleData {
+export interface LikeData {
   liked: boolean
   like_count: number
 }
@@ -266,5 +266,5 @@ export interface CreateMessageRequest {
 // Response-oriented aliases kept explicit at the transport boundary.
 export type LoginResponse = LoginData
 export type UserResponse = UserProfileData
-export type LikeToggleResponse = LikeToggleData
+export type LikeResponse = LikeData
 export type PaginatedResponse<T> = PageData<T>

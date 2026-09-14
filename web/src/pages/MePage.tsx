@@ -249,18 +249,18 @@ export function MePage() {
 
   const signOut = async () => {
     if (!token || signingOut) return
-    const submittedToken = token
     setSigningOut(true)
     try {
-      const sessionCleared = await logout()
-      if (!sessionCleared) return
-      notify('success', '已经退出登录')
-    } catch (logoutError) {
-      if (!isCurrentSession(submittedToken)) return
-      if (handleSessionError(logoutError, submittedToken)) {
-        notify('success', '登录状态已失效，本地会话已清除')
+      const result = await logout()
+      if (!result.localSessionCleared) return
+      if (result.serverRevocationConfirmed) {
+        notify('success', '已经退出登录')
       } else {
-        notify('error', '退出失败', getErrorMessage(logoutError))
+        notify(
+          'error',
+          '已退出本地登录',
+          `未能确认服务器会话已注销，令牌最迟将在过期后失效。${result.error ? ` ${getErrorMessage(result.error)}` : ''}`,
+        )
       }
     } finally {
       setSigningOut(false)

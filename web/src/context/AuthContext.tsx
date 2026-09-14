@@ -19,20 +19,34 @@ interface AuthContextValue {
   isBootstrapping: boolean
   login: (input: LoginRequest) => Promise<User>
   register: (input: RegisterRequest) => Promise<User | null>
-  logout: () => Promise<boolean>
+  logout: () => Promise<LogoutResult>
   refreshUser: () => Promise<User | null>
   isCurrentSession: (expectedToken: string) => boolean
   clearSession: (expectedToken?: string) => boolean
   handleSessionError: (error: unknown, expectedToken: string) => boolean
 }
 
+export interface LogoutResult {
+  localSessionCleared: boolean
+  serverRevocationConfirmed: boolean
+  error?: unknown
+}
+
+interface AuthSession {
+  token: string | null
+  user: User | null
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => tokenStore.get())
-  const [user, setUser] = useState<User | null>(null)
-  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(token))
-  const tokenRef = useRef(token)
+  const [session, setSession] = useState<AuthSession>(() => ({
+    token: tokenStore.get(),
+    user: null,
+  }))
+  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(session.token))
+  const tokenRef = useRef(session.token)
+  const { token, user } = session
 
   const isCurrentSession = useCallback(
     (expectedToken: string) => tokenRef.current === expectedToken,
@@ -45,8 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     tokenStore.clear(expectedToken)
     tokenRef.current = null
-    setToken(null)
-    setUser(null)
+    setSession({ token: null, user: null })
     setIsBootstrapping(false)
     return true
   }, [isCurrentSession])
@@ -61,14 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     if (!token) {
-      setUser(null)
+      setSession({ token: null, user: null })
       return null
     }
 
     try {
       const data = await api.getMe(token)
       if (!isCurrentSession(token)) return null
-      setUser(data.user)
+      setSession((current) => current.token === token
+        ? { token, user: data.user }
+        : current)
       return data.user
     } catch (error) {
       handleSessionError(error, token)
@@ -81,13 +96,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsBootstrapping(false)
       return
     }
+    if (user) {
+      setIsBootstrapping(false)
+      return
+    }
 
     let cancelled = false
     setIsBootstrapping(true)
     api
       .getMe(token)
       .then((data) => {
-        if (!cancelled && isCurrentSession(token)) setUser(data.user)
+        if (cancelled || !isCurrentSession(token)) return
+        if (!data.user) {
+          clearSession(token)
+          return
+        }
+        setSession({ token, user: data.user })
       })
       .catch((error: unknown) => {
         if (!cancelled && shouldClearToken(error)) clearSession(token)
@@ -99,16 +123,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [clearSession, isCurrentSession, token])
+  }, [clearSession, isCurrentSession, token, user])
 
   const login = useCallback(async (input: LoginRequest) => {
     const data = await api.login(input)
+    const profile = await api.getMe(data.token)
+    if (!profile.user) throw new Error('登录成功，但未能读取用户资料')
     tokenStore.set(data.token)
     tokenRef.current = data.token
-    setToken(data.token)
-    const profile = await api.getMe(data.token)
-    setUser(profile.user)
-    if (!profile.user) throw new Error('登录成功，但未能读取用户资料')
+    setSession({ token: data.token, user: profile.user })
+    setIsBootstrapping(false)
     return profile.user
   }, [])
 
@@ -128,9 +152,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const currentToken = token
-    if (!currentToken) return false
-    await api.logout(currentToken)
-    return clearSession(currentToken)
+    if (!currentToken) {
+      return { localSessionCleared: false, serverRevocationConfirmed: false }
+    }
+
+    const localSessionCleared = clearSession(currentToken)
+    let revokeError: unknown
+    try {
+      await api.logout(currentToken)
+    } catch (error) {
+      revokeError = error
+    }
+    return revokeError === undefined
+      ? { localSessionCleared, serverRevocationConfirmed: true }
+      : { localSessionCleared, serverRevocationConfirmed: false, error: revokeError }
   }, [clearSession, token])
 
   const value = useMemo<AuthContextValue>(

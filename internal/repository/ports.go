@@ -118,6 +118,5 @@ type LikeReader interface {
 type LikeRepository interface {
 	LikeReader
 	Create(ctx context.Context, like *model.PostLike) error
-	FindByUserAndPost(ctx context.Context, userID, postID uint) (*model.PostLike, error)
 	DeleteByUserAndPost(ctx context.Context, userID, postID uint) error
 }

@@ -10,8 +10,8 @@ import (
 	"my-bbs/pkg/bizerr"
 )
 
-// LikeToggleResult 点赞切换结果
-type LikeToggleResult struct {
+// LikeResult 表示将帖子点赞设置为目标状态后的结果。
+type LikeResult struct {
 	Liked     bool
 	LikeCount int64
 }
@@ -41,8 +41,8 @@ func NewLikeServiceWithCountCache(
 	}
 }
 
-// Toggle 切换点赞：已赞则取消，未赞则点赞
-func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeToggleResult, error) {
+// Like 确保用户已点赞帖子。重复调用与并发唯一键冲突均视为成功。
+func (s *LikeService) Like(ctx context.Context, postID, userID uint) (*LikeResult, error) {
 	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
 		return nil, err
 	}
@@ -50,42 +50,39 @@ func (s *LikeService) Toggle(ctx context.Context, postID, userID uint) (*LikeTog
 		return nil, err
 	}
 
-	existing, err := s.likeRepo.FindByUserAndPost(ctx, userID, postID)
-	if err != nil {
+	like := &model.PostLike{PostID: postID, UserID: userID}
+	if err := s.likeRepo.Create(ctx, like); err != nil && !errors.Is(err, repository.ErrAlreadyExists) {
+		return nil, err
+	}
+	return s.result(ctx, postID, true)
+}
+
+// Unlike 确保用户未点赞帖子。重复调用与并发删除均视为成功。
+func (s *LikeService) Unlike(ctx context.Context, postID, userID uint) (*LikeResult, error) {
+	if _, err := requireActiveActor(ctx, s.userRepo, userID); err != nil {
+		return nil, err
+	}
+	if err := s.requirePublicPost(ctx, postID); err != nil {
 		return nil, err
 	}
 
-	liked := false
-	if existing != nil {
-		if err := s.likeRepo.DeleteByUserAndPost(ctx, userID, postID); err != nil {
-			// 记录可能在查询后被并发取消；此时目标状态已达成。
-			if !errors.Is(err, repository.ErrNotFound) {
-				return nil, err
-			}
-		}
-		liked = false
-	} else {
-		like := &model.PostLike{PostID: postID, UserID: userID}
-		if err := s.likeRepo.Create(ctx, like); err != nil {
-			// 并发下唯一索引冲突：视为已点赞
-			if errors.Is(err, repository.ErrAlreadyExists) {
-				liked = true
-			} else {
-				return nil, err
-			}
-		} else {
-			liked = true
-		}
+	if err := s.likeRepo.DeleteByUserAndPost(ctx, userID, postID); err != nil && !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
 	}
+	return s.result(ctx, postID, false)
+}
 
+func (s *LikeService) result(ctx context.Context, postID uint, liked bool) (*LikeResult, error) {
+	if s.countCache != nil {
+		// DB 写入已完成后先失效缓存；即使随后的统计失败，也不能继续暴露旧值。
+		// 写请求之间可能交错，因此不在这里回写可能已经过时的精确计数。
+		s.countCache.DeleteLikeCounts(ctx, postID)
+	}
 	count, err := s.likeRepo.CountByPostID(ctx, postID)
 	if err != nil {
 		return nil, err
 	}
-	if s.countCache != nil {
-		s.countCache.SetLikeCounts(ctx, map[uint]int64{postID: count})
-	}
-	return &LikeToggleResult{Liked: liked, LikeCount: count}, nil
+	return &LikeResult{Liked: liked, LikeCount: count}, nil
 }
 
 func (s *LikeService) requirePublicPost(ctx context.Context, postID uint) error {

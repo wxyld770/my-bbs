@@ -217,13 +217,19 @@ export function PostPage() {
       openAuth('login')
       return
     }
-    if (!canWrite) return
+    if (!canWrite || !detail || detail.post.id !== postId) return
     const submittedToken = token
+    const submittedPostId = postId
+    const shouldLike = !detail.is_liked
     setLiking(true)
     try {
-      const result = await api.toggleLike(submittedToken, postId)
+      const result = shouldLike
+        ? await api.likePost(submittedToken, submittedPostId)
+        : await api.unlikePost(submittedToken, submittedPostId)
       if (!isCurrentSession(submittedToken)) return
-      setDetail((current) => current ? { ...current, is_liked: result.liked, like_count: result.like_count } : current)
+      setDetail((current) => current?.post.id === submittedPostId
+        ? { ...current, is_liked: result.liked, like_count: result.like_count }
+        : current)
     } catch (likeError) {
       if (!isCurrentSession(submittedToken)) return
       if (handleSessionError(likeError, submittedToken)) {

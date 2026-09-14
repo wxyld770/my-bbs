@@ -20,7 +20,15 @@ func NewLikeHandler(likeService *service.LikeService) *LikeHandler {
 	return &LikeHandler{likeService: likeService}
 }
 
-func (h *LikeHandler) ToggleLike(c *gin.Context) {
+func (h *LikeHandler) Like(c *gin.Context) {
+	h.setLikeState(c, true)
+}
+
+func (h *LikeHandler) Unlike(c *gin.Context) {
+	h.setLikeState(c, false)
+}
+
+func (h *LikeHandler) setLikeState(c *gin.Context, liked bool) {
 	postID, err := strconv.Atoi(c.Param("id"))
 	if err != nil || postID <= 0 {
 		response.ReportError(c, bizerr.ErrInvalidPostID)
@@ -33,11 +41,16 @@ func (h *LikeHandler) ToggleLike(c *gin.Context) {
 		return
 	}
 
-	result, err := h.likeService.Toggle(c.Request.Context(), uint(postID), userID)
+	var result *service.LikeResult
+	if liked {
+		result, err = h.likeService.Like(c.Request.Context(), uint(postID), userID)
+	} else {
+		result, err = h.likeService.Unlike(c.Request.Context(), uint(postID), userID)
+	}
 	if err != nil {
 		response.ReportError(c, err)
 		return
 	}
 
-	response.OK(c, httpresp.NewLikeToggleResponse(result))
+	response.OK(c, httpresp.NewLikeResponse(result))
 }

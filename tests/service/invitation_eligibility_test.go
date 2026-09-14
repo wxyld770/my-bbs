@@ -60,22 +60,54 @@ func TestUserService_GenerateInvitationRequiresAgeOrPublishedPost(t *testing.T) 
 	}
 }
 
-func TestUserService_GenerateInvitationAllowsSevenDayOldUser(t *testing.T) {
+func TestUserService_GenerateInvitationSevenDayBoundary(t *testing.T) {
 	ctx := context.Background()
-	db := testutil.NewTestDB(t)
-	userRepo := gormrepo.NewUserRepository(db)
-	invitationRepo := gormrepo.NewInvitationRepository(db)
-	svc := service.NewUserServiceWithInvitations(userRepo, invitationRepo)
-
-	user := seedServiceTestUser(t, db, "seven-day-inviter", "password1", "Seven Days")
-	createdAt := time.Now().Add(-service.InvitationNewUserPeriod).Truncate(time.Millisecond)
-	if err := db.Model(&model.User{}).Where("id = ?", user.ID).
-		UpdateColumn("create_time", createdAt).Error; err != nil {
-		t.Fatalf("set seven-day create time: %v", err)
+	startedAt := time.Now()
+	tests := []struct {
+		name      string
+		createdAt time.Time
+		wantErr   error
+	}{
+		{
+			name:      "younger than seven days requires a published post",
+			createdAt: startedAt.Add(-service.InvitationNewUserPeriod + time.Hour),
+			wantErr:   bizerr.ErrInvitationGenerationRestricted,
+		},
+		{
+			name:      "seven day threshold is eligible",
+			createdAt: startedAt.Add(-service.InvitationNewUserPeriod),
+		},
+		{
+			name:      "older than seven days is eligible",
+			createdAt: startedAt.Add(-service.InvitationNewUserPeriod - time.Hour),
+		},
+		{
+			name: "legacy zero timestamp is eligible",
+		},
 	}
 
-	if code, err := svc.GenerateInvitation(ctx, user.ID); err != nil || code == "" {
-		t.Fatalf("seven-day user code=%q error=%v", code, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			userRepo := newMemoryUserRepository()
+			invitationRepo := newMemoryInvitationRepository(userRepo)
+			user := &model.User{
+				BaseModel: model.BaseModel{CreateTime: tt.createdAt},
+				Username:  "boundary-inviter",
+				Status:    model.UserStatusNormal,
+			}
+			if err := userRepo.CreateUser(ctx, user); err != nil {
+				t.Fatalf("create user: %v", err)
+			}
+
+			svc := service.NewUserServiceWithInvitations(userRepo, invitationRepo)
+			code, err := svc.GenerateInvitation(ctx, user.ID)
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("GenerateInvitation() error=%v, want %v", err, tt.wantErr)
+			}
+			if tt.wantErr == nil && code == "" {
+				t.Fatal("GenerateInvitation() returned an empty code")
+			}
+		})
 	}
 }
 
