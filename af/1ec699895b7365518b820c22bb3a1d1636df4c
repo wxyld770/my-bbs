@@ -1,0 +1,84 @@
+internal/service/like_service.go
+  s_5cfcaa40ecf649::t_9436f39073d6db 77-80
+tests/service/like_reliability_test.go
+  s_5cfcaa40ecf649::t_5add0fb1fba2ca 1,4-5,7-11,14-20,22-23,25-38,43-60,65-88
+web/tests/setup.ts
+  s_5cfcaa40ecf649::t_666520481507c0 1-9
+web/src/types.ts
+  s_5cfcaa40ecf649::t_30b994cba7d7c7 124,269
+web/README.md
+  s_5cfcaa40ecf649::t_ff5cef23adb536 14
+  s_5cfcaa40ecf649::t_d9fa72de3e7132 17
+  s_5cfcaa40ecf649::t_89252d943a5019 35-37
+  s_5cfcaa40ecf649::t_02c9f9aa11bff9 32-34
+internal/handler/like_handler.go
+  s_5cfcaa40ecf649::t_dc156e79c4bdb6 55
+internal/handler/httpresponse/like.go
+  s_5cfcaa40ecf649::t_dc156e79c4bdb6 5,10,12,14
+web/src/pages/PostPage.tsx
+  s_5cfcaa40ecf649::t_53e9f3b02fc488 220,222-223,226-228,230-232
+tests/service/muted_write_test.go
+  s_5cfcaa40ecf649::t_fba89f9ff9af64 62-63
+tests/api/like_idempotency_test.go
+  s_5cfcaa40ecf649::t_19914fe990f29c 6,54,56-64
+  s_5cfcaa40ecf649::t_dc156e79c4bdb6 1-5,7-53,55,65-66
+web/src/lib/api.ts
+  s_5cfcaa40ecf649::t_30b994cba7d7c7 12,544,551
+  s_5cfcaa40ecf649::t_839283b37d7db1 35-42,62-63,93-98,178-182,200,202-214,219,222-223,225-239,241-243,245-268,270-271,546,550,552-598
+  s_5cfcaa40ecf649::t_86e78c56c16dc4 90
+web/package.json
+  s_5cfcaa40ecf649::t_808e2690050eaa 10
+  s_5cfcaa40ecf649::t_666520481507c0 11,27
+  s_5cfcaa40ecf649::t_277b3859466377 20-21,25,28
+web/vitest.config.ts
+  s_5cfcaa40ecf649::t_666520481507c0 1-12
+tests/service/invitation_eligibility_test.go
+  s_5cfcaa40ecf649::t_42556801943791 63,65-86,89-110
+tests/service/repository_not_found_test.go
+  s_5cfcaa40ecf649::t_fba89f9ff9af64 77,83,88,90,93,170
+tests/service/post_count_invalidation_test.go
+  s_5cfcaa40ecf649::t_fba89f9ff9af64 35,37,40
+  s_5cfcaa40ecf649::t_a35e4a49f6c726 42-43
+tests/api/api_test.go
+  s_5cfcaa40ecf649::t_fba89f9ff9af64 388
+  s_5cfcaa40ecf649::t_62c789f9c0b3bc 578-586
+web/tests/api.test.ts
+  s_5cfcaa40ecf649::t_666520481507c0 1-38,40-58,60-65,79-93
+  s_5cfcaa40ecf649::t_86e78c56c16dc4 39,59,66-78
+web/src/pages/MePage.tsx
+  s_5cfcaa40ecf649::t_bca15a14f6e8f2 254-255,257,259-261,263
+  s_5cfcaa40ecf649::t_86e78c56c16dc4 256,262
+readme.md
+  s_5cfcaa40ecf649::t_72b0f92e66ec9f 103-104
+  s_5cfcaa40ecf649::t_252e7b21d2f31a 88,439-440,552
+  s_5cfcaa40ecf649::t_02c9f9aa11bff9 442-443
+web/src/context/AuthContext.tsx
+  s_5cfcaa40ecf649::t_86e78c56c16dc4 31,156,167-168
+  s_5cfcaa40ecf649::t_80f7c816b69125 22,29-30,32-39,43-49,62,77,84-86,99-102,109-114,126,132-135,155,157-158,160-166
+  s_5cfcaa40ecf649::t_9953b0957cea2f 159
+web/tests/auth-context.test.tsx
+  s_5cfcaa40ecf649::t_6cae0c8923d036 49-53,55-62,65-66
+  s_5cfcaa40ecf649::t_9953b0957cea2f 98-101
+  s_5cfcaa40ecf649::t_86e78c56c16dc4 111
+  s_5cfcaa40ecf649::t_666520481507c0 1-48,54,63-64,67-97,102-110,112-119
+.github/workflows/ci.yml
+  s_5cfcaa40ecf649::t_d9fa72de3e7132 583-585
+web/tsconfig.test.json
+  s_5cfcaa40ecf649::t_808e2690050eaa 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "af1ec699895b7365518b820c22bb3a1d1636df4c",
+  "prompts": {},
+  "sessions": {
+    "s_5cfcaa40ecf649": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a00a5e-f365-7cd0-ad4e-62325565e55c",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "wxyld <wxyld770@gmail.com>"
+    }
+  }
+}
